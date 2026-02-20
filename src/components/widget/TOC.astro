@@ -1,0 +1,417 @@
+---
+import type { MarkdownHeading } from "astro";
+
+interface Props {
+  class?: string;
+  style?: string;
+  headings?: MarkdownHeading[];
+}
+
+const { style } = Astro.props;
+const className = Astro.props.class;
+---
+
+<table-of-contents class:list={[className, "group"]} id="toc" style={style}>
+  <!-- TOC 内容由客户端脚本运行时生成 -->
+</table-of-contents>
+
+<script>
+  import { scrollElementBelowTocBaseline } from "@/utils/hash-scroll";
+  import { collectMarkdownHeadings } from "@/utils/markdown-toc";
+  import { getTocBaselineOffset } from "@/utils/toc-offset";
+
+  class TableOfContents extends HTMLElement {
+    tocEl: HTMLElement | null = null;
+    visibleClass = "visible";
+    observer: IntersectionObserver;
+    anchorNavTarget: HTMLElement | null = null;
+    headingIdxMap = new Map<string, number>();
+    headings: HTMLElement[] = [];
+    sections: HTMLElement[] = [];
+    tocEntries: HTMLAnchorElement[] = [];
+    active: boolean[] = [];
+    activeIndicator: HTMLElement | null = null;
+    initTimeout: number | null = null;
+
+    constructor() {
+      super();
+      this.observer = this.createObserver();
+    }
+
+    private createObserver = (): IntersectionObserver => {
+      const baselineOffset = getTocBaselineOffset();
+      return new IntersectionObserver(this.markVisibleSection, {
+        threshold: 0,
+        rootMargin: `-${baselineOffset}px 0px 0px 0px`,
+      });
+    };
+
+    private clearInitTimeout = (): void => {
+      if (this.initTimeout !== null) {
+        window.clearTimeout(this.initTimeout);
+        this.initTimeout = null;
+      }
+    };
+
+    private cleanupObservers = (): void => {
+      this.sections.forEach((section) => this.observer.unobserve(section));
+      this.observer.disconnect();
+    };
+
+    private resetState = (): void => {
+      this.cleanupObservers();
+      this.anchorNavTarget = null;
+      this.headingIdxMap.clear();
+      this.headings = [];
+      this.sections = [];
+      this.tocEntries = [];
+      this.active = [];
+      this.activeIndicator = null;
+    };
+
+    private scheduleInit = (): void => {
+      this.clearInitTimeout();
+      this.initTimeout = window.setTimeout(() => {
+        this.init();
+      }, 160);
+    };
+
+    markVisibleSection = (entries: IntersectionObserverEntry[]): void => {
+      entries.forEach((entry) => {
+        const id = entry.target.firstElementChild?.getAttribute("id");
+        const idx = id ? this.headingIdxMap.get(id) : undefined;
+        if (idx !== undefined) {
+          this.active[idx] = entry.isIntersecting;
+        }
+
+        if (
+          entry.isIntersecting &&
+          this.anchorNavTarget === entry.target.firstElementChild
+        ) {
+          this.anchorNavTarget = null;
+        }
+      });
+
+      if (!this.active.includes(true)) {
+        this.fallback();
+      }
+      this.update();
+    };
+
+    toggleActiveHeading = (): void => {
+      let i = this.active.length - 1;
+      let min = this.active.length - 1;
+      let max = -1;
+
+      while (i >= 0 && !this.active[i]) {
+        this.tocEntries[i]?.classList.remove(this.visibleClass);
+        i -= 1;
+      }
+      while (i >= 0 && this.active[i]) {
+        this.tocEntries[i]?.classList.add(this.visibleClass);
+        min = Math.min(min, i);
+        max = Math.max(max, i);
+        i -= 1;
+      }
+      while (i >= 0) {
+        this.tocEntries[i]?.classList.remove(this.visibleClass);
+        i -= 1;
+      }
+
+      if (min > max) {
+        this.activeIndicator?.setAttribute("style", "opacity: 0");
+        return;
+      }
+
+      const parentOffset = this.tocEl?.getBoundingClientRect().top || 0;
+      const scrollOffset = this.tocEl?.scrollTop || 0;
+      const minEntry = this.tocEntries[min];
+      const maxEntry = this.tocEntries[max];
+      if (!minEntry || !maxEntry) {
+        return;
+      }
+
+      const top =
+        minEntry.getBoundingClientRect().top - parentOffset + scrollOffset;
+      const bottom =
+        maxEntry.getBoundingClientRect().bottom - parentOffset + scrollOffset;
+      this.activeIndicator?.setAttribute(
+        "style",
+        `top: ${top}px; height: ${bottom - top}px`,
+      );
+    };
+
+    scrollToActiveHeading = (): void => {
+      if (this.anchorNavTarget || !this.tocEl) {
+        return;
+      }
+      const activeHeading = this.querySelectorAll<HTMLDivElement>(
+        `.${this.visibleClass}`,
+      );
+      if (activeHeading.length === 0) {
+        return;
+      }
+
+      const topmost = activeHeading[0];
+      const bottommost = activeHeading[activeHeading.length - 1];
+      const tocHeight = this.tocEl.clientHeight;
+      const compactRange =
+        bottommost.getBoundingClientRect().bottom -
+          topmost.getBoundingClientRect().top <
+        0.9 * tocHeight;
+
+      const top = compactRange
+        ? topmost.offsetTop - 32
+        : bottommost.offsetTop - tocHeight * 0.8;
+      this.tocEl.scrollTo({
+        top,
+        left: 0,
+        behavior: "smooth",
+      });
+    };
+
+    update = (): void => {
+      requestAnimationFrame(() => {
+        this.toggleActiveHeading();
+        this.scrollToActiveHeading();
+      });
+    };
+
+    fallback = (): void => {
+      if (this.sections.length === 0) {
+        return;
+      }
+
+      const baselineOffset = getTocBaselineOffset();
+
+      for (let i = 0; i < this.sections.length; i += 1) {
+        const offsetTop = this.sections[i].getBoundingClientRect().top;
+        const offsetBottom = this.sections[i].getBoundingClientRect().bottom;
+        const inViewport =
+          this.isInRange(offsetTop, baselineOffset, window.innerHeight) ||
+          this.isInRange(offsetBottom, baselineOffset, window.innerHeight) ||
+          (offsetTop < baselineOffset && offsetBottom > window.innerHeight);
+
+        if (inViewport) {
+          this.active[i] = true;
+        } else if (offsetTop > window.innerHeight) {
+          break;
+        }
+      }
+    };
+
+    handleAnchorClick = (event: Event): void => {
+      const anchor = event
+        .composedPath()
+        .find((element) => element instanceof HTMLAnchorElement);
+      if (!(anchor instanceof HTMLAnchorElement)) {
+        return;
+      }
+
+      event.preventDefault();
+
+      const id = decodeURIComponent(anchor.hash.substring(1));
+      const targetElement = document.getElementById(id);
+      if (targetElement) {
+        scrollElementBelowTocBaseline(targetElement, {
+          behavior: "smooth",
+        });
+      }
+
+      const idx = this.headingIdxMap.get(id);
+      this.anchorNavTarget =
+        typeof idx === "number" ? this.headings[idx] : null;
+    };
+
+    isInRange(value: number, min: number, max: number): boolean {
+      return min < value && value < max;
+    }
+
+    connectedCallback(): void {
+      this.scheduleInit();
+    }
+
+    init(): void {
+      this.clearInitTimeout();
+      this.resetState();
+      this.observer = this.createObserver();
+
+      this.tocEl = this;
+      this.tocEl.removeEventListener("click", this.handleAnchorClick, {
+        capture: true,
+      } as AddEventListenerOptions);
+      this.tocEl.addEventListener("click", this.handleAnchorClick, {
+        capture: true,
+      });
+
+      this.regenerateTOC();
+      this.activeIndicator = this.querySelector("#active-indicator");
+      this.tocEntries = Array.from(
+        this.querySelectorAll<HTMLAnchorElement>("a[href^='#']"),
+      );
+      if (this.tocEntries.length === 0) {
+        return;
+      }
+
+      const nextSections: HTMLElement[] = [];
+      const nextHeadings: HTMLElement[] = [];
+
+      this.tocEntries.forEach((entry) => {
+        const id = decodeURIComponent(entry.hash.substring(1));
+        const heading = document.getElementById(id);
+        if (!(heading instanceof HTMLElement)) {
+          return;
+        }
+
+        const section =
+          heading.parentElement instanceof HTMLElement
+            ? heading.parentElement
+            : heading;
+        this.headingIdxMap.set(id, nextHeadings.length);
+        nextHeadings.push(heading);
+        nextSections.push(section);
+      });
+
+      this.headings = nextHeadings;
+      this.sections = nextSections;
+      this.active = new Array(this.tocEntries.length).fill(false);
+      this.sections.forEach((section) => this.observer.observe(section));
+
+      this.fallback();
+      this.update();
+    }
+
+    regenerateTOC(retryCount = 0): void {
+      const runtimeSettings = window.__CIALLI_RUNTIME_SETTINGS__;
+      const maxLevel = runtimeSettings?.settings.toc.depth ?? 3;
+      const useJapaneseBadge =
+        runtimeSettings?.settings.toc.useJapaneseBadge ?? false;
+      const headings = collectMarkdownHeadings({ maxDepth: maxLevel });
+
+      if (headings.length === 0) {
+        if (retryCount < 3) {
+          window.setTimeout(() => this.regenerateTOC(retryCount + 1), 120);
+          return;
+        }
+        this.style.display = "none";
+        this.innerHTML = "";
+        delete this.dataset.loaded;
+        return;
+      }
+
+      this.style.display = "block";
+
+      const japaneseKatakana = [
+        "ア",
+        "イ",
+        "ウ",
+        "エ",
+        "オ",
+        "カ",
+        "キ",
+        "ク",
+        "ケ",
+        "コ",
+        "サ",
+        "シ",
+        "ス",
+        "セ",
+        "ソ",
+        "タ",
+        "チ",
+        "ツ",
+        "テ",
+        "ト",
+        "ナ",
+        "ニ",
+        "ヌ",
+        "ネ",
+        "ノ",
+        "ハ",
+        "ヒ",
+        "フ",
+        "ヘ",
+        "ホ",
+        "マ",
+        "ミ",
+        "ム",
+        "メ",
+        "モ",
+        "ヤ",
+        "ユ",
+        "ヨ",
+        "ラ",
+        "リ",
+        "ル",
+        "レ",
+        "ロ",
+        "ワ",
+        "ヲ",
+        "ン",
+      ];
+
+      let heading1Count = 0;
+      const tocHTML = headings
+        .map((heading) => {
+          const depthClass =
+            heading.level === 1 ? "" : heading.level === 2 ? "ml-4" : "ml-8";
+
+          let badgeContent: string;
+          if (heading.level === 1) {
+            heading1Count += 1;
+            if (
+              useJapaneseBadge &&
+              heading1Count - 1 < japaneseKatakana.length
+            ) {
+              badgeContent = japaneseKatakana[heading1Count - 1];
+            } else {
+              badgeContent = String(heading1Count);
+            }
+          } else if (heading.level === 2) {
+            badgeContent =
+              '<div class="transition w-2 h-2 rounded-[0.1875rem] bg-(--toc-badge-bg)"></div>';
+          } else {
+            badgeContent =
+              '<div class="transition w-1.5 h-1.5 rounded-sm bg-black/5 dark:bg-white/10"></div>';
+          }
+
+          return `<a href="#${heading.id}" data-no-swup class="px-2 flex gap-2 relative transition w-full min-h-9 rounded-xl hover:bg-(--toc-btn-hover) active:bg-(--toc-btn-active) py-2">
+                    <div class="transition w-5 h-5 shrink-0 rounded-lg text-xs flex items-center justify-center font-bold ${depthClass} ${heading.level === 1 ? "bg-(--toc-badge-bg) text-(--btn-content)" : ""}">
+                        ${badgeContent}
+                    </div>
+                    <div class="transition text-sm ${heading.level <= 2 ? "text-50" : "text-30"}">${heading.text}</div>
+                </a>`;
+        })
+        .join("");
+
+      this.innerHTML = `${tocHTML}<div id="active-indicator" style="opacity: 0" class="-z-10 absolute bg-(--toc-btn-hover) left-0 right-0 rounded-xl transition-all group-hover:bg-transparent border-2 border-(--toc-btn-hover) group-hover:border-(--toc-btn-active) border-dashed"></div>`;
+      this.dataset.loaded = "true";
+    }
+
+    disconnectedCallback(): void {
+      this.clearInitTimeout();
+      this.cleanupObservers();
+      this.tocEl?.removeEventListener("click", this.handleAnchorClick, {
+        capture: true,
+      } as AddEventListenerOptions);
+    }
+  }
+
+  if (!customElements.get("table-of-contents")) {
+    customElements.define("table-of-contents", TableOfContents);
+  }
+</script>
+
+<style>
+  #toc {
+    max-height: 100%;
+    overflow: auto;
+    position: relative;
+    scroll-behavior: smooth;
+    display: block;
+  }
+
+  #toc::-webkit-scrollbar {
+    display: none;
+  }
+</style>

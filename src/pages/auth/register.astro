@@ -1,0 +1,1873 @@
+---
+import type {
+  AppUserRegistrationRequest,
+  RegistrationRequestStatus,
+} from "@/types/app";
+import type { JsonObject } from "@/types/json";
+import defaultAvatarAsset from "@/assets/images/avatar.webp";
+import I18nKey from "@i18n/i18nKey";
+import { i18n } from "@i18n/translation";
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import { Icon } from "astro-icon/components";
+import { readMany } from "@/server/directus/client";
+import { buildDirectusAssetUrl } from "@/server/directus-auth";
+import { getSessionUser } from "@/server/auth/session";
+import {
+  normalizeRegistrationRequestId,
+  REGISTRATION_REQUEST_COOKIE_NAME,
+} from "@/server/auth/registration-request-cookie";
+import { getResolvedSiteSettings } from "@/server/site-settings/service";
+
+export const prerender = false;
+
+const resolvedSettings =
+  Astro.locals.siteSettings ?? (await getResolvedSiteSettings());
+const registerEnabled = Boolean(
+  resolvedSettings.settings.auth?.register_enabled,
+);
+if (!registerEnabled) {
+  return Astro.redirect("/404");
+}
+
+const registrationRequestId = normalizeRegistrationRequestId(
+  Astro.cookies.get(REGISTRATION_REQUEST_COOKIE_NAME)?.value,
+);
+
+type RegistrationSnapshot = Pick<
+  AppUserRegistrationRequest,
+  | "id"
+  | "email"
+  | "username"
+  | "display_name"
+  | "avatar_file"
+  | "registration_reason"
+  | "request_status"
+  | "approved_user_id"
+  | "reviewed_at"
+  | "reject_reason"
+  | "date_created"
+>;
+
+let currentRegistration: RegistrationSnapshot | null = null;
+let hiddenBySessionMismatch = false;
+
+if (registrationRequestId) {
+  const rows = await readMany("app_user_registration_requests", {
+    filter: { id: { _eq: registrationRequestId } } as JsonObject,
+    limit: 1,
+    fields: [
+      "id",
+      "email",
+      "username",
+      "display_name",
+      "avatar_file",
+      "registration_reason",
+      "request_status",
+      "approved_user_id",
+      "reviewed_at",
+      "reject_reason",
+      "date_created",
+    ],
+  });
+  currentRegistration = (rows[0] as RegistrationSnapshot | undefined) || null;
+  const sessionUser = await getSessionUser(Astro);
+  if (currentRegistration && sessionUser) {
+    const approvedUserId = String(
+      currentRegistration.approved_user_id || "",
+    ).trim();
+    const canDisplayApprovedSelfStatus =
+      currentRegistration.request_status === "approved" &&
+      approvedUserId &&
+      approvedUserId === sessionUser.id;
+    if (!canDisplayApprovedSelfStatus) {
+      currentRegistration = null;
+      hiddenBySessionMismatch = true;
+    }
+  }
+  if (!currentRegistration && !hiddenBySessionMismatch) {
+    Astro.cookies.delete(REGISTRATION_REQUEST_COOKIE_NAME, { path: "/" });
+  }
+}
+
+const registrationStatusMeta: Record<
+  RegistrationRequestStatus,
+  {
+    label: string;
+    description: string;
+    tone: "warning" | "success" | "danger" | "neutral";
+  }
+> = {
+  pending: {
+    label: i18n(I18nKey.authRegisterStatusPending),
+    description: i18n(I18nKey.authRegisterStatusPendingDesc),
+    tone: "warning",
+  },
+  approved: {
+    label: i18n(I18nKey.authRegisterStatusApproved),
+    description: i18n(I18nKey.authRegisterStatusApprovedDesc),
+    tone: "success",
+  },
+  rejected: {
+    label: i18n(I18nKey.authRegisterStatusRejected),
+    description: i18n(I18nKey.authRegisterStatusRejectedDesc),
+    tone: "danger",
+  },
+  cancelled: {
+    label: i18n(I18nKey.authRegisterStatusCancelled),
+    description: i18n(I18nKey.authRegisterStatusCancelledDesc),
+    tone: "neutral",
+  },
+};
+
+const currentRegistrationStatus = currentRegistration
+  ? registrationStatusMeta[currentRegistration.request_status]
+  : null;
+const currentRegistrationAvatarFile = currentRegistration?.avatar_file;
+const currentRegistrationAvatar = currentRegistrationAvatarFile
+  ? buildDirectusAssetUrl(currentRegistrationAvatarFile, {
+      width: 160,
+      height: 160,
+      fit: "cover",
+    })
+  : "";
+const currentRegistrationRejectReason = currentRegistration?.reject_reason;
+const currentRegistrationReviewReason =
+  currentRegistration?.request_status === "rejected"
+    ? String(currentRegistrationRejectReason || "").trim()
+    : "";
+const currentRegistrationReason = String(
+  currentRegistration?.registration_reason || "",
+).trim();
+const defaultAvatarPreviewSrc = defaultAvatarAsset.src;
+const registerI18n = {
+  registerDisabled: i18n(I18nKey.authRegisterDisabled),
+  emailExists: i18n(I18nKey.authRegisterEmailExists),
+  usernameExists: i18n(I18nKey.authRegisterUsernameExists),
+  requestExists: i18n(I18nKey.authRegisterRequestExists),
+  statusConflict: i18n(I18nKey.authRegisterStatusConflict),
+  requestForbidden: i18n(I18nKey.authRegisterRequestForbidden),
+  passwordRequired: i18n(I18nKey.authRegisterPasswordRequired),
+  passwordInvalid: i18n(I18nKey.authRegisterPasswordInvalid),
+  passwordTooShort: i18n(I18nKey.authRegisterPasswordTooShort),
+  passwordTooLong: i18n(I18nKey.authRegisterPasswordTooLong),
+  submitFailed: i18n(I18nKey.authRegisterSubmitFailed),
+  emailRequired: i18n(I18nKey.authRegisterEmailRequired),
+  emailInvalid: i18n(I18nKey.authRegisterEmailInvalid),
+  checking: i18n(I18nKey.authRegisterChecking),
+  emailAvailable: i18n(I18nKey.authRegisterEmailAvailable),
+  emailUnavailable: i18n(I18nKey.authRegisterEmailUnavailable),
+  emailCheckFailed: i18n(I18nKey.authRegisterEmailCheckFailed),
+  usernameRequired: i18n(I18nKey.authRegisterUsernameRequired),
+  usernameRule: i18n(I18nKey.authRegisterUsernameRule),
+  usernameTooLong: i18n(I18nKey.authRegisterUsernameTooLong),
+  usernameAvailable: i18n(I18nKey.authRegisterUsernameAvailable),
+  usernameUnavailable: i18n(I18nKey.authRegisterUsernameUnavailable),
+  usernameCheckFailed: i18n(I18nKey.authRegisterUsernameCheckFailed),
+  hidePassword: i18n(I18nKey.authHidePassword),
+  showPassword: i18n(I18nKey.authShowPassword),
+  passwordEmpty: i18n(I18nKey.authRegisterPasswordEmpty),
+  passwordSetHint: i18n(I18nKey.authRegisterPasswordSetHint),
+  passwordLengthValid: i18n(I18nKey.authRegisterPasswordLengthValid),
+  reapplyDraftLoaded: i18n(I18nKey.authRegisterReapplyDraftLoaded),
+  cropUploading: i18n(I18nKey.authRegisterCropUploading),
+  cropApply: i18n(I18nKey.commonApplyCrop),
+  selectImage: i18n(I18nKey.authRegisterSelectImage),
+  avatarTooLarge: i18n(I18nKey.authRegisterAvatarTooLarge),
+  imageReadFailed: i18n(I18nKey.commonImageReadFailed),
+  cropFailedRetry: i18n(I18nKey.commonCropFailed),
+  avatarUploadFailed: i18n(I18nKey.authRegisterAvatarUploadFailed),
+  completeForm: i18n(I18nKey.authRegisterCompleteForm),
+  passwordRangeInvalid: i18n(I18nKey.authRegisterPasswordRangeInvalid),
+  fixPasswordFirst: i18n(I18nKey.authRegisterFixPasswordFirst),
+  fixAccountFieldFirst: i18n(I18nKey.authRegisterFixAccountFirst),
+  submitting: i18n(I18nKey.commonSubmitting),
+  submitButtonText: i18n(I18nKey.authRegisterSubmit),
+  submitOverlayTitle: i18n(I18nKey.authRegisterSubmittingTitle),
+  submitOverlayText: i18n(I18nKey.authRegisterSubmittingText),
+  uploadAvatarButtonText: i18n(I18nKey.authRegisterUploadingAvatar),
+  uploadAvatarOverlayText: i18n(I18nKey.authRegisterUploadingAvatarText),
+  submitRequestOverlayText: i18n(I18nKey.authRegisterSubmittingRequestText),
+  submitSuccessRedirecting: i18n(I18nKey.authRegisterSubmitSuccessRedirecting),
+  submitFailedRetry: i18n(I18nKey.authRegisterSubmitFailedRetry),
+  reapplyButtonText: i18n(I18nKey.authRegisterReapply),
+  processing: i18n(I18nKey.commonProcessing),
+  resetStatusTitle: i18n(I18nKey.authRegisterResetStatusTitle),
+  processedRedirecting: i18n(I18nKey.authRegisterProcessedRedirecting),
+  resetFailed: i18n(I18nKey.authRegisterResetFailed),
+  cancelRequestButtonText: i18n(I18nKey.authRegisterCancelRequest),
+  invalidRequestId: i18n(I18nKey.authRegisterInvalidRequestId),
+  confirmCancelRequest: i18n(I18nKey.authRegisterConfirmCancelRequest),
+  confirmCancelText: i18n(I18nKey.authRegisterConfirmCancelText),
+  cancelThinkAgain: i18n(I18nKey.authRegisterCancelThinkAgain),
+  cancelOverlayTitle: i18n(I18nKey.authRegisterCancellingTitle),
+  cancelSuccessRefreshing: i18n(I18nKey.authRegisterCancelSuccessRefreshing),
+  cancelFailed: i18n(I18nKey.authRegisterCancelFailed),
+};
+---
+
+<MainGridLayout
+  title={i18n(I18nKey.authRegisterTitle)}
+  description={i18n(I18nKey.authRegisterDescription)}
+>
+  <div
+    data-enter-skeleton-page="auth-register"
+    data-enter-skeleton-target="auth-register"
+  >
+    <div data-enter-skeleton-inline-content>
+      <div class="card-base rounded-(--radius-large) p-6 p-8 space-y-5">
+        <div class="flex items-center gap-3">
+          <div
+            class="w-12 h-12 rounded-2xl bg-(--btn-regular-bg) flex items-center justify-center"
+          >
+            <Icon
+              name="material-symbols:person-add-rounded"
+              class="text-(--btn-content) text-3xl"
+            />
+          </div>
+          <div>
+            <h1 class="text-2xl font-bold text-90">
+              {i18n(I18nKey.authRegisterTitle)}
+            </h1>
+            <p class="text-sm text-75">
+              {i18n(I18nKey.authRegisterHint)}
+            </p>
+          </div>
+        </div>
+
+        {
+          currentRegistration ? (
+            <section class="space-y-4">
+              <div class="flex items-start justify-between gap-4 flex-wrap">
+                <div class="flex items-center gap-3">
+                  {currentRegistrationAvatar ? (
+                    <img
+                      id="register-current-avatar"
+                      class="w-12 h-12 rounded-full object-cover border border-(--line-divider) bg-black/10 dark:bg-white/10"
+                      src={currentRegistrationAvatar}
+                      alt={i18n(I18nKey.authRegisterAvatarAlt)}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div class="w-12 h-12 rounded-full border border-(--line-divider) bg-black/10 dark:bg-white/10 inline-flex items-center justify-center text-60">
+                      <Icon
+                        name="material-symbols:person-rounded"
+                        class="text-xl"
+                      />
+                    </div>
+                  )}
+                  <div class="space-y-1">
+                    <p class="text-sm text-60">
+                      {i18n(I18nKey.authRegisterRequestIdLabel)}：
+                      {currentRegistration.id}
+                    </p>
+                    <p class="text-sm text-75">
+                      {i18n(I18nKey.authRegisterSubmittedAtLabel)}：
+                      {currentRegistration.date_created || "-"}
+                    </p>
+                  </div>
+                </div>
+                <span
+                  class:list={[
+                    "inline-flex items-center px-2.5 h-7 rounded-full text-xs font-medium",
+                    currentRegistrationStatus?.tone === "warning" &&
+                      "bg-amber-500/15 text-amber-600 dark:bg-amber-500/22 dark:text-amber-300",
+                    currentRegistrationStatus?.tone === "success" &&
+                      "bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/22 dark:text-emerald-300",
+                    currentRegistrationStatus?.tone === "danger" &&
+                      "bg-red-500/15 text-red-600 dark:bg-red-500/22 dark:text-red-300",
+                    currentRegistrationStatus?.tone === "neutral" &&
+                      "bg-black/8 text-70 dark:bg-white/10",
+                  ]}
+                >
+                  {currentRegistrationStatus?.label ||
+                    currentRegistration.request_status}
+                </span>
+              </div>
+              <p class="text-sm text-75">
+                {currentRegistrationStatus?.description ||
+                  i18n(I18nKey.authRegisterStatusUpdated)}
+              </p>
+              <div class="grid grid-cols-1 grid-cols-2 gap-3 text-sm">
+                <div class="rounded-lg border border-(--line-divider) bg-black/5 dark:bg-white/5 px-3 py-2.5">
+                  <p class="text-60 text-xs mb-1">
+                    {i18n(I18nKey.authEmailLabel)}
+                  </p>
+                  <p class="text-90 break-all">{currentRegistration.email}</p>
+                </div>
+                <div class="rounded-lg border border-(--line-divider) bg-black/5 dark:bg-white/5 px-3 py-2.5">
+                  <p class="text-60 text-xs mb-1">
+                    {i18n(I18nKey.authRegisterUsernameLabel)}
+                  </p>
+                  <p class="text-90 break-all">
+                    {currentRegistration.username}
+                  </p>
+                </div>
+                <div class="rounded-lg border border-(--line-divider) bg-black/5 dark:bg-white/5 px-3 py-2.5">
+                  <p class="text-60 text-xs mb-1">
+                    {i18n(I18nKey.authRegisterDisplayNameLabel)}
+                  </p>
+                  <p class="text-90 break-all">
+                    {currentRegistration.display_name}
+                  </p>
+                </div>
+                <div class="rounded-lg border border-(--line-divider) bg-black/5 dark:bg-white/5 px-3 py-2.5">
+                  <p class="text-60 text-xs mb-1">
+                    {i18n(I18nKey.authRegisterReviewedAtLabel)}
+                  </p>
+                  <p class="text-90 break-all">
+                    {currentRegistration.reviewed_at || "-"}
+                  </p>
+                </div>
+                <div class="rounded-lg border border-(--line-divider) bg-black/5 dark:bg-white/5 px-3 py-2.5 col-span-2">
+                  <p class="text-60 text-xs mb-1">
+                    {i18n(I18nKey.authRegisterReasonLabel)}
+                  </p>
+                  <p class="text-90 whitespace-pre-wrap break-all">
+                    {currentRegistrationReason || "-"}
+                  </p>
+                </div>
+                {currentRegistrationReviewReason ? (
+                  <div class="rounded-lg border border-red-500/35 bg-red-500/5 dark:border-red-400/35 dark:bg-red-500/12 px-3 py-2.5 col-span-2">
+                    <p class="text-red-600 dark:text-red-300 text-xs mb-1">
+                      {i18n(I18nKey.authRegisterReviewNote)}
+                    </p>
+                    <p class="text-red-700/90 dark:text-red-200/90 whitespace-pre-wrap break-all">
+                      {currentRegistrationReviewReason}
+                    </p>
+                  </div>
+                ) : null}
+              </div>
+              <div class="flex items-center gap-3 pt-2">
+                <a
+                  href="/auth/login"
+                  class="px-4 h-9 rounded-lg text-sm font-medium bg-(--btn-regular-bg) text-(--btn-content) inline-flex items-center"
+                >
+                  {i18n(I18nKey.authApplyLogin)}
+                </a>
+                {currentRegistration.request_status === "pending" ? (
+                  <button
+                    id="register-cancel-btn"
+                    type="button"
+                    data-request-id={currentRegistration.id}
+                    class="px-4 h-9 rounded-lg text-sm font-medium border border-red-500/50 text-red-600 dark:text-red-300 hover:bg-red-500/10 transition"
+                  >
+                    {i18n(I18nKey.authRegisterCancelRequest)}
+                  </button>
+                ) : null}
+                {currentRegistration.request_status === "rejected" ||
+                currentRegistration.request_status === "cancelled" ? (
+                  <button
+                    id="register-reapply-btn"
+                    type="button"
+                    data-reapply-email={currentRegistration.email}
+                    data-reapply-username={currentRegistration.username}
+                    data-reapply-display-name={currentRegistration.display_name}
+                    data-reapply-reason={currentRegistrationReason}
+                    data-reapply-avatar-file={
+                      currentRegistration.avatar_file || ""
+                    }
+                    data-reapply-avatar-url={currentRegistrationAvatar}
+                    class="px-4 h-9 rounded-lg text-sm font-medium border border-(--line-divider) text-75 hover:bg-(--btn-plain-bg-hover) transition"
+                  >
+                    {i18n(I18nKey.authRegisterReapply)}
+                  </button>
+                ) : null}
+              </div>
+            </section>
+          ) : (
+            <>
+              <form id="register-form" class="space-y-4">
+                <label class="block space-y-1">
+                  <span class="text-sm text-70">
+                    {i18n(I18nKey.authEmailLabel)}
+                  </span>
+                  <input
+                    id="register-email"
+                    type="email"
+                    required
+                    autocomplete="email"
+                    class="w-full rounded-lg border border-(--line-divider) px-3 py-2.5 bg-transparent text-75"
+                    placeholder="name@example.com"
+                  />
+                  <span
+                    id="register-email-hint"
+                    class="text-xs text-60 hidden"
+                  />
+                </label>
+                <label class="block space-y-1">
+                  <span class="text-sm text-70">
+                    {i18n(I18nKey.authRegisterUsernameLabel)}
+                  </span>
+                  <input
+                    id="register-username"
+                    required
+                    pattern="[A-Za-z0-9_-]+"
+                    title={i18n(I18nKey.authRegisterUsernameRule)}
+                    class="w-full rounded-lg border border-(--line-divider) px-3 py-2.5 bg-transparent text-75"
+                    placeholder="cialli_user"
+                  />
+                  <span
+                    id="register-username-hint"
+                    class="text-xs text-60 hidden"
+                  />
+                </label>
+                <label class="block space-y-1">
+                  <span class="text-sm text-70">
+                    {i18n(I18nKey.authRegisterDisplayNameLabel)}
+                  </span>
+                  <input
+                    id="register-display-name"
+                    required
+                    class="w-full rounded-lg border border-(--line-divider) px-3 py-2.5 bg-transparent text-75"
+                    placeholder={i18n(
+                      I18nKey.authRegisterDisplayNamePlaceholder,
+                    )}
+                  />
+                </label>
+                <label class="block space-y-1">
+                  <span class="text-sm text-70">
+                    {i18n(I18nKey.authPasswordLabel)}
+                  </span>
+                  <span class="relative block">
+                    <input
+                      id="register-password"
+                      type="password"
+                      required
+                      minlength="8"
+                      maxlength="20"
+                      pattern="[A-Za-z0-9@_]+"
+                      title={i18n(I18nKey.authRegisterPasswordRule)}
+                      autocomplete="new-password"
+                      class="w-full rounded-lg border border-(--line-divider) pl-3 pr-11 py-2.5 bg-transparent text-75"
+                      placeholder={i18n(
+                        I18nKey.authRegisterPasswordPlaceholder,
+                      )}
+                    />
+                    <button
+                      id="register-password-toggle"
+                      type="button"
+                      class="absolute right-2 top-1/2 -translate-y-1/2 border border-(--line-divider) bg-white/70 dark:bg-zinc-800/72 text-zinc-800 dark:text-zinc-200 w-8 h-8 rounded-lg inline-flex items-center justify-center hover:border-(--primary) hover:bg-(--primary)/10 transition"
+                      aria-label={i18n(I18nKey.authShowPassword)}
+                      aria-pressed="false"
+                    >
+                      <svg
+                        class="register-password-icon register-password-icon-show w-4 h-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                      <svg
+                        class="register-password-icon register-password-icon-hide hidden w-4 h-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="1.8"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                        aria-hidden="true"
+                      >
+                        <path d="M3 3l18 18" />
+                        <path d="M10.6 10.6a2 2 0 102.8 2.8" />
+                        <path d="M9.9 5.3A11 11 0 0112 5c6.5 0 10 7 10 7a16.2 16.2 0 01-4 4.7" />
+                        <path d="M6.3 6.3A16.1 16.1 0 002 12s3.5 7 10 7c1 0 2-.2 2.9-.5" />
+                      </svg>
+                    </button>
+                  </span>
+                  <span
+                    id="register-password-hint"
+                    class="text-xs text-60 hidden"
+                  />
+                </label>
+                <div class="space-y-2">
+                  <span class="text-sm text-70">
+                    {i18n(I18nKey.authRegisterAvatarOptional)}
+                  </span>
+                  <div class="flex items-center gap-4">
+                    <img
+                      id="register-avatar-preview"
+                      src={defaultAvatarPreviewSrc}
+                      class="w-20 h-20 rounded-full object-cover border border-(--line-divider) bg-black/10 dark:bg-white/10"
+                      alt={i18n(I18nKey.authRegisterAvatarPreviewAlt)}
+                      loading="lazy"
+                    />
+                    <div class="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        id="register-avatar-upload-btn"
+                        class="px-4 h-9 rounded-lg text-sm font-medium cursor-pointer bg-(--primary) text-white hover:opacity-90 transition"
+                      >
+                        {i18n(I18nKey.authRegisterUploadAvatar)}
+                      </button>
+                      <button
+                        type="button"
+                        id="register-avatar-clear-btn"
+                        class="px-4 h-9 rounded-lg text-sm border border-(--line-divider) text-75"
+                      >
+                        {i18n(I18nKey.commonClear)}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <label class="block space-y-1">
+                  <span class="text-sm text-70">
+                    {i18n(I18nKey.authRegisterReasonLabel)}
+                  </span>
+                  <textarea
+                    id="register-reason"
+                    required
+                    rows="4"
+                    maxlength="500"
+                    class="w-full rounded-lg border border-(--line-divider) px-3 py-2.5 bg-transparent text-75 resize-none"
+                    placeholder={i18n(I18nKey.authRegisterReasonPlaceholder)}
+                  />
+                </label>
+                <div id="register-message" class="text-sm text-70 hidden" />
+                <button
+                  id="register-submit"
+                  type="submit"
+                  class="w-full px-4 py-2.5 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm font-semibold"
+                >
+                  <span id="register-submit-text">
+                    {i18n(I18nKey.authRegisterSubmit)}
+                  </span>
+                </button>
+              </form>
+
+              <p class="text-sm text-70">
+                {i18n(I18nKey.authNoAccount)}
+                <a class="text-(--primary) hover:underline" href="/auth/login">
+                  {i18n(I18nKey.authApplyLogin)}
+                </a>
+              </p>
+            </>
+          )
+        }
+      </div>
+    </div>
+    <div data-enter-skeleton-inline-placeholder aria-hidden="true">
+      <div class="card-base rounded-(--radius-large) p-6 p-8 space-y-5">
+        <div class="flex items-center gap-3">
+          <div class="md3-skeleton-block w-12 h-12 rounded-2xl"></div>
+          <div class="space-y-2 flex-1">
+            <div
+              class="md3-skeleton-text"
+              style="--skeleton-width: 26%; --skeleton-height: 1.6rem;"
+            >
+            </div>
+            <div
+              class="md3-skeleton-text"
+              style="--skeleton-width: 56%; --skeleton-height: 0.82rem;"
+            >
+            </div>
+          </div>
+        </div>
+        <div class="space-y-4">
+          <div class="space-y-2">
+            <div
+              class="md3-skeleton-text"
+              style="--skeleton-width: 12%; --skeleton-height: 0.82rem;"
+            >
+            </div>
+            <div class="md3-skeleton-block h-11 rounded-lg"></div>
+          </div>
+          <div class="space-y-2">
+            <div
+              class="md3-skeleton-text"
+              style="--skeleton-width: 14%; --skeleton-height: 0.82rem;"
+            >
+            </div>
+            <div class="md3-skeleton-block h-11 rounded-lg"></div>
+          </div>
+          <div class="space-y-2">
+            <div
+              class="md3-skeleton-text"
+              style="--skeleton-width: 10%; --skeleton-height: 0.82rem;"
+            >
+            </div>
+            <div class="md3-skeleton-block h-11 rounded-lg"></div>
+          </div>
+          <div class="space-y-2">
+            <div
+              class="md3-skeleton-text"
+              style="--skeleton-width: 18%; --skeleton-height: 0.82rem;"
+            >
+            </div>
+            <div class="flex items-center gap-4">
+              <div class="md3-skeleton-circle w-20 h-20"></div>
+              <div class="flex flex-wrap gap-2">
+                <div class="md3-skeleton-block h-9 w-22 rounded-lg"></div>
+                <div class="md3-skeleton-block h-9 w-16 rounded-lg"></div>
+              </div>
+            </div>
+          </div>
+          <div class="space-y-2">
+            <div
+              class="md3-skeleton-text"
+              style="--skeleton-width: 16%; --skeleton-height: 0.82rem;"
+            >
+            </div>
+            <div class="md3-skeleton-block h-28 rounded-lg"></div>
+          </div>
+          <div class="md3-skeleton-block h-11 rounded-xl"></div>
+          <div
+            class="md3-skeleton-text"
+            style="--skeleton-width: 30%; --skeleton-height: 0.82rem;"
+          >
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div
+    slot="modal"
+    id="register-avatar-crop-modal"
+    class="fixed inset-0 z-9999 hidden items-center justify-center bg-black/70 px-4 py-5"
+    tabindex="-1"
+  >
+    <div
+      class="card-base w-full max-w-xl rounded-(--radius-large) border border-(--line-divider) p-5 p-6 space-y-4 text-75"
+    >
+      <div class="flex items-center gap-2">
+        <h3 class="text-lg text-xl font-semibold text-90">
+          {i18n(I18nKey.authRegisterCropAvatarTitle)}
+        </h3>
+      </div>
+      <p class="text-sm text-60">
+        {i18n(I18nKey.authRegisterCropAvatarHint)}
+      </p>
+      <div
+        id="register-avatar-crop-viewport"
+        class="relative mx-auto w-full max-w-[360px] aspect-square overflow-hidden rounded-2xl border border-(--line-divider) bg-black/15 dark:bg-white/10 select-none touch-none"
+      >
+        <img
+          id="register-avatar-crop-image"
+          src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
+          class="absolute left-0 top-0 max-w-none pointer-events-none hidden"
+          alt={i18n(I18nKey.authRegisterCropAvatarAlt)}
+        />
+        <div
+          id="register-avatar-crop-empty"
+          class="absolute inset-0 grid place-items-center text-sm text-60 pointer-events-none"
+        >
+          {i18n(I18nKey.commonSelectImageFirst)}
+        </div>
+        <div
+          class="absolute inset-0 pointer-events-none rounded-2xl ring-2 ring-white/80"
+        >
+        </div>
+      </div>
+      <div class="space-y-1">
+        <label for="register-avatar-crop-zoom" class="text-sm text-60">
+          {i18n(I18nKey.commonZoom)}
+        </label>
+        <input
+          id="register-avatar-crop-zoom"
+          type="range"
+          min="100"
+          max="300"
+          step="1"
+          value="100"
+          class="w-full"
+        />
+      </div>
+      <div class="flex flex-wrap items-center gap-3">
+        <input
+          id="register-avatar-crop-file"
+          type="file"
+          accept="image/*"
+          class="hidden"
+        />
+        <button
+          type="button"
+          id="register-avatar-crop-select-btn"
+          class="px-4 h-9 rounded-lg text-sm font-medium cursor-pointer bg-(--primary) text-white hover:opacity-90 transition"
+        >
+          {i18n(I18nKey.commonChooseFile)}
+        </button>
+        <button
+          type="button"
+          id="register-avatar-crop-apply-btn"
+          class="px-4 py-2.5 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
+        >
+          {i18n(I18nKey.commonApplyCrop)}
+        </button>
+        <button
+          type="button"
+          id="register-avatar-crop-cancel-btn"
+          class="ml-auto px-4 py-2.5 rounded-lg border border-(--line-divider) text-sm text-75"
+        >
+          {i18n(I18nKey.commonCancel)}
+        </button>
+      </div>
+      <span id="register-avatar-crop-msg" class="text-sm text-red-500"></span>
+    </div>
+  </div>
+
+  <script>
+    import "@/scripts/dialogs";
+  </script>
+
+  <script is:inline define:vars={{ defaultAvatarPreviewSrc, registerI18n }}>
+    const API_REGISTER = "/api/v1/public/registration-requests";
+    const API_REGISTER_CHECK = "/api/v1/public/registration-check";
+    const API_REGISTER_SESSION = "/api/v1/public/registration-session";
+    const API_REGISTER_BASE = "/api/v1/public/registration-requests";
+    const API_UPLOAD = "/api/v1/uploads";
+    const DATA_BOUND = "data-register-bound";
+    const REAPPLY_DRAFT_STORAGE_KEY = "dc_registration_reapply_draft_v1";
+
+    function getProgressOverlay() {
+      return window.__CIALLI_PROGRESS_OVERLAY__;
+    }
+
+    function startOverlayTask(options) {
+      const progressOverlay = getProgressOverlay();
+      if (!progressOverlay) return null;
+      return progressOverlay.startTask({
+        delayMs: 300,
+        ...options,
+      });
+    }
+
+    function updateOverlayTask(handle, stage) {
+      const progressOverlay = getProgressOverlay();
+      if (!progressOverlay || typeof handle !== "number") return;
+      progressOverlay.updateTask(handle, stage);
+    }
+
+    function finishOverlayTask(handle) {
+      const progressOverlay = getProgressOverlay();
+      if (!progressOverlay || typeof handle !== "number") return;
+      progressOverlay.finishTask(handle);
+    }
+
+    function getCsrfToken() {
+      const m = document.cookie.match(/(?:^|;\s*)cialli_csrf=([^;]*)/);
+      return m ? decodeURIComponent(m[1]) : "";
+    }
+    const AVATAR_OUTPUT_SIZE = 512;
+    const AVATAR_ZOOM_MIN = 100;
+    const AVATAR_ZOOM_MAX = 300;
+    const DEFAULT_AVATAR_SRC = String(defaultAvatarPreviewSrc || "").trim();
+
+    function bindCurrentAvatarFallback() {
+      const currentAvatarEl = document.getElementById(
+        "register-current-avatar",
+      );
+      if (!(currentAvatarEl instanceof HTMLImageElement)) {
+        return;
+      }
+      currentAvatarEl.addEventListener(
+        "error",
+        () => {
+          currentAvatarEl.src = DEFAULT_AVATAR_SRC;
+        },
+        { once: true },
+      );
+    }
+
+    function setPageMessage(message, tone = "normal") {
+      const messageEl = document.getElementById("register-message");
+      if (!messageEl) {
+        return;
+      }
+      if (!message) {
+        messageEl.classList.add("hidden");
+        messageEl.textContent = "";
+        messageEl.classList.remove("text-red-500", "text-emerald-600");
+        messageEl.classList.add("text-70");
+        return;
+      }
+      messageEl.classList.remove("hidden", "text-red-500", "text-emerald-600");
+      messageEl.classList.add(
+        tone === "error" ? "text-red-500" : "text-emerald-600",
+      );
+      messageEl.textContent = message;
+    }
+
+    function setFieldHint(element, message, tone = "default") {
+      if (!element) {
+        return;
+      }
+      const text = String(message || "").trim();
+      element.classList.remove(
+        "hidden",
+        "text-60",
+        "text-red-500",
+        "text-emerald-600",
+        "text-(--primary)",
+      );
+      if (!text) {
+        element.textContent = "";
+        element.classList.add("hidden");
+        return;
+      }
+      element.textContent = text;
+      if (tone === "error") {
+        element.classList.add("text-red-500");
+        return;
+      }
+      if (tone === "success") {
+        element.classList.add("text-emerald-600");
+        return;
+      }
+      if (tone === "loading") {
+        element.classList.add("text-(--primary)");
+        return;
+      }
+      element.classList.add("text-60");
+    }
+
+    async function requestRegistrationCheck({ email, username }) {
+      const params = new URLSearchParams();
+      if (email) {
+        params.set("email", email);
+      }
+      if (username) {
+        params.set("username", username);
+      }
+      const response = await fetch(
+        `${API_REGISTER_CHECK}?${params.toString()}`,
+        {
+          method: "GET",
+          credentials: "include",
+          headers: {
+            Accept: "application/json",
+          },
+        },
+      );
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.ok) {
+        throw new Error(resolveRegisterError(data));
+      }
+      return data;
+    }
+
+    function buildAssetUrl(fileId) {
+      const normalized = String(fileId || "").trim();
+      if (!normalized) {
+        return "";
+      }
+      return `/api/v1/public/assets/${encodeURIComponent(normalized)}?width=160&height=160&fit=cover`;
+    }
+
+    function toSafeFileLabel(value) {
+      return String(value || "")
+        .trim()
+        .replace(/[\\/:*?"<>|]/g, "-")
+        .replace(/\s+/g, " ");
+    }
+
+    function resolveRegisterError(data) {
+      const error = data?.error;
+      const code = String(error?.code || "");
+      if (code === "REGISTER_DISABLED") {
+        return registerI18n.registerDisabled;
+      }
+      if (code === "EMAIL_EXISTS") {
+        return registerI18n.emailExists;
+      }
+      if (code === "USERNAME_EXISTS") {
+        return registerI18n.usernameExists;
+      }
+      if (code === "REGISTRATION_REQUEST_EXISTS") {
+        return registerI18n.requestExists;
+      }
+      if (code === "REGISTRATION_STATUS_CONFLICT") {
+        return registerI18n.statusConflict;
+      }
+      if (code === "REGISTRATION_REQUEST_FORBIDDEN") {
+        return registerI18n.requestForbidden;
+      }
+      if (code === "REGISTRATION_PASSWORD_REQUIRED") {
+        return registerI18n.passwordRequired;
+      }
+      if (code === "REGISTRATION_PASSWORD_INVALID") {
+        return registerI18n.passwordInvalid;
+      }
+      if (code === "REGISTRATION_PASSWORD_TOO_SHORT") {
+        return registerI18n.passwordTooShort;
+      }
+      if (code === "REGISTRATION_PASSWORD_TOO_LONG") {
+        return registerI18n.passwordTooLong;
+      }
+      return String(error?.message || registerI18n.submitFailed);
+    }
+
+    function persistReapplyDraft(draft) {
+      try {
+        const payload = {
+          email: String(draft?.email || "").trim(),
+          username: String(draft?.username || "").trim(),
+          displayName: String(draft?.displayName || "").trim(),
+          reason: String(draft?.reason || "").trim(),
+          avatarFileId: String(draft?.avatarFileId || "").trim(),
+          avatarUrl: String(draft?.avatarUrl || "").trim(),
+        };
+        if (
+          !payload.email &&
+          !payload.username &&
+          !payload.displayName &&
+          !payload.reason &&
+          !payload.avatarFileId
+        ) {
+          return;
+        }
+        window.sessionStorage.setItem(
+          REAPPLY_DRAFT_STORAGE_KEY,
+          JSON.stringify(payload),
+        );
+      } catch {
+        // ignore
+      }
+    }
+
+    function consumeReapplyDraft() {
+      try {
+        const raw = window.sessionStorage.getItem(REAPPLY_DRAFT_STORAGE_KEY);
+        if (!raw) {
+          return null;
+        }
+        window.sessionStorage.removeItem(REAPPLY_DRAFT_STORAGE_KEY);
+        const data = JSON.parse(raw);
+        if (!data || typeof data !== "object") {
+          return null;
+        }
+        return {
+          email: String(data.email || "").trim(),
+          username: String(data.username || "").trim(),
+          displayName: String(data.displayName || "").trim(),
+          reason: String(data.reason || "").trim(),
+          avatarFileId: String(data.avatarFileId || "").trim(),
+          avatarUrl: String(data.avatarUrl || "").trim(),
+        };
+      } catch {
+        return null;
+      }
+    }
+
+    async function initRegisterPage() {
+      const form = document.getElementById("register-form");
+      if (!form || form.hasAttribute(DATA_BOUND)) {
+        return;
+      }
+
+      const emailEl = document.getElementById("register-email");
+      const emailHintEl = document.getElementById("register-email-hint");
+      const usernameEl = document.getElementById("register-username");
+      const usernameHintEl = document.getElementById("register-username-hint");
+      const displayNameEl = document.getElementById("register-display-name");
+      const passwordEl = document.getElementById("register-password");
+      const passwordHintEl = document.getElementById("register-password-hint");
+      const passwordToggleEl = document.getElementById(
+        "register-password-toggle",
+      );
+      const reasonEl = document.getElementById("register-reason");
+      const submitBtn = document.getElementById("register-submit");
+      const submitText = document.getElementById("register-submit-text");
+      const avatarPreviewEl = document.getElementById(
+        "register-avatar-preview",
+      );
+      const avatarUploadBtn = document.getElementById(
+        "register-avatar-upload-btn",
+      );
+      const avatarClearBtn = document.getElementById(
+        "register-avatar-clear-btn",
+      );
+      const cropModal = document.getElementById("register-avatar-crop-modal");
+      const cropViewport = document.getElementById(
+        "register-avatar-crop-viewport",
+      );
+      const cropImage = document.getElementById("register-avatar-crop-image");
+      const cropEmpty = document.getElementById("register-avatar-crop-empty");
+      const cropFileInput = document.getElementById(
+        "register-avatar-crop-file",
+      );
+      const cropSelectBtn = document.getElementById(
+        "register-avatar-crop-select-btn",
+      );
+      const cropApplyBtn = document.getElementById(
+        "register-avatar-crop-apply-btn",
+      );
+      const cropCancelBtn = document.getElementById(
+        "register-avatar-crop-cancel-btn",
+      );
+      const cropZoomInput = document.getElementById(
+        "register-avatar-crop-zoom",
+      );
+      const cropMsg = document.getElementById("register-avatar-crop-msg");
+
+      if (
+        !emailEl ||
+        !emailHintEl ||
+        !usernameEl ||
+        !usernameHintEl ||
+        !displayNameEl ||
+        !passwordEl ||
+        !passwordHintEl ||
+        !passwordToggleEl ||
+        !reasonEl ||
+        !submitBtn ||
+        !submitText ||
+        !avatarPreviewEl ||
+        !avatarUploadBtn ||
+        !avatarClearBtn ||
+        !cropModal ||
+        !cropViewport ||
+        !cropImage ||
+        !cropEmpty ||
+        !cropFileInput ||
+        !cropSelectBtn ||
+        !cropApplyBtn ||
+        !cropCancelBtn ||
+        !cropZoomInput ||
+        !cropMsg
+      ) {
+        window.setTimeout(() => {
+          if (!form.hasAttribute(DATA_BOUND)) {
+            void initRegisterPage();
+          }
+        }, 0);
+        return;
+      }
+      form.setAttribute(DATA_BOUND, "1");
+
+      const setAvatarPreviewSrc = (input) => {
+        const next = String(input || "").trim() || DEFAULT_AVATAR_SRC;
+        avatarPreviewEl.dataset.fallbackApplied = "0";
+        avatarPreviewEl.src = next;
+      };
+      avatarPreviewEl.addEventListener("error", () => {
+        if (avatarPreviewEl.dataset.fallbackApplied === "1") {
+          return;
+        }
+        avatarPreviewEl.dataset.fallbackApplied = "1";
+        avatarPreviewEl.src = DEFAULT_AVATAR_SRC;
+      });
+      setAvatarPreviewSrc(DEFAULT_AVATAR_SRC);
+
+      let avatarFileId = "";
+      let pendingAvatarBlob = null;
+      let pendingAvatarPreviewUrl = "";
+      let avatarUploading = false;
+      let emailCheckSeq = 0;
+      let usernameCheckSeq = 0;
+      let emailCheckTimer = 0;
+      let usernameCheckTimer = 0;
+      let emailCheckPassed = false;
+      let usernameCheckPassed = false;
+      let passwordCheckPassed = false;
+      let cropObjectUrl = "";
+      let cropLoaded = false;
+      let cropImageWidth = 0;
+      let cropImageHeight = 0;
+      let cropViewportSize = 0;
+      let cropMinScale = 1;
+      let cropScale = 1;
+      let cropOffsetX = 0;
+      let cropOffsetY = 0;
+      let cropPointerId = null;
+      let cropPointerX = 0;
+      let cropPointerY = 0;
+
+      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
+      const revokePendingAvatarPreviewUrl = () => {
+        if (!pendingAvatarPreviewUrl) {
+          return;
+        }
+        URL.revokeObjectURL(pendingAvatarPreviewUrl);
+        pendingAvatarPreviewUrl = "";
+      };
+
+      const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const USERNAME_PATTERN = /^[A-Za-z0-9_-]+$/;
+      const PASSWORD_PATTERN = /^[A-Za-z0-9@_]+$/;
+      const PASSWORD_MIN_LENGTH = 8;
+      const PASSWORD_MAX_LENGTH = 20;
+
+      const validateEmailField = async (force = false) => {
+        const value = String(emailEl.value || "").trim();
+        emailCheckPassed = false;
+        if (!value) {
+          setFieldHint(emailHintEl, registerI18n.emailRequired, "default");
+          return false;
+        }
+        if (!EMAIL_PATTERN.test(value)) {
+          setFieldHint(emailHintEl, registerI18n.emailInvalid, "error");
+          return false;
+        }
+
+        const run = async () => {
+          const currentSeq = ++emailCheckSeq;
+          setFieldHint(emailHintEl, registerI18n.checking, "loading");
+          try {
+            const data = await requestRegistrationCheck({ email: value });
+            if (currentSeq !== emailCheckSeq) {
+              return false;
+            }
+            const result = data?.email;
+            if (result?.valid && result?.available) {
+              emailCheckPassed = true;
+              setFieldHint(emailHintEl, registerI18n.emailAvailable, "success");
+              return true;
+            }
+            setFieldHint(
+              emailHintEl,
+              result?.error?.message || registerI18n.emailUnavailable,
+              "error",
+            );
+            return false;
+          } catch (error) {
+            if (currentSeq !== emailCheckSeq) {
+              return false;
+            }
+            setFieldHint(
+              emailHintEl,
+              error instanceof Error
+                ? error.message
+                : registerI18n.emailCheckFailed,
+              "error",
+            );
+            return false;
+          }
+        };
+
+        if (force) {
+          return await run();
+        }
+        window.clearTimeout(emailCheckTimer);
+        emailCheckTimer = window.setTimeout(() => {
+          void run();
+        }, 350);
+        return false;
+      };
+
+      const validateUsernameField = async (force = false) => {
+        const value = String(usernameEl.value || "").trim();
+        usernameCheckPassed = false;
+        if (!value) {
+          setFieldHint(
+            usernameHintEl,
+            registerI18n.usernameRequired,
+            "default",
+          );
+          return false;
+        }
+        if (!USERNAME_PATTERN.test(value)) {
+          setFieldHint(usernameHintEl, registerI18n.usernameRule, "error");
+          return false;
+        }
+        if (value.length > 14) {
+          setFieldHint(usernameHintEl, registerI18n.usernameTooLong, "error");
+          return false;
+        }
+
+        const run = async () => {
+          const currentSeq = ++usernameCheckSeq;
+          setFieldHint(usernameHintEl, registerI18n.checking, "loading");
+          try {
+            const data = await requestRegistrationCheck({ username: value });
+            if (currentSeq !== usernameCheckSeq) {
+              return false;
+            }
+            const result = data?.username;
+            if (result?.valid && result?.available) {
+              usernameCheckPassed = true;
+              setFieldHint(
+                usernameHintEl,
+                registerI18n.usernameAvailable,
+                "success",
+              );
+              return true;
+            }
+            setFieldHint(
+              usernameHintEl,
+              result?.error?.message || registerI18n.usernameUnavailable,
+              "error",
+            );
+            return false;
+          } catch (error) {
+            if (currentSeq !== usernameCheckSeq) {
+              return false;
+            }
+            setFieldHint(
+              usernameHintEl,
+              error instanceof Error
+                ? error.message
+                : registerI18n.usernameCheckFailed,
+              "error",
+            );
+            return false;
+          }
+        };
+
+        if (force) {
+          return await run();
+        }
+        window.clearTimeout(usernameCheckTimer);
+        usernameCheckTimer = window.setTimeout(() => {
+          void run();
+        }, 350);
+        return false;
+      };
+
+      const setPasswordVisible = (visible) => {
+        const nextType = visible ? "text" : "password";
+        try {
+          passwordEl.type = nextType;
+        } catch {
+          // ignore
+        }
+        const actuallyVisible = passwordEl.type === "text";
+        passwordToggleEl
+          .querySelector(".register-password-icon-show")
+          ?.classList.toggle("hidden", actuallyVisible);
+        passwordToggleEl
+          .querySelector(".register-password-icon-hide")
+          ?.classList.toggle("hidden", !actuallyVisible);
+        passwordToggleEl.setAttribute(
+          "aria-label",
+          actuallyVisible
+            ? registerI18n.hidePassword
+            : registerI18n.showPassword,
+        );
+        passwordToggleEl.setAttribute(
+          "aria-pressed",
+          actuallyVisible ? "true" : "false",
+        );
+      };
+
+      const validatePasswordField = (force = false) => {
+        const value = String(passwordEl.value || "");
+        const trimmed = value.trim();
+        passwordCheckPassed = false;
+        if (!trimmed) {
+          setFieldHint(
+            passwordHintEl,
+            force ? registerI18n.passwordEmpty : registerI18n.passwordSetHint,
+            force ? "error" : "default",
+          );
+          return false;
+        }
+        if (value.length < PASSWORD_MIN_LENGTH) {
+          setFieldHint(passwordHintEl, registerI18n.passwordTooShort, "error");
+          return false;
+        }
+        if (value.length > PASSWORD_MAX_LENGTH) {
+          setFieldHint(passwordHintEl, registerI18n.passwordTooLong, "error");
+          return false;
+        }
+        if (!PASSWORD_PATTERN.test(value)) {
+          setFieldHint(passwordHintEl, registerI18n.passwordInvalid, "error");
+          return false;
+        }
+        passwordCheckPassed = true;
+        setFieldHint(
+          passwordHintEl,
+          registerI18n.passwordLengthValid,
+          "success",
+        );
+        return true;
+      };
+
+      const reapplyDraft = consumeReapplyDraft();
+      if (reapplyDraft) {
+        if (reapplyDraft.email) {
+          emailEl.value = reapplyDraft.email;
+        }
+        if (reapplyDraft.username) {
+          usernameEl.value = reapplyDraft.username;
+        }
+        if (reapplyDraft.displayName) {
+          displayNameEl.value = reapplyDraft.displayName;
+        }
+        if (reapplyDraft.reason) {
+          reasonEl.value = reapplyDraft.reason;
+        }
+        if (reapplyDraft.avatarFileId) {
+          avatarFileId = reapplyDraft.avatarFileId;
+          pendingAvatarBlob = null;
+          revokePendingAvatarPreviewUrl();
+          setAvatarPreviewSrc(
+            reapplyDraft.avatarUrl || buildAssetUrl(reapplyDraft.avatarFileId),
+          );
+        }
+        void validateEmailField(false);
+        void validateUsernameField(false);
+        setPageMessage(registerI18n.reapplyDraftLoaded, "success");
+      }
+
+      const setCropMessage = (message) => {
+        cropMsg.textContent = String(message || "");
+      };
+
+      const setCropApplyState = () => {
+        cropApplyBtn.disabled = !cropLoaded || avatarUploading;
+        cropApplyBtn.textContent = avatarUploading
+          ? registerI18n.cropUploading
+          : registerI18n.cropApply;
+      };
+
+      const setCropEmptyVisible = (visible) => {
+        cropEmpty.classList.toggle("hidden", !visible);
+      };
+
+      const revokeCropObjectUrl = () => {
+        if (!cropObjectUrl) {
+          return;
+        }
+        URL.revokeObjectURL(cropObjectUrl);
+        cropObjectUrl = "";
+      };
+
+      const resetCropState = () => {
+        revokeCropObjectUrl();
+        cropLoaded = false;
+        cropImageWidth = 0;
+        cropImageHeight = 0;
+        cropViewportSize = 0;
+        cropMinScale = 1;
+        cropScale = 1;
+        cropOffsetX = 0;
+        cropOffsetY = 0;
+        cropPointerId = null;
+        cropPointerX = 0;
+        cropPointerY = 0;
+        cropImage.removeAttribute("src");
+        cropImage.classList.add("hidden");
+        cropImage.style.transform = "";
+        cropImage.style.width = "";
+        cropImage.style.height = "";
+        cropZoomInput.value = String(AVATAR_ZOOM_MIN);
+        setCropMessage("");
+        setCropEmptyVisible(true);
+        setCropApplyState();
+      };
+
+      const openCropModal = () => {
+        cropModal.classList.remove("hidden");
+        cropModal.classList.add("flex");
+        cropModal.focus();
+        resetCropState();
+      };
+
+      const closeCropModal = () => {
+        cropModal.classList.remove("flex");
+        cropModal.classList.add("hidden");
+        cropFileInput.value = "";
+        resetCropState();
+      };
+
+      const measureViewport = () => {
+        const rect = cropViewport.getBoundingClientRect();
+        return Math.min(rect.width, rect.height);
+      };
+
+      const clampCropOffset = () => {
+        if (!cropLoaded || cropViewportSize <= 0) {
+          return;
+        }
+        const scaledWidth = cropImageWidth * cropScale;
+        const scaledHeight = cropImageHeight * cropScale;
+        const minX = cropViewportSize - scaledWidth;
+        const minY = cropViewportSize - scaledHeight;
+        cropOffsetX = clamp(cropOffsetX, minX, 0);
+        cropOffsetY = clamp(cropOffsetY, minY, 0);
+      };
+
+      const renderCropImage = () => {
+        if (!cropLoaded) {
+          cropImage.classList.add("hidden");
+          setCropEmptyVisible(true);
+          return;
+        }
+        clampCropOffset();
+        cropImage.classList.remove("hidden");
+        cropImage.style.width = `${cropImageWidth}px`;
+        cropImage.style.height = `${cropImageHeight}px`;
+        cropImage.style.transform = `translate3d(${cropOffsetX}px, ${cropOffsetY}px, 0) scale(${cropScale})`;
+        cropImage.style.transformOrigin = "top left";
+        setCropEmptyVisible(false);
+      };
+
+      const setCropScaleFromZoom = (zoomValue, anchorX, anchorY) => {
+        if (!cropLoaded || cropViewportSize <= 0) {
+          return;
+        }
+        const normalizedZoom = clamp(
+          Number.isFinite(Number(zoomValue))
+            ? Number(zoomValue)
+            : AVATAR_ZOOM_MIN,
+          AVATAR_ZOOM_MIN,
+          AVATAR_ZOOM_MAX,
+        );
+        const nextScale = cropMinScale * (normalizedZoom / 100);
+        const safeAnchorX = clamp(anchorX, 0, cropViewportSize);
+        const safeAnchorY = clamp(anchorY, 0, cropViewportSize);
+        const imagePointX = (safeAnchorX - cropOffsetX) / cropScale;
+        const imagePointY = (safeAnchorY - cropOffsetY) / cropScale;
+        cropScale = nextScale;
+        cropOffsetX = safeAnchorX - imagePointX * cropScale;
+        cropOffsetY = safeAnchorY - imagePointY * cropScale;
+        clampCropOffset();
+        renderCropImage();
+        cropZoomInput.value = String(Math.round(normalizedZoom));
+      };
+
+      const loadCropFile = (file) => {
+        if (!file) {
+          setCropMessage(registerI18n.selectImage);
+          return;
+        }
+        if (file.size > 1.5 * 1024 * 1024) {
+          setCropMessage(registerI18n.avatarTooLarge);
+          return;
+        }
+        setCropMessage("");
+        const nextObjectUrl = URL.createObjectURL(file);
+        cropImage.onload = () => {
+          cropLoaded = true;
+          cropImageWidth = Math.max(1, cropImage.naturalWidth);
+          cropImageHeight = Math.max(1, cropImage.naturalHeight);
+          cropViewportSize = measureViewport() || 320;
+          cropMinScale = Math.max(
+            cropViewportSize / cropImageWidth,
+            cropViewportSize / cropImageHeight,
+          );
+          cropScale = cropMinScale;
+          cropOffsetX = (cropViewportSize - cropImageWidth * cropScale) / 2;
+          cropOffsetY = (cropViewportSize - cropImageHeight * cropScale) / 2;
+          cropZoomInput.value = String(AVATAR_ZOOM_MIN);
+          renderCropImage();
+          setCropApplyState();
+        };
+        cropImage.onerror = () => {
+          setCropMessage(registerI18n.imageReadFailed);
+          resetCropState();
+        };
+        revokeCropObjectUrl();
+        cropObjectUrl = nextObjectUrl;
+        cropImage.src = nextObjectUrl;
+      };
+
+      const buildCropBlob = async () => {
+        if (!cropLoaded || cropViewportSize <= 0) {
+          return null;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.width = AVATAR_OUTPUT_SIZE;
+        canvas.height = AVATAR_OUTPUT_SIZE;
+        const context = canvas.getContext("2d");
+        if (!context) {
+          return null;
+        }
+        const ratio = AVATAR_OUTPUT_SIZE / cropViewportSize;
+        context.imageSmoothingEnabled = true;
+        context.imageSmoothingQuality = "high";
+        context.clearRect(0, 0, canvas.width, canvas.height);
+        context.drawImage(
+          cropImage,
+          cropOffsetX * ratio,
+          cropOffsetY * ratio,
+          cropImageWidth * cropScale * ratio,
+          cropImageHeight * cropScale * ratio,
+        );
+        return await new Promise((resolve) => {
+          canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.92);
+        });
+      };
+
+      const uploadCroppedAvatar = async (blob) => {
+        const avatarTitleBase = `Avatar-${toSafeFileLabel(String(emailEl.value || "").trim() || "unknown")}`;
+        const formData = new FormData();
+        formData.append("file", blob, `${avatarTitleBase}.jpg`);
+        formData.append("title", avatarTitleBase);
+        formData.append("purpose", "registration-avatar");
+        const response = await fetch(API_UPLOAD, {
+          method: "POST",
+          credentials: "include",
+          headers: { "x-csrf-token": getCsrfToken() },
+          body: formData,
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.ok || !data?.file?.id) {
+          throw new Error(resolveRegisterError(data));
+        }
+        return String(data.file.id);
+      };
+
+      const applyCrop = async () => {
+        if (!cropLoaded || avatarUploading) {
+          return;
+        }
+        avatarUploading = true;
+        setCropApplyState();
+        try {
+          const blob = await buildCropBlob();
+          if (!blob) {
+            setCropMessage(registerI18n.cropFailedRetry);
+            return;
+          }
+          pendingAvatarBlob = blob;
+          avatarFileId = "";
+          revokePendingAvatarPreviewUrl();
+          pendingAvatarPreviewUrl = URL.createObjectURL(blob);
+          setAvatarPreviewSrc(pendingAvatarPreviewUrl);
+          closeCropModal();
+        } catch (error) {
+          setCropMessage(
+            error instanceof Error
+              ? error.message
+              : registerI18n.avatarUploadFailed,
+          );
+        } finally {
+          avatarUploading = false;
+          setCropApplyState();
+        }
+      };
+
+      avatarUploadBtn.addEventListener("click", openCropModal);
+      emailEl.addEventListener("input", () => {
+        void validateEmailField(false);
+      });
+      emailEl.addEventListener("blur", () => {
+        void validateEmailField(true);
+      });
+      usernameEl.addEventListener("input", () => {
+        void validateUsernameField(false);
+      });
+      usernameEl.addEventListener("blur", () => {
+        void validateUsernameField(true);
+      });
+      passwordEl.addEventListener("input", () => {
+        validatePasswordField(false);
+      });
+      passwordEl.addEventListener("blur", () => {
+        validatePasswordField(true);
+      });
+      setPasswordVisible(false);
+      passwordToggleEl.addEventListener("pointerdown", (event) => {
+        event.preventDefault();
+      });
+      passwordToggleEl.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        setPasswordVisible(passwordEl.type === "password");
+      });
+      avatarClearBtn.addEventListener("click", () => {
+        avatarFileId = "";
+        pendingAvatarBlob = null;
+        revokePendingAvatarPreviewUrl();
+        setAvatarPreviewSrc(DEFAULT_AVATAR_SRC);
+      });
+      cropSelectBtn.addEventListener("click", () => cropFileInput.click());
+      cropFileInput.addEventListener("change", () => {
+        const file = cropFileInput.files?.[0];
+        if (file) {
+          loadCropFile(file);
+        }
+      });
+      cropZoomInput.addEventListener("input", () => {
+        const center = cropViewportSize > 0 ? cropViewportSize / 2 : 0;
+        setCropScaleFromZoom(cropZoomInput.value, center, center);
+      });
+      cropApplyBtn.addEventListener("click", () => void applyCrop());
+      cropCancelBtn.addEventListener("click", () => {
+        if (!avatarUploading) {
+          closeCropModal();
+        }
+      });
+      cropModal.addEventListener("click", (event) => {
+        if (!avatarUploading && event.target === cropModal) {
+          closeCropModal();
+        }
+      });
+      cropModal.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !avatarUploading) {
+          closeCropModal();
+        }
+      });
+      cropViewport.addEventListener("pointerdown", (event) => {
+        if (!cropLoaded) {
+          return;
+        }
+        cropPointerId = event.pointerId;
+        cropPointerX = event.clientX;
+        cropPointerY = event.clientY;
+        cropViewport.setPointerCapture(event.pointerId);
+      });
+      cropViewport.addEventListener("pointermove", (event) => {
+        if (!cropLoaded || cropPointerId !== event.pointerId) {
+          return;
+        }
+        const deltaX = event.clientX - cropPointerX;
+        const deltaY = event.clientY - cropPointerY;
+        cropPointerX = event.clientX;
+        cropPointerY = event.clientY;
+        cropOffsetX += deltaX;
+        cropOffsetY += deltaY;
+        renderCropImage();
+      });
+      const releasePointer = (event) => {
+        if (cropPointerId !== event.pointerId) {
+          return;
+        }
+        if (cropViewport.hasPointerCapture(event.pointerId)) {
+          cropViewport.releasePointerCapture(event.pointerId);
+        }
+        cropPointerId = null;
+      };
+      cropViewport.addEventListener("pointerup", releasePointer);
+      cropViewport.addEventListener("pointercancel", releasePointer);
+
+      form.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        setPageMessage("");
+        const email = String(emailEl.value || "").trim();
+        const username = String(usernameEl.value || "").trim();
+        const displayName = String(displayNameEl.value || "").trim();
+        const password = String(passwordEl.value || "");
+        const registrationReason = String(reasonEl.value || "").trim();
+
+        if (
+          !email ||
+          !username ||
+          !displayName ||
+          !password ||
+          !registrationReason
+        ) {
+          setPageMessage(registerI18n.completeForm, "error");
+          return;
+        }
+        if (password.length < 8 || password.length > 20) {
+          setPageMessage(registerI18n.passwordRangeInvalid, "error");
+          return;
+        }
+        const passwordAvailable = passwordCheckPassed
+          ? true
+          : validatePasswordField(true);
+        if (!passwordAvailable) {
+          setPageMessage(registerI18n.fixPasswordFirst, "error");
+          return;
+        }
+        const [emailAvailable, usernameAvailable] = await Promise.all([
+          emailCheckPassed ? Promise.resolve(true) : validateEmailField(true),
+          usernameCheckPassed
+            ? Promise.resolve(true)
+            : validateUsernameField(true),
+        ]);
+        if (!emailAvailable || !usernameAvailable) {
+          setPageMessage(registerI18n.fixAccountFieldFirst, "error");
+          return;
+        }
+
+        submitBtn.disabled = true;
+        submitText.textContent = registerI18n.submitting;
+        const overlayHandle = startOverlayTask({
+          title: registerI18n.submitOverlayTitle,
+          mode: "indeterminate",
+          text: registerI18n.submitOverlayText,
+        });
+        try {
+          if (pendingAvatarBlob) {
+            submitText.textContent = registerI18n.uploadAvatarButtonText;
+            updateOverlayTask(overlayHandle, {
+              text: registerI18n.uploadAvatarOverlayText,
+            });
+            avatarFileId = await uploadCroppedAvatar(pendingAvatarBlob);
+            pendingAvatarBlob = null;
+            revokePendingAvatarPreviewUrl();
+            setAvatarPreviewSrc(buildAssetUrl(avatarFileId));
+            submitText.textContent = registerI18n.submitting;
+          }
+          updateOverlayTask(overlayHandle, {
+            text: registerI18n.submitRequestOverlayText,
+          });
+          const payload = {
+            email,
+            username,
+            display_name: displayName,
+            password,
+            registration_reason: registrationReason,
+            avatar_file: avatarFileId || null,
+          };
+          const response = await fetch(API_REGISTER, {
+            method: "POST",
+            credentials: "include",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/json",
+              "x-csrf-token": getCsrfToken(),
+            },
+            body: JSON.stringify(payload),
+          });
+          const data = await response.json().catch(() => null);
+          if (!response.ok || !data?.ok) {
+            setPageMessage(resolveRegisterError(data), "error");
+            return;
+          }
+          updateOverlayTask(overlayHandle, {
+            text: registerI18n.submitSuccessRedirecting,
+          });
+          window.location.assign("/auth/register");
+          return;
+        } catch (error) {
+          setPageMessage(
+            error instanceof Error
+              ? error.message
+              : registerI18n.submitFailedRetry,
+            "error",
+          );
+        } finally {
+          submitBtn.disabled = false;
+          submitText.textContent = registerI18n.submitButtonText;
+          finishOverlayTask(overlayHandle);
+        }
+      });
+    }
+
+    function initRegistrationStatusPage() {
+      const retryButton = document.getElementById("register-reapply-btn");
+      if (retryButton && !retryButton.hasAttribute("data-bound")) {
+        retryButton.setAttribute("data-bound", "1");
+        const originalText =
+          retryButton.textContent || registerI18n.reapplyButtonText;
+        retryButton.addEventListener("click", async () => {
+          persistReapplyDraft({
+            email: retryButton.getAttribute("data-reapply-email"),
+            username: retryButton.getAttribute("data-reapply-username"),
+            displayName: retryButton.getAttribute("data-reapply-display-name"),
+            reason: retryButton.getAttribute("data-reapply-reason"),
+            avatarFileId: retryButton.getAttribute("data-reapply-avatar-file"),
+            avatarUrl: retryButton.getAttribute("data-reapply-avatar-url"),
+          });
+          retryButton.setAttribute("disabled", "true");
+          retryButton.textContent = registerI18n.processing;
+          const overlayHandle = startOverlayTask({
+            title: registerI18n.resetStatusTitle,
+            mode: "indeterminate",
+            text: registerI18n.processing,
+          });
+          try {
+            const response = await fetch(API_REGISTER_SESSION, {
+              method: "DELETE",
+              credentials: "include",
+              headers: {
+                Accept: "application/json",
+                "x-csrf-token": getCsrfToken(),
+              },
+            });
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.ok) {
+              window.alert(resolveRegisterError(data));
+              return;
+            }
+            updateOverlayTask(overlayHandle, {
+              text: registerI18n.processedRedirecting,
+            });
+            window.location.assign("/auth/register");
+          } catch (error) {
+            window.alert(
+              error instanceof Error ? error.message : registerI18n.resetFailed,
+            );
+          } finally {
+            retryButton.removeAttribute("disabled");
+            retryButton.textContent = originalText;
+            finishOverlayTask(overlayHandle);
+          }
+        });
+      }
+
+      const cancelButton = document.getElementById("register-cancel-btn");
+      if (cancelButton && !cancelButton.hasAttribute("data-bound")) {
+        cancelButton.setAttribute("data-bound", "1");
+        const originalText =
+          cancelButton.textContent || registerI18n.cancelRequestButtonText;
+        cancelButton.addEventListener("click", async () => {
+          const requestId = String(
+            cancelButton.getAttribute("data-request-id") || "",
+          ).trim();
+          if (!requestId) {
+            await window.showNoticeDialog({
+              message: registerI18n.invalidRequestId,
+            });
+            return;
+          }
+          const confirmCancel = await window.showConfirmDialog({
+            message: registerI18n.confirmCancelRequest,
+            confirmText: registerI18n.confirmCancelText,
+            cancelText: registerI18n.cancelThinkAgain,
+            confirmVariant: "danger",
+          });
+          if (!confirmCancel) {
+            return;
+          }
+          cancelButton.setAttribute("disabled", "true");
+          cancelButton.textContent = registerI18n.processing;
+          const overlayHandle = startOverlayTask({
+            title: registerI18n.cancelOverlayTitle,
+            mode: "indeterminate",
+            text: registerI18n.processing,
+          });
+          try {
+            const response = await fetch(
+              `${API_REGISTER_BASE}/${encodeURIComponent(requestId)}`,
+              {
+                method: "PATCH",
+                credentials: "include",
+                headers: {
+                  "Content-Type": "application/json",
+                  Accept: "application/json",
+                  "x-csrf-token": getCsrfToken(),
+                },
+                body: JSON.stringify({
+                  action: "cancel",
+                }),
+              },
+            );
+            const data = await response.json().catch(() => null);
+            if (!response.ok || !data?.ok) {
+              await window.showNoticeDialog({
+                message: resolveRegisterError(data),
+              });
+              return;
+            }
+            updateOverlayTask(overlayHandle, {
+              text: registerI18n.cancelSuccessRefreshing,
+            });
+            window.location.assign("/auth/register");
+          } catch (error) {
+            await window.showNoticeDialog({
+              message:
+                error instanceof Error
+                  ? error.message
+                  : registerI18n.cancelFailed,
+            });
+          } finally {
+            cancelButton.removeAttribute("disabled");
+            cancelButton.textContent = originalText;
+            finishOverlayTask(overlayHandle);
+          }
+        });
+      }
+    }
+
+    function initPage() {
+      bindCurrentAvatarFallback();
+      initRegisterPage();
+      initRegistrationStatusPage();
+    }
+
+    initPage();
+    document.addEventListener("astro:after-swap", initPage);
+  </script>
+</MainGridLayout>

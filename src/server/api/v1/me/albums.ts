@@ -1,0 +1,378 @@
+import type { APIContext } from "astro";
+
+import type { AppAlbum } from "@/types/app";
+import {
+    ALBUM_PHOTO_MAX,
+    ALBUM_TITLE_MAX,
+    weightedCharLength,
+} from "@/constants/text-limits";
+import type { JsonObject } from "@/types/json";
+import { assertCan, assertOwnerOrAdmin } from "@/server/auth/acl";
+import {
+    countItems,
+    createOne,
+    deleteOne,
+    readMany,
+    readOneById,
+    updateOne,
+} from "@/server/directus/client";
+import { fail, ok } from "@/server/api/response";
+import { parseJsonBody, parsePagination } from "@/server/api/utils";
+import { validateBody } from "@/server/api/validate";
+import {
+    CreateAlbumSchema,
+    UpdateAlbumSchema,
+    CreateAlbumPhotoSchema,
+    UpdateAlbumPhotoSchema,
+} from "@/server/api/schemas";
+import {
+    createWithShortId,
+    isUniqueConstraintError,
+} from "@/server/utils/short-id";
+import { cacheManager } from "@/server/cache/manager";
+
+import type { AppAccess } from "../shared";
+import { hasOwn, parseRouteId, safeCsv, sanitizeSlug } from "../shared";
+import {
+    cleanupOrphanDirectusFiles,
+    collectAlbumFileIds,
+    normalizeDirectusFileId,
+} from "../shared/file-cleanup";
+import { isSlugUniqueConflict, bindFileOwnerToUser } from "./_helpers";
+
+export async function handleMeAlbums(
+    context: APIContext,
+    access: AppAccess,
+    segments: string[],
+): Promise<Response> {
+    if (segments.length === 1) {
+        if (context.request.method === "GET") {
+            const { page, limit, offset } = parsePagination(context.url);
+            const rows = await readMany("app_albums", {
+                filter: {
+                    author_id: { _eq: access.user.id },
+                } as JsonObject,
+                sort: ["-date", "-date_created"],
+                limit,
+                offset,
+            });
+            return ok({
+                items: rows.map((row) => ({ ...row, tags: safeCsv(row.tags) })),
+                page,
+                limit,
+                total: rows.length,
+            });
+        }
+
+        if (context.request.method === "POST") {
+            assertCan(access, "can_manage_albums");
+            const body = await parseJsonBody(context.request);
+            const input = validateBody(CreateAlbumSchema, body);
+
+            if (weightedCharLength(input.title) > ALBUM_TITLE_MAX) {
+                return fail(
+                    `相册标题过长（最多 ${ALBUM_TITLE_MAX} 字符，中文算 2 字符）`,
+                    400,
+                );
+            }
+
+            const baseSlug = sanitizeSlug(input.slug || input.title);
+            const albumPayload = {
+                status: (input.is_public
+                    ? "published"
+                    : "private") as AppAlbum["status"],
+                author_id: access.user.id,
+                title: input.title,
+                slug: baseSlug,
+                description: input.description ?? null,
+                cover_file: input.cover_file ?? null,
+                cover_url: input.cover_url ?? null,
+                date: input.date ?? null,
+                location: input.location ?? null,
+                tags: input.tags,
+                category: input.category ?? null,
+                layout: input.layout,
+                columns: input.columns,
+                is_public: input.is_public,
+            };
+
+            let created: AppAlbum | null = null;
+            let nextSlug = baseSlug;
+            let slugSuffix = 1;
+            const MAX_ALBUM_CREATE_RETRIES = 6;
+            for (
+                let attempt = 0;
+                attempt < MAX_ALBUM_CREATE_RETRIES;
+                attempt++
+            ) {
+                try {
+                    created = await createWithShortId(
+                        "app_albums",
+                        { ...albumPayload, slug: nextSlug },
+                        createOne,
+                    );
+                    break;
+                } catch (error) {
+                    if (
+                        isUniqueConstraintError(error) &&
+                        isSlugUniqueConflict(error) &&
+                        attempt < MAX_ALBUM_CREATE_RETRIES - 1
+                    ) {
+                        slugSuffix += 1;
+                        nextSlug = `${baseSlug}-${slugSuffix}`;
+                        continue;
+                    }
+                    throw error;
+                }
+            }
+            if (created?.cover_file) {
+                await bindFileOwnerToUser(created.cover_file, access.user.id);
+            }
+            void cacheManager.invalidateByDomain("album-list");
+            return ok({ item: { ...created, tags: safeCsv(created?.tags) } });
+        }
+    }
+
+    if (segments.length === 2) {
+        const id = parseRouteId(segments[1]);
+        if (!id) {
+            return fail("缺少相册 ID", 400);
+        }
+        const target = await readOneById("app_albums", id);
+        if (!target) {
+            return fail("相册不存在", 404);
+        }
+        assertOwnerOrAdmin(access, target.author_id);
+
+        if (context.request.method === "GET") {
+            const photos = await readMany("app_album_photos", {
+                filter: {
+                    album_id: { _eq: id },
+                } as JsonObject,
+                sort: ["sort", "-date_created"],
+                limit: 200,
+            });
+            return ok({
+                item: { ...target, tags: safeCsv(target.tags) },
+                photos: photos.map((photo) => ({
+                    ...photo,
+                    tags: safeCsv(photo.tags),
+                })),
+            });
+        }
+
+        if (context.request.method === "PATCH") {
+            const body = await parseJsonBody(context.request);
+            const input = validateBody(UpdateAlbumSchema, body);
+            const payload: JsonObject = {};
+            const prevCoverFile = normalizeDirectusFileId(target.cover_file);
+            let nextCoverFile = prevCoverFile;
+
+            if (input.title !== undefined) {
+                if (
+                    input.title &&
+                    weightedCharLength(input.title) > ALBUM_TITLE_MAX
+                ) {
+                    return fail(
+                        `相册标题过长（最多 ${ALBUM_TITLE_MAX} 字符，中文算 2 字符）`,
+                        400,
+                    );
+                }
+                payload.title = input.title;
+            }
+            if (input.slug !== undefined) {
+                payload.slug = input.slug ? sanitizeSlug(input.slug) : null;
+            }
+            if (input.description !== undefined) {
+                payload.description = input.description;
+            }
+            if (hasOwn(body as JsonObject, "cover_file")) {
+                nextCoverFile = normalizeDirectusFileId(input.cover_file);
+                payload.cover_file = input.cover_file ?? null;
+            }
+            if (input.cover_url !== undefined) {
+                payload.cover_url = input.cover_url;
+            }
+            if (input.date !== undefined) {
+                payload.date = input.date;
+            }
+            if (input.location !== undefined) {
+                payload.location = input.location;
+            }
+            if (input.tags !== undefined) {
+                payload.tags = input.tags;
+            }
+            if (input.category !== undefined) {
+                payload.category = input.category;
+            }
+            if (input.layout !== undefined) {
+                payload.layout = input.layout;
+            }
+            if (input.columns !== undefined) {
+                payload.columns = input.columns;
+            }
+            if (input.is_public !== undefined) {
+                payload.is_public = input.is_public;
+                payload.status = input.is_public ? "published" : "private";
+            }
+            const updated = await updateOne("app_albums", id, payload);
+            if (hasOwn(body as JsonObject, "cover_file") && nextCoverFile) {
+                await bindFileOwnerToUser(nextCoverFile, access.user.id);
+            }
+            if (
+                hasOwn(body as JsonObject, "cover_file") &&
+                prevCoverFile &&
+                prevCoverFile !== nextCoverFile
+            ) {
+                await cleanupOrphanDirectusFiles([prevCoverFile]);
+            }
+            void cacheManager.invalidateByDomain("album-list");
+            void cacheManager.invalidate("album-detail", id);
+            return ok({ item: { ...updated, tags: safeCsv(updated.tags) } });
+        }
+
+        if (context.request.method === "DELETE") {
+            const fileIds = await collectAlbumFileIds(id, target.cover_file);
+            await deleteOne("app_albums", id);
+            await cleanupOrphanDirectusFiles(fileIds);
+            void cacheManager.invalidateByDomain("album-list");
+            void cacheManager.invalidate("album-detail", id);
+            return ok({ id });
+        }
+    }
+
+    return fail("未找到接口", 404);
+}
+
+export async function handleMeAlbumPhotos(
+    context: APIContext,
+    access: AppAccess,
+    segments: string[],
+): Promise<Response> {
+    if (segments.length === 3 && context.request.method === "POST") {
+        assertCan(access, "can_manage_albums");
+        const albumId = parseRouteId(segments[1]);
+        if (!albumId) {
+            return fail("缺少相册 ID", 400);
+        }
+        const album = await readOneById("app_albums", albumId);
+        if (!album) {
+            return fail("相册不存在", 404);
+        }
+        assertOwnerOrAdmin(access, album.author_id);
+        const photoCount = await countItems("app_album_photos", {
+            album_id: { _eq: albumId },
+        } as JsonObject);
+        if (photoCount >= ALBUM_PHOTO_MAX) {
+            return fail(`相册最多 ${ALBUM_PHOTO_MAX} 张照片`, 400);
+        }
+        const body = await parseJsonBody(context.request);
+        const input = validateBody(CreateAlbumPhotoSchema, body);
+        const created = await createOne("app_album_photos", {
+            status: input.is_public ? "published" : "archived",
+            album_id: albumId,
+            file_id: input.file_id ?? null,
+            image_url: input.image_url ?? null,
+            title: input.title ?? null,
+            description: input.description ?? null,
+            tags: input.tags,
+            taken_at: input.taken_at ?? null,
+            location: input.location ?? null,
+            sort: input.sort ?? null,
+            is_public: input.is_public,
+            show_on_profile: input.show_on_profile,
+        });
+        if (created.file_id) {
+            await bindFileOwnerToUser(created.file_id, access.user.id);
+        }
+        void cacheManager.invalidate("album-detail", albumId);
+        return ok({ item: { ...created, tags: safeCsv(created.tags) } });
+    }
+
+    if (segments.length === 4) {
+        const photoId = parseRouteId(segments[3]);
+        if (!photoId) {
+            return fail("缺少图片 ID", 400);
+        }
+        const photo = await readOneById("app_album_photos", photoId);
+        if (!photo) {
+            return fail("图片不存在", 404);
+        }
+        const album = await readOneById("app_albums", photo.album_id);
+        if (!album) {
+            return fail("相册不存在", 404);
+        }
+        assertOwnerOrAdmin(access, album.author_id);
+
+        if (context.request.method === "PATCH") {
+            const body = await parseJsonBody(context.request);
+            const input = validateBody(UpdateAlbumPhotoSchema, body);
+            const payload: JsonObject = {};
+            const prevFileId = normalizeDirectusFileId(photo.file_id);
+            let nextFileId = prevFileId;
+            if (hasOwn(body as JsonObject, "file_id")) {
+                nextFileId = normalizeDirectusFileId(input.file_id);
+                payload.file_id = input.file_id ?? null;
+            }
+            if (input.image_url !== undefined) {
+                payload.image_url = input.image_url;
+            }
+            if (input.title !== undefined) {
+                payload.title = input.title;
+            }
+            if (input.description !== undefined) {
+                payload.description = input.description;
+            }
+            if (input.tags !== undefined) {
+                payload.tags = input.tags;
+            }
+            if (input.taken_at !== undefined) {
+                payload.taken_at = input.taken_at;
+            }
+            if (input.location !== undefined) {
+                payload.location = input.location;
+            }
+            if (input.sort !== undefined) {
+                payload.sort = input.sort;
+            }
+            if (input.is_public !== undefined) {
+                payload.is_public = input.is_public;
+            }
+            if (input.show_on_profile !== undefined) {
+                payload.show_on_profile = input.show_on_profile;
+            }
+            if (input.status !== undefined) {
+                payload.status = input.status;
+            }
+            const updated = await updateOne(
+                "app_album_photos",
+                photoId,
+                payload,
+            );
+            if (hasOwn(body as JsonObject, "file_id") && nextFileId) {
+                await bindFileOwnerToUser(nextFileId, access.user.id);
+            }
+            if (
+                hasOwn(body as JsonObject, "file_id") &&
+                prevFileId &&
+                prevFileId !== nextFileId
+            ) {
+                await cleanupOrphanDirectusFiles([prevFileId]);
+            }
+            void cacheManager.invalidate("album-detail", photo.album_id);
+            return ok({ item: { ...updated, tags: safeCsv(updated.tags) } });
+        }
+
+        if (context.request.method === "DELETE") {
+            const fileId = normalizeDirectusFileId(photo.file_id);
+            await deleteOne("app_album_photos", photoId);
+            if (fileId) {
+                await cleanupOrphanDirectusFiles([fileId]);
+            }
+            void cacheManager.invalidate("album-detail", photo.album_id);
+            return ok({ id: photoId });
+        }
+    }
+
+    return fail("未找到接口", 404);
+}

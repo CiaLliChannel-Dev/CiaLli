@@ -1,0 +1,89 @@
+/**
+ * 通用 Zod Schema 定义
+ *
+ * 全局共享的枚举、分页、可见性、社交链接等 schema。
+ */
+import * as z from "zod";
+
+// ── 枚举 ──
+
+export const AppStatusSchema = z.enum(["draft", "published", "archived"]);
+export const CommentStatusSchema = z.enum(["published", "hidden", "archived"]);
+export const WatchStatusSchema = z.enum([
+    "watching",
+    "completed",
+    "planned",
+    "onhold",
+    "dropped",
+]);
+export const AlbumLayoutSchema = z.enum(["grid", "masonry"]);
+export const AppRoleSchema = z.enum(["admin", "member"]);
+export const ReportTargetTypeSchema = z.enum([
+    "article",
+    "diary",
+    "article_comment",
+    "diary_comment",
+]);
+export const ReportReasonSchema = z.enum([
+    "spam",
+    "abuse",
+    "hate",
+    "violence",
+    "copyright",
+    "other",
+]);
+export const ReportStatusSchema = z.enum([
+    "pending",
+    "reviewed",
+    "resolved",
+    "rejected",
+]);
+export const RegistrationRequestStatusSchema = z.enum([
+    "pending",
+    "approved",
+    "rejected",
+    "cancelled",
+]);
+
+// ── 分页 ──
+
+export const PaginationSchema = z.object({
+    page: z.coerce.number().int().positive().default(1),
+    limit: z.coerce.number().int().positive().max(100).default(20),
+});
+
+// ── 可见性 PATCH ──
+
+export const VisibilityPatchSchema = z
+    .object({
+        status: AppStatusSchema,
+        is_public: z.boolean(),
+        show_on_profile: z.boolean(),
+    })
+    .partial();
+
+// ── 社交链接 ──
+
+export const SocialLinkSchema = z.object({
+    platform: z.string().min(1).max(50),
+    url: z.string().max(500),
+    enabled: z.boolean().default(true),
+});
+
+export const SocialLinksSchema = z
+    .array(SocialLinkSchema)
+    .max(20)
+    .nullable()
+    .default(null);
+
+// ── 标签 ──
+
+export const TagsSchema = z.array(z.string().max(100)).max(20).default([]);
+
+// ── 通用字段 ──
+
+/** 可选字符串（null 或 string） */
+export const OptionalStringSchema = z.string().nullable().optional();
+
+/** 正整数或 null */
+export const OptionalIntSchema = z.number().int().nullable().optional();

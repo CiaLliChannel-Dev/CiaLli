@@ -1,0 +1,233 @@
+import type { APIContext } from "astro";
+
+import type { JsonObject } from "@/types/json";
+import { deleteOne, readMany, updateOne } from "@/server/directus/client";
+import { fail, ok } from "@/server/api/response";
+import {
+    parseJsonBody,
+    toBooleanValue,
+    toOptionalString,
+    toStringValue,
+} from "@/server/api/utils";
+import { cacheManager } from "@/server/cache/manager";
+import {
+    cleanupOrphanDirectusFiles,
+    collectAlbumFileIds,
+    collectDiaryFileIds,
+    normalizeDirectusFileId,
+} from "../shared/file-cleanup";
+
+import {
+    ADMIN_MODULE_COLLECTION,
+    DIARY_FIELDS,
+    type AdminModuleKey,
+    hasOwn,
+    parseBodyTextField,
+    parseRouteId,
+    requireAdmin,
+} from "../shared";
+
+function invalidateDiaryDetailCache(id: string, shortId?: string | null): void {
+    void cacheManager.invalidate("diary-detail", id);
+    const normalizedShortId = String(shortId ?? "").trim();
+    if (normalizedShortId) {
+        void cacheManager.invalidate("diary-detail", normalizedShortId);
+    }
+}
+
+export async function handleAdminContent(
+    context: APIContext,
+    segments: string[],
+): Promise<Response> {
+    const required = await requireAdmin(context);
+    if ("response" in required) {
+        return required.response;
+    }
+
+    if (segments.length === 1 && context.request.method === "GET") {
+        const module = context.url.searchParams.get("module")?.trim() as
+            | AdminModuleKey
+            | undefined;
+
+        const modules: AdminModuleKey[] = module
+            ? ([module] as AdminModuleKey[])
+            : (Object.keys(ADMIN_MODULE_COLLECTION) as AdminModuleKey[]);
+
+        const items: Array<{
+            module: AdminModuleKey;
+            id: string;
+            author_id?: string;
+            title?: string;
+            status?: string;
+            is_public?: boolean;
+            show_on_profile?: boolean;
+            date_created?: string | null;
+        }> = [];
+
+        for (const key of modules) {
+            const collection = ADMIN_MODULE_COLLECTION[key];
+            const rows = await readMany(collection, {
+                sort: ["-date_created"],
+                limit: 40,
+                fields: key === "diaries" ? [...DIARY_FIELDS] : undefined,
+            });
+            for (const row of rows as JsonObject[]) {
+                const rowBody = toOptionalString(row.body);
+                items.push({
+                    module: key,
+                    id: toStringValue(row.id),
+                    author_id: toOptionalString(row.author_id) || undefined,
+                    title:
+                        toOptionalString(row.title) ||
+                        toOptionalString(row.slug) ||
+                        rowBody ||
+                        toOptionalString(row.content) ||
+                        undefined,
+                    status: toOptionalString(row.status) || undefined,
+                    is_public:
+                        typeof row.is_public === "boolean"
+                            ? row.is_public
+                            : undefined,
+                    show_on_profile:
+                        typeof row.show_on_profile === "boolean"
+                            ? row.show_on_profile
+                            : undefined,
+                    date_created: toOptionalString(row.date_created),
+                });
+            }
+        }
+
+        items.sort((a, b) => {
+            const at = new Date(a.date_created || "1970-01-01").getTime();
+            const bt = new Date(b.date_created || "1970-01-01").getTime();
+            return bt - at;
+        });
+        return ok({ items });
+    }
+
+    if (segments.length === 3) {
+        const module = parseRouteId(segments[1]) as AdminModuleKey;
+        const id = parseRouteId(segments[2]);
+        if (!module || !id) {
+            return fail("参数不完整", 400);
+        }
+        if (!(module in ADMIN_MODULE_COLLECTION)) {
+            return fail("不支持的模块", 400);
+        }
+        const collection = ADMIN_MODULE_COLLECTION[module];
+
+        if (context.request.method === "PATCH") {
+            const body = await parseJsonBody(context.request);
+            const payload: JsonObject = {};
+            if (hasOwn(body, "status")) {
+                payload.status = parseBodyTextField(body, "status");
+            }
+            if (hasOwn(body, "is_public")) {
+                payload.is_public = toBooleanValue(body.is_public, true);
+            }
+            if (
+                module !== "albums" &&
+                module !== "articles" &&
+                hasOwn(body, "show_on_profile")
+            ) {
+                payload.show_on_profile = toBooleanValue(
+                    body.show_on_profile,
+                    true,
+                );
+            }
+            if (hasOwn(body, "allow_comments")) {
+                payload.allow_comments = toBooleanValue(
+                    body.allow_comments,
+                    true,
+                );
+            }
+            const updated = await updateOne(
+                collection,
+                id,
+                payload,
+                module === "diaries"
+                    ? {
+                          fields: [...DIARY_FIELDS],
+                      }
+                    : undefined,
+            );
+            // 失效缓存
+            if (module === "articles") {
+                void cacheManager.invalidateByDomain("article-list");
+                void cacheManager.invalidate("article-detail", id);
+                void cacheManager.invalidateByDomain("home-feed");
+            } else if (module === "diaries") {
+                void cacheManager.invalidateByDomain("diary-list");
+                void cacheManager.invalidateByDomain("home-feed");
+                const updatedShortId =
+                    "short_id" in updated ? updated.short_id : null;
+                invalidateDiaryDetailCache(
+                    id,
+                    toOptionalString(updatedShortId),
+                );
+            } else if (module === "albums") {
+                void cacheManager.invalidateByDomain("album-list");
+                void cacheManager.invalidate("album-detail", id);
+            }
+            return ok({ item: updated });
+        }
+
+        if (context.request.method === "DELETE") {
+            const candidateFileIds: string[] = [];
+            if (module === "articles") {
+                const rows = await readMany("app_articles", {
+                    filter: { id: { _eq: id } } as JsonObject,
+                    fields: ["cover_file"],
+                    limit: 1,
+                });
+                const coverFile = normalizeDirectusFileId(rows[0]?.cover_file);
+                if (coverFile) {
+                    candidateFileIds.push(coverFile);
+                }
+            }
+            if (module === "albums") {
+                const rows = await readMany("app_albums", {
+                    filter: { id: { _eq: id } } as JsonObject,
+                    fields: ["cover_file"],
+                    limit: 1,
+                });
+                const fileIds = await collectAlbumFileIds(
+                    id,
+                    rows[0]?.cover_file,
+                );
+                candidateFileIds.push(...fileIds);
+            }
+            if (module === "diaries") {
+                const fileIds = await collectDiaryFileIds(id);
+                candidateFileIds.push(...fileIds);
+            }
+            let deletedDiaryShortId: string | null = null;
+            if (module === "diaries") {
+                const rows = await readMany("app_diaries", {
+                    filter: { id: { _eq: id } } as JsonObject,
+                    fields: ["short_id"],
+                    limit: 1,
+                });
+                deletedDiaryShortId = toOptionalString(rows[0]?.short_id);
+            }
+            await deleteOne(collection, id);
+            await cleanupOrphanDirectusFiles(candidateFileIds);
+            // 失效缓存
+            if (module === "articles") {
+                void cacheManager.invalidateByDomain("article-list");
+                void cacheManager.invalidate("article-detail", id);
+                void cacheManager.invalidateByDomain("home-feed");
+            } else if (module === "diaries") {
+                void cacheManager.invalidateByDomain("diary-list");
+                void cacheManager.invalidateByDomain("home-feed");
+                invalidateDiaryDetailCache(id, deletedDiaryShortId);
+            } else if (module === "albums") {
+                void cacheManager.invalidateByDomain("album-list");
+                void cacheManager.invalidate("album-detail", id);
+            }
+            return ok({ id, module });
+        }
+    }
+
+    return fail("未找到接口", 404);
+}

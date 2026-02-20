@@ -1,0 +1,880 @@
+---
+import BackToTop from "@components/control/BackToTop.astro";
+import FloatingTOC from "@components/control/FloatingTOC.astro";
+import Footer from "@components/Footer.astro";
+import RightSideBar from "@components/layout/RightSideBar.astro";
+import Navbar from "@components/Navbar.astro";
+import SideBar from "@components/widget/SideBar.astro";
+import type { MarkdownHeading } from "astro";
+import IconifyLoader from "../components/misc/IconifyLoader.astro";
+import ImageWrapper from "../components/misc/ImageWrapper.astro";
+import TypewriterText from "../components/TypewriterText.astro";
+import TOC from "../components/widget/TOC.astro";
+import { buildLegacySiteConfig } from "@/config";
+import { getResolvedSiteSettings } from "@/server/site-settings/service";
+import {
+  BANNER_HEIGHT_EXTEND,
+  BANNER_HEIGHT_HOME,
+} from "../constants/constants";
+import { widgetManager } from "@utils/widget-manager";
+import Layout from "@layouts/Layout.astro";
+
+const resolvedSiteSettings =
+  Astro.locals.siteSettings ?? (await getResolvedSiteSettings());
+const siteConfig = buildLegacySiteConfig(
+  resolvedSiteSettings.system,
+  resolvedSiteSettings.settings,
+);
+const tocMode = siteConfig.toc.mode || "float";
+const isFloatTOC = tocMode === "float";
+const isSidebarTOC = tocMode === "sidebar";
+const isPostDetailPage = /^\/posts\/[^/]+\/?$/.test(Astro.url.pathname);
+const shouldShowPostTocSidebar =
+  siteConfig.toc.enable && isSidebarTOC && isPostDetailPage;
+
+interface Props {
+  title?: string;
+  banner?: string;
+  description?: string;
+  lang?: string;
+  setOGTypeArticle?: boolean;
+  headings?: MarkdownHeading[];
+}
+
+const normalizeBannerList = (value: string | string[]): string[] => {
+  if (typeof value === "string") {
+    const normalized = value.trim();
+    return normalized ? [normalized] : [];
+  }
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry || "").trim()).filter(Boolean);
+  }
+  return [];
+};
+
+const getBannerImages = async (): Promise<string[]> => {
+  let bannerSrc = siteConfig.banner.src;
+
+  if (siteConfig.banner.imageApi?.enable && siteConfig.banner.imageApi?.url) {
+    try {
+      const response = await fetch(siteConfig.banner.imageApi.url);
+      const text = await response.text();
+      const apiImages = text
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      if (apiImages.length > 0) {
+        bannerSrc = apiImages;
+      }
+    } catch (error) {
+      console.warn(
+        "[main-grid-layout] failed to fetch images from API:",
+        error,
+      );
+    }
+  }
+
+  return normalizeBannerList(bannerSrc);
+};
+
+const bannerImages = await getBannerImages();
+
+const {
+  title,
+  banner,
+  description,
+  lang,
+  setOGTypeArticle,
+  headings = [],
+} = Astro.props;
+
+const hasCustomRightSidebar = Astro.slots.has("sidebar-right");
+const isHomePage = Astro.url.pathname === "/" || Astro.url.pathname === "";
+const normalizedPath = Astro.url.pathname.replace(/\/+$/, "");
+const isFullWidthPage =
+  normalizedPath === "/posts/new" ||
+  /^\/posts\/[^/]+\/edit$/.test(normalizedPath);
+const showHomeText = siteConfig.banner.homeText?.enable && isHomePage;
+
+const configuredWallpaperMode = siteConfig.wallpaperMode.defaultMode;
+const initialWallpaperMode = isHomePage ? configuredWallpaperMode : "none";
+const mainPanelTop =
+  initialWallpaperMode === "banner" ? `${BANNER_HEIGHT_HOME}vh` : "5.5rem";
+const finalMainPanelTop =
+  initialWallpaperMode === "banner" ? mainPanelTop : "5.5rem";
+
+const hasLeftSidebarComponents =
+  widgetManager.getComponentsByPosition("top", "left").length > 0 ||
+  widgetManager.getComponentsByPosition("sticky", "left").length > 0;
+
+const rightTopComponents = widgetManager.getComponentsByPosition(
+  "top",
+  "right",
+);
+const rightStickyComponents = widgetManager.getComponentsByPosition(
+  "sticky",
+  "right",
+);
+const hasRightSidebarComponents =
+  rightTopComponents.length > 0 || rightStickyComponents.length > 0;
+
+const hasRightSidebarTocWidget = [
+  ...rightTopComponents,
+  ...rightStickyComponents,
+].some((component) => component.type === "toc");
+
+const shouldRenderDedicatedPostToc =
+  shouldShowPostTocSidebar && !hasRightSidebarTocWidget;
+const hasRightSidebarContent =
+  hasRightSidebarComponents || shouldRenderDedicatedPostToc;
+const shouldFixRightSidebarSlot =
+  shouldRenderDedicatedPostToc || hasCustomRightSidebar;
+
+const desktopShowLeftSidebar = hasLeftSidebarComponents && !isFullWidthPage;
+const effectiveShowRightSidebar =
+  (hasRightSidebarContent || hasCustomRightSidebar) && !isFullWidthPage;
+const desktopShowSidebar =
+  hasLeftSidebarComponents || effectiveShowRightSidebar;
+
+let gridCols = "grid-cols-1";
+if (desktopShowLeftSidebar && effectiveShowRightSidebar) {
+  gridCols = "grid-cols-[17.5rem_minmax(0,1fr)_17.5rem]";
+} else if (desktopShowLeftSidebar) {
+  gridCols = "grid-cols-[17.5rem_minmax(0,1fr)]";
+} else if (effectiveShowRightSidebar) {
+  gridCols = "grid-cols-[minmax(0,1fr)_17.5rem]";
+}
+
+const sidebarClass = desktopShowLeftSidebar
+  ? "onload-animation mb-4 max-w-[17.5rem] col-start-1 col-end-2 row-start-1 row-end-2"
+  : "hidden";
+
+let rightSidebarClass = "hidden";
+if (hasCustomRightSidebar) {
+  rightSidebarClass = `onload-animation block mb-4 max-w-[17.5rem] row-start-1 row-end-2 ${desktopShowLeftSidebar ? "col-start-3 col-end-4" : "col-start-2 col-end-3"}`;
+} else if (hasRightSidebarComponents || shouldRenderDedicatedPostToc) {
+  rightSidebarClass = `onload-animation block overflow-x-hidden mb-4 max-w-[17.5rem] row-start-1 row-end-2 ${desktopShowLeftSidebar ? "col-start-3 col-end-4" : "col-start-2 col-end-3"}`;
+}
+
+let mainGridPositionClass = "col-span-1";
+if (desktopShowLeftSidebar && effectiveShowRightSidebar) {
+  mainGridPositionClass = "col-start-2 col-end-3";
+} else if (desktopShowLeftSidebar) {
+  mainGridPositionClass = "col-start-2 col-end-3";
+} else if (effectiveShowRightSidebar) {
+  mainGridPositionClass = "col-start-1 col-end-2";
+}
+
+const mainContentClass = `
+  transition-swup-fade overflow-clip w-full
+  col-span-1 row-start-1 row-end-2
+  ${desktopShowSidebar ? mainGridPositionClass : "col-span-1"}
+`
+  .trim()
+  .replace(/\s+/g, " ");
+
+const hasCarousel =
+  siteConfig.banner.carousel?.enable &&
+  Array.isArray(bannerImages) &&
+  bannerImages.length > 1;
+---
+
+<Layout
+  title={title}
+  banner={banner}
+  description={description}
+  lang={lang}
+  setOGTypeArticle={setOGTypeArticle}
+>
+  <IconifyLoader />
+
+  <slot slot="head" name="head" />
+  <div id="top-row" class="z-50 pointer-events-none fixed top-0 left-0 right-0">
+    <div id="navbar-wrapper" class="pointer-events-auto">
+      <Navbar />
+    </div>
+  </div>
+
+  <div
+    id="banner-wrapper"
+    class={`absolute z-10 w-full transition duration-700 overflow-hidden wallpaper-layer ${initialWallpaperMode !== "banner" ? "wallpaper-layer-hidden" : ""}`}
+    style={`top: -${BANNER_HEIGHT_EXTEND}vh`}
+    aria-hidden={initialWallpaperMode !== "banner" ? "true" : undefined}
+    inert={initialWallpaperMode !== "banner"}
+  >
+    <div class="banner-container relative h-full w-full">
+      {
+        hasCarousel ? (
+          <div
+            id="banner-carousel"
+            class="relative h-full w-full overflow-hidden"
+          >
+            <ul class="carousel-list h-full w-full">
+              {bannerImages.map((image, index) => (
+                <li
+                  class={`carousel-item absolute inset-0 transition-all duration-500 ${index === 0 ? "opacity-100 scale-100" : "opacity-0 scale-110"}`}
+                >
+                  <ImageWrapper
+                    alt={`Desktop banner image ${index + 1}`}
+                    class:list={[
+                      "banner-image object-cover h-full w-full transition-transform duration-500 ease-out",
+                    ]}
+                    src={image}
+                    position={siteConfig.banner.position}
+                    loading={index === 0 ? "eager" : "lazy"}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div id="banner-single-container" class="relative h-full w-full" />
+        )
+      }
+
+      <script
+        is:inline
+        define:vars={{
+          desktopImages: bannerImages,
+          position: siteConfig.banner.position,
+        }}
+      >
+        (function () {
+          const container = document.getElementById("banner-single-container");
+          if (!container || container.children.length > 0) {
+            return;
+          }
+
+          const images = Array.isArray(desktopImages)
+            ? desktopImages.filter((entry) => String(entry || "").trim())
+            : [];
+          if (images.length === 0) {
+            return;
+          }
+
+          let picked = images[0];
+          if (images.length > 1) {
+            const storageKey = "banner_desktop_index";
+            const previous = Number.parseInt(
+              sessionStorage.getItem(storageKey) || "-1",
+              10,
+            );
+            let next = Math.floor(Math.random() * images.length);
+            while (next === previous && images.length > 1) {
+              next = Math.floor(Math.random() * images.length);
+            }
+            sessionStorage.setItem(storageKey, String(next));
+            picked = images[next];
+          }
+
+          const desktopImg = document.createElement("img");
+          desktopImg.id = "banner";
+          desktopImg.alt = "Desktop banner image of the blog";
+          desktopImg.className =
+            "banner-image object-cover h-full w-full transition duration-700 opacity-100";
+          desktopImg.src = picked;
+          desktopImg.loading = "eager";
+          if (position) {
+            desktopImg.dataset.position = position;
+          }
+          container.appendChild(desktopImg);
+        })();
+      </script>
+
+      <div class="navbar-scrim" aria-hidden="true"></div>
+
+      {
+        siteConfig.banner.homeText?.enable && (
+          <div
+            class={`banner-text-overlay absolute inset-0 z-20 flex items-center justify-center ${!showHomeText ? "hidden" : ""}`}
+          >
+            <div class="w-3/4 text-center mb-0">
+              <div class="flex flex-col">
+                {siteConfig.banner.homeText?.title && (
+                  <h1 class="banner-title text-8xl text-white drop-shadow-lg mb-4">
+                    {siteConfig.banner.homeText.title}
+                  </h1>
+                )}
+                {siteConfig.banner.homeText?.subtitle && (
+                  <h2 class="banner-subtitle text-3xl text-white/90 drop-shadow-md">
+                    <span class="inline-block min-h-[1.2em]">
+                      {siteConfig.banner.homeText.typewriter?.enable ? (
+                        <TypewriterText
+                          text={siteConfig.banner.homeText.subtitle}
+                          speed={siteConfig.banner.homeText.typewriter.speed}
+                          deleteSpeed={
+                            siteConfig.banner.homeText.typewriter.deleteSpeed
+                          }
+                          pauseTime={
+                            siteConfig.banner.homeText.typewriter.pauseTime
+                          }
+                        />
+                      ) : Array.isArray(siteConfig.banner.homeText.subtitle) ? (
+                        siteConfig.banner.homeText.subtitle[0]
+                      ) : (
+                        siteConfig.banner.homeText.subtitle
+                      )}
+                    </span>
+                  </h2>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {
+        siteConfig.banner.waves?.enable && (
+          <div
+            class="waves absolute -bottom-px h-[15vh] max-h-[9.375rem] min-h-[3.125rem] w-full"
+            id="header-waves"
+            style="transform: translateZ(0); will-change: fill;"
+          >
+            <svg
+              class="waves"
+              xmlns="http://www.w3.org/2000/svg"
+              xmlns:xlink="http://www.w3.org/1999/xlink"
+              viewBox="0 20 150 32"
+              preserveAspectRatio="none"
+              shape-rendering="auto"
+              style="transform: translateZ(0); backface-visibility: hidden;"
+            >
+              <defs>
+                <path
+                  id="gentle-wave"
+                  d="M-160 44c30 0 58-18 88-18s 58 18 88 18 58-18 88-18 58 18 88 18 v48h-352z"
+                />
+              </defs>
+              <g class="parallax" style="transform: translateZ(0);">
+                <use
+                  xlink:href="#gentle-wave"
+                  x="48"
+                  y="0"
+                  class="opacity-25 fill-(--page-bg)"
+                  style="animation-delay: -2s; animation-duration: 7s; will-change: transform;"
+                />
+                <use
+                  xlink:href="#gentle-wave"
+                  x="48"
+                  y="3"
+                  class="opacity-50 fill-(--page-bg)"
+                  style="animation-delay: -3s; animation-duration: 10s; will-change: transform;"
+                />
+                <use
+                  xlink:href="#gentle-wave"
+                  x="48"
+                  y="5"
+                  class="opacity-75 fill-(--page-bg)"
+                  style="animation-delay: -4s; animation-duration: 13s; will-change: transform;"
+                />
+                <use
+                  xlink:href="#gentle-wave"
+                  x="48"
+                  y="7"
+                  class="fill-(--page-bg)"
+                  style="animation-delay: -5s; animation-duration: 20s; will-change: transform;"
+                />
+              </g>
+            </svg>
+          </div>
+        )
+      }
+    </div>
+  </div>
+
+  <div
+    class={`absolute w-full z-30 pointer-events-none main-panel-wrapper ${initialWallpaperMode === "none" ? "no-banner-layout" : ""}`}
+    style={`top: ${finalMainPanelTop}`}
+  >
+    <div class="relative max-w-(--page-width) mx-auto pointer-events-auto">
+      <div
+        id="main-grid"
+        class={`transition duration-700 w-full left-0 right-0 grid ${gridCols} grid-rows-none mx-auto gap-4 px-4`}
+      >
+        {
+          desktopShowLeftSidebar ? (
+            <SideBar class={sidebarClass} headings={headings} />
+          ) : (
+            // 保证 Swup 容器在全宽页也存在，避免 container mismatch 触发整页刷新。
+            <div
+              id="sidebar"
+              class="hidden"
+              data-sidebar-uid="__placeholder__"
+              data-sidebar-layout-key='{"top":[],"sticky":[]}'
+              data-scrollable="false"
+              aria-hidden="true"
+            />
+          )
+        }
+
+        <div
+          id="right-sidebar-slot"
+          class={`right-sidebar-container self-start ${shouldFixRightSidebarSlot ? "right-sidebar-toc-fixed" : ""} ${rightSidebarClass}`}
+        >
+          {
+            hasCustomRightSidebar ? (
+              <slot name="sidebar-right" />
+            ) : hasRightSidebarComponents ? (
+              <>
+                <RightSideBar headings={headings} />
+                {shouldRenderDedicatedPostToc && (
+                  <div id="toc-wrapper" class="w-full transition-swup-fade">
+                    <div
+                      id="toc-inner-wrapper"
+                      class="w-full max-h-[calc(100vh-10rem)] overflow-hidden"
+                    >
+                      <div
+                        id="toc-container"
+                        class="w-full transition-swup-fade"
+                      >
+                        <TOC headings={headings} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : shouldRenderDedicatedPostToc ? (
+              <div id="toc-wrapper" class="w-full transition-swup-fade">
+                <div
+                  id="toc-inner-wrapper"
+                  class="w-full max-h-[calc(100vh-10rem)] overflow-hidden"
+                >
+                  <div id="toc-container" class="w-full transition-swup-fade">
+                    <TOC headings={headings} />
+                  </div>
+                </div>
+              </div>
+            ) : null
+          }
+        </div>
+
+        <main
+          id="swup-container"
+          data-enter-skeleton-target="fallback"
+          class={`${mainContentClass} transition-main relative`}
+        >
+          <div
+            id="content-wrapper"
+            data-enter-skeleton-content
+            class="onload-animation transition-leaving"
+          >
+            <slot />
+            <div class="footer col-span-full onload-animation block">
+              <Footer />
+            </div>
+          </div>
+          <div
+            data-enter-skeleton-placeholder
+            aria-hidden="true"
+            class="absolute inset-0 z-20 pointer-events-none"
+          >
+            <div data-enter-skeleton-template="fallback" class="space-y-5">
+              <div class="md3-skeleton-surface rounded-(--radius-large) p-8">
+                <div class="flex items-start justify-between gap-4">
+                  <div class="w-full space-y-3">
+                    <div
+                      class="md3-skeleton-text"
+                      style="--skeleton-width: 42%; --skeleton-height: 1.5rem;"
+                    >
+                    </div>
+                    <div
+                      class="md3-skeleton-text"
+                      style="--skeleton-width: 68%;"
+                    >
+                    </div>
+                  </div>
+                  <div class="md3-skeleton-block h-12 w-36 rounded-xl"></div>
+                </div>
+              </div>
+
+              <div class="md3-skeleton-surface rounded-(--radius-large) p-6">
+                <div class="space-y-3">
+                  <div class="md3-skeleton-text" style="--skeleton-width: 94%;">
+                  </div>
+                  <div class="md3-skeleton-text" style="--skeleton-width: 90%;">
+                  </div>
+                  <div class="md3-skeleton-text" style="--skeleton-width: 86%;">
+                  </div>
+                  <div class="md3-skeleton-text" style="--skeleton-width: 72%;">
+                  </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4 pt-4">
+                  <div class="md3-skeleton-block h-24 rounded-xl"></div>
+                  <div class="md3-skeleton-block h-24 rounded-xl"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+
+      <BackToTop />
+      {siteConfig.toc.enable && isFloatTOC && <FloatingTOC />}
+    </div>
+  </div>
+
+  {
+    (!siteConfig.toc.enable || isFloatTOC || !shouldRenderDedicatedPostToc) && (
+      <div id="toc-container" class="hidden" />
+    )
+  }
+
+  <slot name="modal" />
+</Layout>
+
+<style>
+  :root {
+    --layout-mode-transition-duration: 0.98s;
+    --layout-mode-transition-easing: cubic-bezier(0.16, 1, 0.4, 1);
+    --layout-banner-route-transition-duration: 920ms;
+    --layout-banner-route-transition-easing: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .navbar-scrim {
+    position: absolute;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: calc(clamp(5.5rem, 12vh, 8.5rem) + env(safe-area-inset-top, 0px));
+    pointer-events: none;
+    z-index: 15;
+    background: linear-gradient(
+      to bottom,
+      rgba(255, 255, 255, 0.78) 0%,
+      rgba(255, 255, 255, 0.42) 48%,
+      rgba(255, 255, 255, 0) 100%
+    );
+  }
+
+  :root.dark .navbar-scrim {
+    background: linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0.7) 0%,
+      rgba(0, 0, 0, 0.38) 48%,
+      rgba(0, 0, 0, 0) 100%
+    );
+  }
+
+  .banner-title {
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
+    animation: fadeInUp 1s ease-out;
+    font-weight: bold;
+  }
+
+  .banner-subtitle {
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
+    animation: fadeInUp 1s ease-out 0.3s both;
+    min-height: 1.5em;
+    line-height: 1.2;
+  }
+
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  :global(#sidebar) {
+    overflow-x: clip;
+  }
+
+  :global(#right-sidebar-slot) {
+    overflow: visible;
+  }
+
+  :global(html.layout-banner-to-spec-transition) #banner-wrapper,
+  :global(html.layout-banner-to-spec-transition) .main-panel-wrapper {
+    transition:
+      transform var(--layout-banner-route-transition-duration, 920ms)
+        var(
+          --layout-banner-route-transition-easing,
+          cubic-bezier(0.22, 1, 0.36, 1)
+        ),
+      opacity var(--layout-banner-route-transition-duration, 920ms)
+        var(
+          --layout-banner-route-transition-easing,
+          cubic-bezier(0.22, 1, 0.36, 1)
+        );
+    will-change: transform;
+  }
+
+  :global(
+      html.layout-banner-to-spec-transition.layout-banner-to-spec-transition-active
+    )
+    .main-panel-wrapper {
+    transform: translate3d(
+      0px,
+      calc(var(--layout-banner-route-up-shift, 0px) * -1),
+      0px
+    );
+  }
+
+  :global(
+      html.layout-banner-to-spec-transition.layout-banner-to-spec-transition-active
+    )
+    #banner-wrapper {
+    transform: translate3d(
+      0px,
+      calc(
+        (
+            var(--layout-banner-route-up-shift, 0px) +
+              var(--layout-banner-route-banner-extra-shift, 0px)
+          ) *
+          -1
+      ),
+      0px
+    );
+  }
+
+  :global(html.layout-banner-to-spec-transition .transition-main),
+  :global(html.layout-banner-to-spec-transition .transition-leaving),
+  :global(html.layout-banner-to-spec-transition .transition-swup-fade) {
+    transition-duration: 280ms !important;
+  }
+
+  :global(html.layout-banner-to-spec-transition #content-wrapper) {
+    transition: opacity 240ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+  }
+
+  :global(html.layout-banner-to-spec-transition.is-animating) #swup-container,
+  :global(html.layout-banner-to-spec-transition.is-animating.is-leaving)
+    #content-wrapper {
+    transform: none !important;
+  }
+
+  :global(html.layout-banner-to-spec-transition.is-animating.is-leaving)
+    #content-wrapper {
+    opacity: 1 !important;
+  }
+
+  :global(
+    html.layout-banner-to-spec-transition.layout-banner-to-spec-transition-active.layout-banner-to-spec-navbar-sync
+      #navbar
+      > div
+  ) {
+    border-radius: 0 !important;
+    background: var(--page-bg) !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+    transition-property:
+      border-radius, background-color, box-shadow, backdrop-filter !important;
+    transition-duration: var(
+      --layout-banner-route-transition-duration,
+      920ms
+    ) !important;
+    transition-timing-function: var(
+      --layout-banner-route-transition-easing,
+      cubic-bezier(0.22, 1, 0.36, 1)
+    ) !important;
+  }
+
+  :global(
+    html.layout-banner-to-spec-transition.layout-banner-to-spec-transition-active.layout-banner-to-spec-navbar-sync
+      #navbar-logo
+  ),
+  :global(
+    html.layout-banner-to-spec-transition.layout-banner-to-spec-transition-active.layout-banner-to-spec-navbar-sync
+      #navbar-logo
+      img
+  ) {
+    transition-duration: var(
+      --layout-banner-route-transition-duration,
+      920ms
+    ) !important;
+    transition-timing-function: var(
+      --layout-banner-route-transition-easing,
+      cubic-bezier(0.22, 1, 0.36, 1)
+    ) !important;
+  }
+
+  :global(
+    html.layout-banner-to-spec-transition.layout-banner-to-spec-navbar-commit-freeze
+      #navbar
+      > div
+  ),
+  :global(
+    html.layout-banner-to-spec-transition.layout-banner-to-spec-navbar-commit-freeze
+      #navbar-logo
+  ),
+  :global(
+    html.layout-banner-to-spec-transition.layout-banner-to-spec-navbar-commit-freeze
+      #navbar-logo
+      img
+  ) {
+    transition: none !important;
+  }
+
+  :global(html.layout-banner-to-spec-transition) #top-row,
+  :global(
+      html.layout-banner-to-spec-transition.layout-banner-to-spec-transition-active
+    )
+    #top-row {
+    transform: translate3d(0px, 0px, 0px) !important;
+  }
+
+  :global(#right-sidebar-slot.right-sidebar-toc-fixed) {
+    position: sticky;
+    top: 5.5rem;
+    align-self: start;
+  }
+
+  :global(.wallpaper-layer) {
+    opacity: 1;
+    transition: opacity var(--layout-mode-transition-duration)
+      var(--layout-mode-transition-easing);
+    will-change: opacity;
+  }
+
+  :global(.wallpaper-layer-hidden) {
+    opacity: 0 !important;
+    pointer-events: none;
+  }
+
+  body[data-layout-mode="none"] #banner-wrapper,
+  body[data-layout-mode="collapsed"] #banner-wrapper {
+    display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    top: 0 !important;
+    overflow: hidden !important;
+    opacity: 0 !important;
+    visibility: hidden !important;
+    transition: none !important;
+    pointer-events: none !important;
+  }
+
+  .main-panel-wrapper {
+    transition:
+      top var(--layout-mode-transition-duration)
+        var(--layout-mode-transition-easing),
+      min-height var(--layout-mode-transition-duration)
+        var(--layout-mode-transition-easing);
+    will-change: top;
+  }
+
+  #toc-inner-wrapper {
+    transition:
+      top var(--layout-mode-transition-duration)
+        var(--layout-mode-transition-easing),
+      max-height var(--layout-mode-transition-duration)
+        var(--layout-mode-transition-easing);
+  }
+
+  body[data-layout-mode="none"] #main-grid,
+  body[data-layout-mode="collapsed"] #main-grid,
+  body[data-layout-mode="none"] .main-panel-wrapper,
+  body[data-layout-mode="collapsed"] .main-panel-wrapper,
+  body[data-layout-mode="none"] #toc-inner-wrapper,
+  body[data-layout-mode="collapsed"] #toc-inner-wrapper {
+    transition: none !important;
+  }
+
+  body[data-layout-mode="none"] #content-wrapper,
+  body[data-layout-mode="collapsed"] #content-wrapper {
+    overflow-anchor: none;
+  }
+
+  #top-row {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: auto;
+    z-index: 50;
+  }
+
+  body[data-layout-mode="none"] .main-panel-wrapper,
+  body[data-layout-mode="collapsed"] .main-panel-wrapper,
+  .no-banner-layout {
+    top: 5.5rem !important;
+    min-height: calc(100vh - 5.5rem) !important;
+  }
+
+  body[data-layout-mode="none"] #toc-inner-wrapper,
+  body[data-layout-mode="collapsed"] #toc-inner-wrapper {
+    top: 5.5rem !important;
+    max-height: calc(100vh - 8rem) !important;
+  }
+
+  .waves {
+    overflow: visible;
+    z-index: 5;
+    transform: translateZ(0);
+    will-change: transform;
+    contain: layout style paint;
+  }
+
+  .waves svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  .waves use {
+    will-change: fill;
+  }
+
+  body[data-layout-mode="none"] .waves > .parallax use,
+  body[data-layout-mode="collapsed"] .waves > .parallax use {
+    animation-play-state: paused;
+  }
+
+  :global(body[data-layout-mode="banner"][data-route-home="true"] #sidebar),
+  :global(body[data-layout-mode="none"] #sidebar),
+  :global(body[data-layout-mode="none"] #right-sidebar),
+  :global(body[data-layout-mode="collapsed"] #sidebar),
+  :global(body[data-layout-mode="collapsed"] #right-sidebar) {
+    position: sticky;
+    top: 5.5rem;
+    align-self: start;
+  }
+
+  :global(
+    body[data-layout-mode="banner"][data-route-home="true"]
+      #sidebar[data-scrollable="true"]
+  ),
+  :global(body[data-layout-mode="none"] #sidebar[data-scrollable="true"]),
+  :global(body[data-layout-mode="none"] #right-sidebar),
+  :global(body[data-layout-mode="collapsed"] #sidebar[data-scrollable="true"]),
+  :global(body[data-layout-mode="collapsed"] #right-sidebar) {
+    max-height: calc(100vh - 6.5rem);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  :global(
+    body[data-layout-mode="banner"][data-route-home="true"]
+      #sidebar[data-scrollable="false"]
+  ),
+  :global(body[data-layout-mode="none"] #sidebar[data-scrollable="false"]),
+  :global(
+    body[data-layout-mode="collapsed"] #sidebar[data-scrollable="false"]
+  ) {
+    overflow-y: hidden;
+  }
+
+  :global(
+    body[data-layout-mode="banner"][data-route-home="true"]
+      #sidebar
+      #sidebar-sticky
+  ),
+  :global(body[data-layout-mode="none"] #sidebar #sidebar-sticky),
+  :global(body[data-layout-mode="none"] #right-sidebar #right-sidebar-sticky),
+  :global(body[data-layout-mode="collapsed"] #sidebar #sidebar-sticky),
+  :global(
+    body[data-layout-mode="collapsed"] #right-sidebar #right-sidebar-sticky
+  ) {
+    position: relative;
+    top: auto;
+  }
+</style>

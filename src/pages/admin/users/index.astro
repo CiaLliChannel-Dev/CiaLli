@@ -1,0 +1,168 @@
+---
+import I18nKey from "@i18n/i18nKey";
+import { i18n } from "@i18n/translation";
+import AdminLayout from "@layouts/AdminLayout.astro";
+
+export const prerender = false;
+---
+
+<AdminLayout
+  title={i18n(I18nKey.adminUsersTitle)}
+  description={i18n(I18nKey.adminUsersDescription)}
+>
+  <div
+    data-enter-skeleton-page="admin-users"
+    data-enter-skeleton-target="admin-users"
+  >
+    <div data-enter-skeleton-inline-content class="space-y-4 text-75">
+      <section class="card-base px-9 py-6 rounded-(--radius-large) space-y-2">
+        <h1
+          class="text-4xl font-bold text-90 mb-2 relative
+				before:w-1 before:h-8 before:rounded-md before:bg-(--primary)
+				before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
+        >
+          {i18n(I18nKey.adminUsersTitle)}
+        </h1>
+        <p class="text-base text-70">
+          {i18n(I18nKey.adminUsersDescription)}
+        </p>
+      </section>
+
+      <section class="card-base p-6 rounded-(--radius-large) space-y-3">
+        <h2 class="text-xl font-semibold text-90">
+          {i18n(I18nKey.adminUsersRegisterSwitchTitle)}
+        </h2>
+        <div class="pt-2 flex flex-wrap items-center gap-3">
+          <label
+            class="flex items-center gap-3 text-75 cursor-pointer select-none"
+          >
+            <input
+              type="checkbox"
+              id="admin-register-enabled"
+              class="toggle-checkbox"
+            />
+            <span class="toggle-track"><span class="toggle-knob"></span></span>
+            {i18n(I18nKey.adminUsersRegisterSwitchLabel)}
+          </label>
+          <span id="admin-register-msg" class="text-xs text-60"></span>
+        </div>
+      </section>
+
+      <section class="card-base p-6 rounded-(--radius-large) space-y-3">
+        <div class="flex flex-wrap items-center justify-between gap-3">
+          <h2 class="text-xl font-semibold text-90">
+            {i18n(I18nKey.adminUsersRegistrationsTitle)}
+          </h2>
+          <div class="flex items-center gap-2">
+            <label for="admin-registration-status" class="sr-only">
+              {i18n(I18nKey.adminUsersRegistrationStatusFilter)}
+            </label>
+            <select
+              id="admin-registration-status"
+              class="rounded-lg border border-(--line-divider) px-3 py-2 text-sm bg-black/5 dark:bg-white/5 text-75"
+            >
+              <option value="pending">pending</option>
+              <option value="approved">approved</option>
+              <option value="rejected">rejected</option>
+              <option value="cancelled">cancelled</option>
+              <option value="all">all</option>
+            </select>
+            <button
+              id="admin-registration-refresh"
+              class="px-3 py-2 rounded-lg border border-(--line-divider) text-sm text-75 hover:bg-(--btn-plain-bg-hover) transition-colors"
+            >
+              {i18n(I18nKey.commonRefresh)}
+            </button>
+          </div>
+        </div>
+        <div class="overflow-auto">
+          <table class="w-full text-sm min-w-[420px] text-75">
+            <thead>
+              <tr class="text-left text-60 border-b border-(--line-divider)">
+                <th class="py-2">{i18n(I18nKey.meSettingsAvatarLabel)}</th>
+                <th class="py-2">{i18n(I18nKey.meSettingsUsernameLabel)}</th>
+              </tr>
+            </thead>
+            <tbody id="admin-registration-table"></tbody>
+          </table>
+        </div>
+        <div id="admin-registration-msg" class="text-xs text-60"></div>
+      </section>
+
+      <section class="card-base p-6 rounded-(--radius-large) space-y-3">
+        <div class="flex items-center justify-between gap-3">
+          <h2 class="text-xl font-semibold text-90">
+            {i18n(I18nKey.adminUsersListTitle)}
+          </h2>
+          <button
+            id="admin-users-refresh"
+            class="px-3 py-2 rounded-lg border border-(--line-divider) text-sm text-75 hover:bg-(--btn-plain-bg-hover) transition-colors"
+          >
+            {i18n(I18nKey.commonRefresh)}
+          </button>
+        </div>
+        <div class="overflow-auto">
+          <table class="w-full text-sm min-w-[860px] text-75">
+            <thead>
+              <tr class="text-left text-60 border-b border-(--line-divider)">
+                <th class="py-2">{i18n(I18nKey.authEmailLabel)}</th>
+                <th class="py-2">{i18n(I18nKey.meSettingsUsernameLabel)}</th>
+                <th class="py-2">{i18n(I18nKey.adminUsersRole)}</th>
+                <th class="py-2">{i18n(I18nKey.adminUsersActions)}</th>
+              </tr>
+            </thead>
+            <tbody id="admin-users-table"></tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+    <div
+      data-enter-skeleton-inline-placeholder
+      aria-hidden="true"
+      class="space-y-4"
+    >
+      <section class="card-base px-9 py-6 rounded-(--radius-large) space-y-3">
+        <div
+          class="md3-skeleton-text"
+          style="--skeleton-width: 30%; --skeleton-height: 2rem;"
+        >
+        </div>
+        <div class="md3-skeleton-text" style="--skeleton-width: 54%;"></div>
+      </section>
+      <section class="card-base p-6 rounded-(--radius-large) space-y-4">
+        <div class="flex items-center justify-between gap-3">
+          <div
+            class="md3-skeleton-text"
+            style="--skeleton-width: 24%; --skeleton-height: 1.25rem;"
+          >
+          </div>
+          <div class="md3-skeleton-block h-9 w-16 rounded-lg"></div>
+        </div>
+        <div class="space-y-2">
+          {
+            Array.from({ length: 6 }).map(() => (
+              <div class="md3-skeleton-block h-11 rounded-lg" />
+            ))
+          }
+        </div>
+      </section>
+      <section class="card-base p-6 rounded-(--radius-large) space-y-4">
+        <div class="flex items-center justify-between gap-3">
+          <div
+            class="md3-skeleton-text"
+            style="--skeleton-width: 20%; --skeleton-height: 1.25rem;"
+          >
+          </div>
+          <div class="md3-skeleton-block h-9 w-16 rounded-lg"></div>
+        </div>
+        <div class="space-y-2">
+          {
+            Array.from({ length: 5 }).map(() => (
+              <div class="md3-skeleton-block h-11 rounded-lg" />
+            ))
+          }
+        </div>
+      </section>
+    </div>
+  </div>
+</AdminLayout>

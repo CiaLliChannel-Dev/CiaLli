@@ -1,0 +1,362 @@
+---
+import Comment from "@components/comment/index.astro";
+import ContentNotVisible from "@components/misc/ContentNotVisible.astro";
+import I18nKey from "@i18n/i18nKey";
+import { i18n } from "@i18n/translation";
+import Markdown from "@components/misc/Markdown.astro";
+import PasswordProtection from "@components/PasswordProtection.astro";
+import ResponsiveImage from "@components/misc/ResponsiveImage.astro";
+import { systemSiteConfig } from "@/config";
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import { renderMarkdown } from "@/server/markdown/render";
+import { buildPublicAssetUrl } from "@/server/directus-auth";
+import {
+  isSpecialArticleSlug,
+  loadArticleByShortIdLoose,
+  loadArticleBySlugLoose,
+  loadPublicArticleByShortId,
+  loadPublicArticleBySlug,
+  safeCsv,
+} from "@/server/api/v1/shared";
+import { isShortId } from "@/server/utils/short-id";
+import { getAuthorBundle } from "@/server/api/v1/shared/author-cache";
+import { readAuthor } from "@/server/api/v1/public-data";
+import {
+  loadProfileForViewerByUserId,
+  profileToSidebarData,
+} from "@/server/api/v1/public-data";
+import { countItems, readMany } from "@/server/directus/client";
+import { getSessionUser } from "@/server/auth/session";
+import type { JsonObject } from "@/types/json";
+import { buildOwnerArticlePasswordStorageKeys } from "@/utils/protected-content";
+import DetailActionFloat from "@components/control/DetailActionFloat.astro";
+
+export const prerender = false;
+
+const rawId = (Astro.params.id || "").replace(/^\/+|\/+$/g, "");
+
+let article: {
+  id: string;
+  short_id: string | null;
+  title: string;
+  slug: string | null;
+  summary: string | null;
+  body_markdown: string;
+  cover_file: string | null;
+  cover_url: string | null;
+  tags: string[];
+  category: string | null;
+  allow_comments: boolean;
+  published_at: string | null;
+  author?: { id?: string; name?: string };
+} | null = null;
+let articleHtml = "";
+let encryptedBody = "";
+let articleLikeCount = 0;
+let articleCommentCount = 0;
+let articleLikedByViewer = false;
+let viewerIsOwner = false;
+let ownerPasswordStorageKeys: string[] = [];
+
+if (rawId) {
+  try {
+    const sessionUser = await getSessionUser(Astro);
+
+    // First try public query
+    let rawArticle = isShortId(rawId)
+      ? await loadPublicArticleByShortId(rawId)
+      : isSpecialArticleSlug(rawId)
+        ? await loadPublicArticleBySlug(rawId)
+        : null;
+
+    // Public query failed + user is logged in → try owner fallback
+    if (!rawArticle && sessionUser) {
+      const candidate = isShortId(rawId)
+        ? await loadArticleByShortIdLoose(rawId)
+        : isSpecialArticleSlug(rawId)
+          ? await loadArticleBySlugLoose(rawId)
+          : null;
+      if (candidate && candidate.author_id === sessionUser.id) {
+        rawArticle = candidate;
+      }
+    }
+
+    if (rawArticle) {
+      const authorMap = await getAuthorBundle([rawArticle.author_id]);
+      article = {
+        ...rawArticle,
+        tags: safeCsv(rawArticle.tags),
+        author: readAuthor(authorMap, rawArticle.author_id),
+      };
+
+      const [likeCount, commentCount, likedRows] = await Promise.all([
+        countItems("app_article_likes", {
+          _and: [
+            { article_id: { _eq: rawArticle.id } },
+            { status: { _eq: "published" } },
+          ],
+        } as JsonObject),
+        countItems("app_article_comments", {
+          _and: [
+            { article_id: { _eq: rawArticle.id } },
+            { status: { _eq: "published" } },
+            { is_public: { _eq: true } },
+          ],
+        } as JsonObject),
+        sessionUser?.id
+          ? readMany("app_article_likes", {
+              filter: {
+                _and: [
+                  { article_id: { _eq: rawArticle.id } },
+                  { user_id: { _eq: sessionUser.id } },
+                  { status: { _eq: "published" } },
+                ],
+              } as JsonObject,
+              limit: 1,
+              fields: ["id"],
+            })
+          : Promise.resolve([]),
+      ]);
+      articleLikeCount = likeCount;
+      articleCommentCount = commentCount;
+      articleLikedByViewer = likedRows.length > 0;
+      viewerIsOwner = Boolean(
+        sessionUser?.id && rawArticle.author_id === sessionUser.id,
+      );
+
+      const rawBodyMarkdown = String(rawArticle.body_markdown || "");
+      if (rawBodyMarkdown.trim().startsWith("CL2:")) {
+        encryptedBody = rawBodyMarkdown.trim();
+        ownerPasswordStorageKeys = buildOwnerArticlePasswordStorageKeys({
+          id: rawArticle.id,
+          shortId: rawArticle.short_id,
+          slug: rawArticle.slug,
+        });
+      } else {
+        articleHtml = await renderMarkdown(rawBodyMarkdown, {
+          target: "page",
+        });
+      }
+      const authorProfile = await loadProfileForViewerByUserId(
+        rawArticle.author_id,
+        sessionUser?.id ?? null,
+      );
+      if (authorProfile) {
+        Astro.locals.sidebarProfile = profileToSidebarData(authorProfile);
+      }
+    } else {
+      Astro.response.status = 404;
+    }
+  } catch (error) {
+    console.error("[posts] failed to load article:", error);
+    Astro.response.status = 500;
+  }
+} else {
+  Astro.response.status = 404;
+}
+
+const hasCoverFile = Boolean(article?.cover_file);
+const coverUrl = article?.cover_url
+  ? article.cover_url
+  : article?.cover_file
+    ? buildPublicAssetUrl(article.cover_file, {
+        width: 1600,
+        height: 900,
+        fit: "cover",
+      })
+    : null;
+
+// LCP preload: 当文章有 Directus 封面文件时，预加载 WebP 格式
+const coverPreloadUrl = article?.cover_file
+  ? buildPublicAssetUrl(article.cover_file, {
+      width: 1200,
+      height: 675,
+      fit: "cover",
+      format: "webp",
+    })
+  : null;
+
+function formatArticleMetaDate(input: string | null | undefined): string {
+  if (!input) {
+    return "";
+  }
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+  const localeMap: Record<string, string> = {
+    zh_CN: "zh-CN",
+    zh_TW: "zh-TW",
+    ja: "ja-JP",
+    en: "en-US",
+  };
+  const locale = localeMap[systemSiteConfig.lang] || "en-US";
+  const timePart = new Intl.DateTimeFormat(locale, {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).format(date);
+  const datePart = new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+  return `${timePart} · ${datePart}`;
+}
+
+const publishedMetaText = formatArticleMetaDate(article?.published_at);
+---
+
+<MainGridLayout
+  setOGTypeArticle={true}
+  title={article?.title || i18n(I18nKey.articleNotFoundTitle)}
+  description={article?.summary || ""}
+>
+  {
+    coverPreloadUrl && (
+      <link
+        slot="head"
+        rel="preload"
+        as="image"
+        type="image/webp"
+        href={coverPreloadUrl}
+      />
+    )
+  }
+  {
+    !article ? (
+      <ContentNotVisible
+        mode="not_found"
+        title={i18n(I18nKey.articleNotFoundTitle)}
+        description={i18n(I18nKey.articleNotFoundDescription)}
+        backHref="/"
+        backLabel={i18n(I18nKey.userBackToHome)}
+      />
+    ) : (
+      <>
+        <article
+          id="post-container"
+          data-enter-skeleton-target="post-detail"
+          class="card-base p-6 rounded-(--radius-large) mb-4 relative"
+        >
+          <div data-enter-skeleton-content>
+            <header class="mb-6 space-y-3">
+              <h1 class="text-3xl font-bold text-90">{article.title}</h1>
+              <div class="flex flex-wrap items-center gap-3 text-sm text-60">
+                {article.published_at && publishedMetaText && (
+                  <time datetime={article.published_at}>
+                    {publishedMetaText}
+                  </time>
+                )}
+                {article.category && <span>{article.category}</span>}
+              </div>
+              {article.summary && (
+                <p class="text-base text-75">{article.summary}</p>
+              )}
+              {article.tags.length > 0 && (
+                <div class="flex flex-wrap gap-2">
+                  {article.tags.map((tag) => (
+                    <span class="btn-regular h-7 text-xs px-3 rounded-lg">
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </header>
+
+            {coverUrl && (
+              <div class="mb-6">
+                {hasCoverFile && article?.cover_file ? (
+                  <ResponsiveImage
+                    fileId={article.cover_file}
+                    alt={article.title}
+                    preset="cover"
+                    eager
+                    isPublic
+                    class="w-full max-h-[420px] object-cover rounded-xl border border-(--line-divider)"
+                  />
+                ) : (
+                  <img
+                    src={coverUrl}
+                    alt={article.title}
+                    class="w-full max-h-[420px] object-cover rounded-xl border border-(--line-divider)"
+                    loading="lazy"
+                  />
+                )}
+              </div>
+            )}
+
+            {encryptedBody ? (
+              <PasswordProtection
+                encryptedContent={encryptedBody}
+                viewerIsOwner={viewerIsOwner}
+                ownerPasswordStorageKeys={ownerPasswordStorageKeys}
+              />
+            ) : (
+              <Markdown class="markdown-content">
+                <Fragment set:html={articleHtml} />
+              </Markdown>
+            )}
+          </div>
+          <div
+            data-enter-skeleton-placeholder
+            aria-hidden="true"
+            class="absolute inset-0 z-20 pointer-events-none p-6"
+          >
+            <div class="space-y-4">
+              <div
+                class="md3-skeleton-text"
+                style="--skeleton-width: 62%; --skeleton-height: 2rem;"
+              />
+              <div
+                class="md3-skeleton-text"
+                style="--skeleton-width: 48%; --skeleton-height: 0.95rem;"
+              />
+              <div class="space-y-2 pt-1">
+                <div class="md3-skeleton-text" style="--skeleton-width: 92%;" />
+                <div class="md3-skeleton-text" style="--skeleton-width: 66%;" />
+              </div>
+              {coverUrl && (
+                <div class="md3-skeleton-block h-[240px] w-full rounded-xl" />
+              )}
+              <div class="space-y-3 pt-2">
+                <div
+                  class="md3-skeleton-text"
+                  style="--skeleton-width: 100%;"
+                />
+                <div class="md3-skeleton-text" style="--skeleton-width: 96%;" />
+                <div class="md3-skeleton-text" style="--skeleton-width: 94%;" />
+                <div class="md3-skeleton-text" style="--skeleton-width: 98%;" />
+                <div class="md3-skeleton-text" style="--skeleton-width: 90%;" />
+                <div class="md3-skeleton-text" style="--skeleton-width: 84%;" />
+                <div class="md3-skeleton-text" style="--skeleton-width: 88%;" />
+                <div class="md3-skeleton-text" style="--skeleton-width: 72%;" />
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <DetailActionFloat
+          contentType="article"
+          contentId={article.id}
+          authorId={article.author?.id || ""}
+          likeCount={articleLikeCount}
+          commentCount={articleCommentCount}
+          likedByViewer={articleLikedByViewer}
+          editHref={`/posts/${encodeURIComponent(article.short_id || rawId)}/edit`}
+          deleteEndpoint={`/api/v1/me/articles/${encodeURIComponent(article.id)}`}
+          deleteConfirmMessage={i18n(I18nKey.articleDeleteConfirm)}
+          deleteSuccessHref="/"
+        />
+
+        <Comment
+          module="articles"
+          contentId={article.id}
+          contentShortId={article.short_id || ""}
+          contentAuthorId={article?.author?.id || ""}
+          allowComments={article.allow_comments}
+        />
+      </>
+    )
+  }
+</MainGridLayout>
