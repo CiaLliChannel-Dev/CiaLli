@@ -47,7 +47,7 @@
     "@tailwindcss/vite": "^4.2.0",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.36.2",
-    "astro": "5.17.2",
+    "astro": "5.17.3",
     "astro-expressive-code": "^0.41.6",
     "astro-icon": "^1.1.5",
     "axios": "^1.13.5",
