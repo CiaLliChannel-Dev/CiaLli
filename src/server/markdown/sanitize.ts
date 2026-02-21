@@ -55,13 +55,12 @@ const ALLOWED_ATTRIBUTES: sanitizeHtml.IOptions["allowedAttributes"] = {
         "allow",
         "allowfullscreen",
         "scrolling",
+        "sandbox",
     ],
 };
 
-const ALLOWED_SCHEMES_BY_TAG: sanitizeHtml.IOptions["allowedSchemesByTag"] = {
-    img: ["http", "https", "data", "blob"],
-    iframe: ["http", "https"],
-};
+const DEFAULT_IMG_SCHEMES = ["http", "https"] as const;
+const PREVIEW_IMG_SCHEMES = ["http", "https", "blob"] as const;
 
 const ALLOWED_STYLES: sanitizeHtml.IOptions["allowedStyles"] = {
     // 安全策略：仅允许基础排版样式，阻断 position/z-index/top/left 等页面覆盖能力。
@@ -77,12 +76,39 @@ const ALLOWED_STYLES: sanitizeHtml.IOptions["allowedStyles"] = {
     },
 };
 
-export function sanitizeMarkdownHtml(html: string): string {
+const NON_BOOLEAN_ATTRIBUTES =
+    sanitizeHtml.defaults.nonBooleanAttributes.filter(
+        (attribute) => attribute !== "sandbox",
+    );
+
+export type SanitizeMarkdownOptions = {
+    allowBlobImages?: boolean;
+};
+
+function resolveAllowedSchemesByTag(
+    options: SanitizeMarkdownOptions,
+): sanitizeHtml.IOptions["allowedSchemesByTag"] {
+    return {
+        // 安全策略：默认禁用 blob，仅在受控预览链路按需放开。
+        img: options.allowBlobImages
+            ? [...PREVIEW_IMG_SCHEMES]
+            : [...DEFAULT_IMG_SCHEMES],
+        iframe: ["http", "https"],
+    };
+}
+
+export function sanitizeMarkdownHtml(
+    html: string,
+    options: SanitizeMarkdownOptions = {},
+): string {
     return sanitizeHtml(String(html || ""), {
         allowedTags: ALLOWED_TAGS,
         allowedAttributes: ALLOWED_ATTRIBUTES,
-        allowedSchemes: ["http", "https", "mailto", "tel", "data"],
-        allowedSchemesByTag: ALLOWED_SCHEMES_BY_TAG,
+        // 允许 sandbox 以空值/布尔属性形式输出（即严格沙箱，不授予任何 allow 权限）。
+        nonBooleanAttributes: NON_BOOLEAN_ATTRIBUTES,
+        // 收敛 URI scheme，移除 data 以阻断 data: SVG 等绕过路径。
+        allowedSchemes: ["http", "https", "mailto", "tel"],
+        allowedSchemesByTag: resolveAllowedSchemesByTag(options),
         allowedStyles: ALLOWED_STYLES,
         allowProtocolRelative: true,
         transformTags: {
@@ -94,6 +120,11 @@ export function sanitizeMarkdownHtml(html: string): string {
                         ? `${rel} noopener noreferrer`.trim()
                         : "noopener noreferrer";
                 }
+                return { tagName, attribs: output };
+            },
+            iframe: (tagName, attribs) => {
+                // 强制空 sandbox：严格隔离 iframe，避免脚本与同源能力被放行。
+                const output = { ...attribs, sandbox: "" };
                 return { tagName, attribs: output };
             },
         },

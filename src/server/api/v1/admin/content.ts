@@ -35,6 +35,26 @@ function invalidateDiaryDetailCache(id: string, shortId?: string | null): void {
     }
 }
 
+async function loadAdminVisibleDiary(
+    diaryId: string,
+): Promise<{ id: string; short_id: string | null } | null> {
+    const rows = await readMany("app_diaries", {
+        filter: {
+            _and: [{ id: { _eq: diaryId } }, { praviate: { _eq: true } }],
+        } as JsonObject,
+        fields: ["id", "short_id"],
+        limit: 1,
+    });
+    const first = rows[0] as JsonObject | undefined;
+    if (!first) {
+        return null;
+    }
+    return {
+        id: toStringValue(first.id),
+        short_id: toOptionalString(first.short_id),
+    };
+}
+
 export async function handleAdminContent(
     context: APIContext,
     segments: string[],
@@ -66,11 +86,21 @@ export async function handleAdminContent(
 
         for (const key of modules) {
             const collection = ADMIN_MODULE_COLLECTION[key];
-            const rows = await readMany(collection, {
+            const query: {
+                sort: string[];
+                limit: number;
+                fields?: string[];
+                filter?: JsonObject;
+            } = {
                 sort: ["-date_created"],
                 limit: 40,
-                fields: key === "diaries" ? [...DIARY_FIELDS] : undefined,
-            });
+            };
+            if (key === "diaries") {
+                query.fields = [...DIARY_FIELDS];
+                // 管理端只允许访问公开日记，避免私密内容被批量读取。
+                query.filter = { praviate: { _eq: true } } as JsonObject;
+            }
+            const rows = await readMany(collection, query);
             for (const row of rows as JsonObject[]) {
                 const rowBody = toOptionalString(row.body);
                 items.push({
@@ -115,6 +145,16 @@ export async function handleAdminContent(
             return fail("不支持的模块", 400);
         }
         const collection = ADMIN_MODULE_COLLECTION[module];
+        const needsPublicDiaryGuard =
+            module === "diaries" &&
+            (context.request.method === "PATCH" ||
+                context.request.method === "DELETE");
+        const adminVisibleDiary = needsPublicDiaryGuard
+            ? await loadAdminVisibleDiary(id)
+            : null;
+        if (needsPublicDiaryGuard && !adminVisibleDiary) {
+            return fail("日记不存在", 404);
+        }
 
         if (context.request.method === "PATCH") {
             const body = await parseJsonBody(context.request);
@@ -203,12 +243,7 @@ export async function handleAdminContent(
             }
             let deletedDiaryShortId: string | null = null;
             if (module === "diaries") {
-                const rows = await readMany("app_diaries", {
-                    filter: { id: { _eq: id } } as JsonObject,
-                    fields: ["short_id"],
-                    limit: 1,
-                });
-                deletedDiaryShortId = toOptionalString(rows[0]?.short_id);
+                deletedDiaryShortId = adminVisibleDiary?.short_id ?? null;
             }
             await deleteOne(collection, id);
             await cleanupOrphanDirectusFiles(candidateFileIds);

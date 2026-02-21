@@ -65,13 +65,30 @@ describe("renderMarkdown mode", () => {
         expect(html).toContain("<strong>safe</strong>");
     });
 
-    it("允许保留粘贴图片的 blob 协议", async () => {
+    it("不保留粘贴图片的 blob 协议", async () => {
         const blobUrl = "blob:https://example.com/preview-image";
         const html = await renderMarkdown(`![paste-image](${blobUrl})`, {
             target: "page",
             mode: "full",
         });
 
-        expect(html).toContain(`src="${blobUrl}"`);
+        expect(html).not.toContain(`src="${blobUrl}"`);
+        expect(html).toContain("<img");
+    });
+
+    it("预览模式允许保留 blob 协议，且不污染严格缓存", async () => {
+        const blobUrl = "blob:https://example.com/preview-image";
+        const strictHtml = await renderMarkdown(`![paste-image](${blobUrl})`, {
+            target: "page",
+            mode: "full",
+        });
+        const previewHtml = await renderMarkdown(`![paste-image](${blobUrl})`, {
+            target: "page",
+            mode: "full",
+            allowBlobImages: true,
+        });
+
+        expect(strictHtml).not.toContain(`src="${blobUrl}"`);
+        expect(previewHtml).toContain(`src="${blobUrl}"`);
     });
 });

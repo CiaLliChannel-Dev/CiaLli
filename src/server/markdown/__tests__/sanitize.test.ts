@@ -26,4 +26,23 @@ describe("sanitizeMarkdownHtml 样式白名单", () => {
         expect(html).toContain("text-decoration:underline");
         expect(html).toContain("background-color:#fff");
     });
+
+    it("强制 iframe 使用严格 sandbox", () => {
+        const html = sanitizeMarkdownHtml(
+            '<iframe src="https://example.com/embed" sandbox="allow-scripts"></iframe>',
+        );
+
+        expect(html).toContain("<iframe");
+        expect(html).toContain("sandbox");
+        expect(html).not.toContain("allow-scripts");
+    });
+
+    it("移除 img 的 data URI 载荷", () => {
+        const html = sanitizeMarkdownHtml(
+            '<img src="data:image/svg+xml;base64,PHN2Zz48c2NyaXB0PmFsZXJ0KDEpPC9zY3JpcHQ+PC9zdmc+" alt="x" />',
+        );
+
+        expect(html).not.toContain("data:image/svg+xml");
+        expect(html).toContain("<img");
+    });
 });

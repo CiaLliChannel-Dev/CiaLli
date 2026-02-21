@@ -245,13 +245,20 @@ async function deleteCommentWithDescendants(
 async function renderCommentBodyHtml(
     markdown: string,
     mode: MarkdownRenderMode = "full",
+    options?: {
+        allowBlobImages?: boolean;
+    },
 ): Promise<string> {
     const source = String(markdown || "");
     if (!source.trim()) {
         return "";
     }
     try {
-        return await renderMarkdown(source, { target: "page", mode });
+        return await renderMarkdown(source, {
+            target: "page",
+            mode,
+            allowBlobImages: options?.allowBlobImages ?? false,
+        });
     } catch (error) {
         console.error("[comments] markdown render failed:", error);
         return "";
@@ -390,7 +397,14 @@ async function handleCommentPreview(
     const body = await parseJsonBody(context.request);
     const input = validateBody(CommentPreviewSchema, body);
     const renderStart = performance.now();
-    const bodyHtml = await renderCommentBodyHtml(input.body, input.render_mode);
+    const bodyHtml = await renderCommentBodyHtml(
+        input.body,
+        input.render_mode,
+        {
+            // 仅评论预览放开 blob，落库/展示链路仍走严格策略。
+            allowBlobImages: true,
+        },
+    );
     const renderDuration = performance.now() - renderStart;
     return ok(
         {
