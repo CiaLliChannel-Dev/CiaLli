@@ -89,7 +89,6 @@ function normalizePermissions(raw: Partial<AppPermissions>): AppPermissions {
         can_manage_anime: raw.can_manage_anime ?? true,
         can_manage_albums: raw.can_manage_albums ?? true,
         can_upload_files: raw.can_upload_files ?? true,
-        status: raw.status || "published",
     };
 }
 
@@ -195,7 +194,6 @@ export async function ensureAppIdentity(
         permissions = normalizePermissions(permRows[0]);
     } else {
         const created = await createOne("app_user_permissions", {
-            status: "published",
             user_id: user.id,
             app_role: user.isSystemAdmin ? "admin" : "member",
             can_publish_articles: true,
@@ -222,10 +220,6 @@ export async function getAppAccessContext(
         permissions,
         isAdmin: user.isSystemAdmin || permissions.app_role === "admin",
     };
-}
-
-export function assertNotSuspended(access: AppAccessContext): void {
-    void access;
 }
 
 export function assertCan(

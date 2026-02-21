@@ -281,7 +281,6 @@ enum I18nKey {
     apiAuthInvalidCredentials = "apiAuthInvalidCredentials",
     apiAuthLoginFailed = "apiAuthLoginFailed",
     apiAuthNotLoggedIn = "apiAuthNotLoggedIn",
-    apiAuthSuspended = "apiAuthSuspended",
     apiAuthGetUserFailed = "apiAuthGetUserFailed",
     apiServerConfigMissing = "apiServerConfigMissing",
 

@@ -289,7 +289,6 @@ export const zh_CN: Translation = {
     [Key.apiAuthInvalidCredentials]: "邮箱或密码错误",
     [Key.apiAuthLoginFailed]: "登录失败",
     [Key.apiAuthNotLoggedIn]: "未登录",
-    [Key.apiAuthSuspended]: "账号已被停用",
     [Key.apiAuthGetUserFailed]: "获取用户信息失败",
     [Key.apiServerConfigMissing]: "服务端配置缺失，请联系管理员",
 

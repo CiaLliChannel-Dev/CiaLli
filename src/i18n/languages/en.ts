@@ -305,7 +305,6 @@ export const en: Translation = {
     [Key.apiAuthInvalidCredentials]: "Invalid email or password",
     [Key.apiAuthLoginFailed]: "Login failed",
     [Key.apiAuthNotLoggedIn]: "Not logged in",
-    [Key.apiAuthSuspended]: "Account has been suspended",
     [Key.apiAuthGetUserFailed]: "Failed to fetch user info",
     [Key.apiServerConfigMissing]:
         "Server configuration is missing. Please contact the administrator.",

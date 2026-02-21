@@ -1,7 +1,7 @@
 import type { APIContext } from "astro";
 
 import type { JsonObject } from "@/types/json";
-import { assertNotSuspended, getAppAccessContext } from "@/server/auth/acl";
+import { getAppAccessContext } from "@/server/auth/acl";
 import { fail } from "@/server/api/response";
 import { getSessionUser } from "@/server/auth/session";
 
@@ -22,13 +22,9 @@ export async function requireAccess(context: APIContext): Promise<
 
     try {
         const access = await getAppAccessContext(user);
-        assertNotSuspended(access);
         return { access };
     } catch (error) {
-        const message = String((error as Error)?.message ?? error);
-        if (message.includes("ACCOUNT_SUSPENDED")) {
-            return { response: fail("账号已被停用", 403) };
-        }
+        void error;
         return { response: fail("权限不足", 403) };
     }
 }

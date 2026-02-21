@@ -65,6 +65,10 @@ function json<T>(data: T, init?: ResponseInit): Response {
     });
 }
 
+function normalizeRateLimitEmailKey(email: string): string {
+    return `email:${email.trim().toLowerCase()}`;
+}
+
 async function shouldClearRegistrationCookieOnLogin(
     context: APIContext,
     userId: string,
@@ -118,9 +122,9 @@ export async function POST(context: APIContext): Promise<Response> {
     if (csrfDenied) return csrfDenied;
 
     const ip = resolveTrustedClientIp(request.headers);
-    let rate: Awaited<ReturnType<typeof applyRateLimit>>;
+    let ipRate: Awaited<ReturnType<typeof applyRateLimit>>;
     try {
-        rate = await applyRateLimit(ip, "auth");
+        ipRate = await applyRateLimit(ip, "auth");
     } catch (error) {
         if (
             error instanceof AppError &&
@@ -140,8 +144,8 @@ export async function POST(context: APIContext): Promise<Response> {
             { status: 500 },
         );
     }
-    if (!rate.ok) {
-        return rateLimitResponse(rate);
+    if (!ipRate.ok) {
+        return rateLimitResponse(ipRate);
     }
 
     let body: JsonValue;
@@ -164,6 +168,36 @@ export async function POST(context: APIContext): Promise<Response> {
             { ok: false, message: i18n(I18nKey.apiAuthEmailPasswordRequired) },
             { status: 400 },
         );
+    }
+
+    // 登录限流采用 IP + 账号双维度，避免通过伪造来源 IP 绕过限制。
+    let emailRate: Awaited<ReturnType<typeof applyRateLimit>>;
+    try {
+        emailRate = await applyRateLimit(
+            normalizeRateLimitEmailKey(email),
+            "auth",
+        );
+    } catch (error) {
+        if (
+            error instanceof AppError &&
+            error.message.includes("限流服务未配置")
+        ) {
+            return json(
+                {
+                    ok: false,
+                    message: i18n(I18nKey.apiRateLimitServiceMissing),
+                },
+                { status: 500 },
+            );
+        }
+        console.error("[api/auth/login] account rate limit failed:", error);
+        return json(
+            { ok: false, message: i18n(I18nKey.apiRateLimitCheckFailed) },
+            { status: 500 },
+        );
+    }
+    if (!emailRate.ok) {
+        return rateLimitResponse(emailRate);
     }
 
     const sessionOnly = !remember;
@@ -218,7 +252,9 @@ export async function POST(context: APIContext): Promise<Response> {
             { ok: true, user },
             {
                 headers: {
-                    "X-RateLimit-Remaining": String(rate.remaining),
+                    "X-RateLimit-Remaining": String(
+                        Math.min(ipRate.remaining, emailRate.remaining),
+                    ),
                 },
             },
         );

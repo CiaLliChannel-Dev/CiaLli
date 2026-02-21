@@ -309,7 +309,6 @@ export const ja: Translation = {
         "メールアドレスまたはパスワードが正しくありません",
     [Key.apiAuthLoginFailed]: "ログインに失敗しました",
     [Key.apiAuthNotLoggedIn]: "ログインしていません",
-    [Key.apiAuthSuspended]: "アカウントは停止されています",
     [Key.apiAuthGetUserFailed]: "ユーザー情報の取得に失敗しました",
     [Key.apiServerConfigMissing]:
         "サーバー設定が不足しています。管理者に連絡してください。",

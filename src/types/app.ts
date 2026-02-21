@@ -58,7 +58,6 @@ export type AppPermissions = {
     can_manage_anime: boolean;
     can_manage_albums: boolean;
     can_upload_files: boolean;
-    status: AppStatus;
 };
 
 export type AppArticle = {
