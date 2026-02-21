@@ -42,7 +42,7 @@
 - 用户：`app_user_profiles`、`app_user_permissions`、`app_user_blocks`、`app_user_registration_requests`
 - 内容：`app_articles`、`app_article_comments`、`app_article_likes`、`app_article_comment_likes`
 - 日记：`app_diaries`、`app_diary_images`、`app_diary_comments`、`app_diary_likes`、`app_diary_comment_likes`
-- 其他：`app_anime_entries`、`app_albums`、`app_album_photos`、`app_friends`、`app_content_reports`、`app_site_settings`
+- 其他：`app_anime_entries`、`app_albums`、`app_album_photos`、`app_friends`、`app_site_settings`
 
 ## 安全与渲染约束
 

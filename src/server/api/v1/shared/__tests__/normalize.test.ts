@@ -6,8 +6,6 @@ import {
     normalizeWatchStatus,
     normalizeAlbumLayout,
     normalizeCommentStatus,
-    normalizeReportTargetType,
-    normalizeReportReason,
     normalizeRegistrationRequestStatus,
 } from "@/server/api/v1/shared/normalize";
 
@@ -65,33 +63,6 @@ describe("normalizeCommentStatus", () => {
     it("非法值返回 fallback", () => {
         expect(normalizeCommentStatus("invalid")).toBe("published");
         expect(normalizeCommentStatus("invalid", "hidden")).toBe("hidden");
-    });
-});
-
-describe("normalizeReportTargetType", () => {
-    it("合法值直接返回", () => {
-        expect(normalizeReportTargetType("article")).toBe("article");
-        expect(normalizeReportTargetType("diary")).toBe("diary");
-        expect(normalizeReportTargetType("article_comment")).toBe(
-            "article_comment",
-        );
-        expect(normalizeReportTargetType("diary_comment")).toBe(
-            "diary_comment",
-        );
-    });
-    it("非法值 → null", () => {
-        expect(normalizeReportTargetType("invalid")).toBe(null);
-    });
-});
-
-describe("normalizeReportReason", () => {
-    it("合法值直接返回", () => {
-        expect(normalizeReportReason("spam")).toBe("spam");
-        expect(normalizeReportReason("abuse")).toBe("abuse");
-        expect(normalizeReportReason("copyright")).toBe("copyright");
-    });
-    it("非法值 → other", () => {
-        expect(normalizeReportReason("invalid")).toBe("other");
     });
 });
 

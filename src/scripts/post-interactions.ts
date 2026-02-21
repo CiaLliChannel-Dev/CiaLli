@@ -11,7 +11,6 @@ import {
 } from "@/scripts/dialogs";
 import I18nKey from "@i18n/i18nKey";
 import { t } from "@/scripts/i18n-runtime";
-import { runWithTask } from "@/scripts/progress-overlay-manager";
 import { getCsrfToken } from "@/utils/csrf";
 
 type CalendarFilterDetail = {
@@ -158,9 +157,6 @@ function applyCardActionVisibility(
     const blockBtn = card.querySelector<HTMLButtonElement>(
         'button[data-action="block-user"]',
     );
-    const reportBtn = card.querySelector<HTMLButtonElement>(
-        'button[data-action="report-content"]',
-    );
     const likeBtn = card.querySelector<HTMLButtonElement>(
         'button[data-action="toggle-like"]',
     );
@@ -176,10 +172,6 @@ function applyCardActionVisibility(
         const canBlock =
             state.isLoggedIn && Boolean(authorId) && state.userId !== authorId;
         blockBtn.classList.toggle("hidden", !canBlock);
-    }
-
-    if (reportBtn) {
-        reportBtn.classList.toggle("hidden", !state.isLoggedIn);
     }
 
     if (likeBtn) {
@@ -472,34 +464,6 @@ async function requestBlockUser(blockedUserId: string, reason?: string) {
         body: JSON.stringify({
             blocked_user_id: blockedUserId,
             reason: reason || undefined,
-        }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data?.ok) {
-        throw new Error(getErrorMessage(data, t(I18nKey.postActionFailed)));
-    }
-}
-
-async function requestReportContent(input: {
-    targetType: string;
-    targetId: string;
-    targetUserId: string;
-    reason: string;
-    detail?: string;
-}) {
-    const response = await fetch("/api/v1/me/reports", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-            "content-type": "application/json",
-            "x-csrf-token": getCsrfToken(),
-        },
-        body: JSON.stringify({
-            target_type: input.targetType,
-            target_id: input.targetId,
-            target_user_id: input.targetUserId || undefined,
-            reason: input.reason,
-            detail: input.detail || undefined,
         }),
     });
     const data = await response.json().catch(() => ({}));
@@ -804,96 +768,6 @@ function setupPostCardActions() {
                 return;
             }
 
-            if (action === "report-content") {
-                const formValues = await showFormDialog({
-                    ariaLabel: t(I18nKey.postReportTitle),
-                    message: t(I18nKey.postReportMessage),
-                    confirmText: t(I18nKey.commonConfirm),
-                    cancelText: t(I18nKey.commonCancel),
-                    confirmVariant: "danger",
-                    fields: [
-                        {
-                            name: "reason",
-                            label: t(I18nKey.postReportReasonLabel),
-                            type: "select",
-                            required: true,
-                            value: "other",
-                            options: [
-                                {
-                                    label: t(I18nKey.postReportReasonSpam),
-                                    value: "spam",
-                                },
-                                {
-                                    label: t(I18nKey.postReportReasonAbuse),
-                                    value: "abuse",
-                                },
-                                {
-                                    label: t(I18nKey.postReportReasonHate),
-                                    value: "hate",
-                                },
-                                {
-                                    label: t(I18nKey.postReportReasonViolence),
-                                    value: "violence",
-                                },
-                                {
-                                    label: t(I18nKey.postReportReasonCopyright),
-                                    value: "copyright",
-                                },
-                                {
-                                    label: t(I18nKey.postReportReasonOther),
-                                    value: "other",
-                                },
-                            ],
-                        },
-                        {
-                            name: "detail",
-                            label: t(I18nKey.postReportDetailLabel),
-                            type: "textarea",
-                            placeholder: t(I18nKey.postReportDetailPlaceholder),
-                            rows: 4,
-                        },
-                    ],
-                });
-                if (!formValues) {
-                    return;
-                }
-                const reason = String(formValues.reason || "")
-                    .trim()
-                    .toLowerCase();
-                const normalizedReason = [
-                    "spam",
-                    "abuse",
-                    "hate",
-                    "violence",
-                    "copyright",
-                    "other",
-                ].includes(reason)
-                    ? reason
-                    : "other";
-                const detail = String(formValues.detail || "").trim();
-                await runWithTask(
-                    {
-                        title: t(I18nKey.postReportSubmittingTitle),
-                        mode: "indeterminate",
-                        text: t(I18nKey.postReportSubmittingText),
-                    },
-                    async ({ update }) => {
-                        update({ text: t(I18nKey.postReportSubmittingText) });
-                        await requestReportContent({
-                            targetType:
-                                cardType === "diary" ? "diary" : "article",
-                            targetId: itemId,
-                            targetUserId: authorId,
-                            reason: normalizedReason,
-                            detail,
-                        });
-                    },
-                );
-                await showNoticeDialog({
-                    ariaLabel: t(I18nKey.dialogNoticeTitle),
-                    message: t(I18nKey.postReportSuccess),
-                });
-            }
         } catch (error) {
             const message =
                 error instanceof Error

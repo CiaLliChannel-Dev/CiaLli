@@ -432,22 +432,6 @@ export const en: Translation = {
     [Key.postBlockReasonPlaceholder]:
         "For example: spam, harassment, abuse, etc.",
     [Key.postBlockSuccess]: "User has been blocked.",
-    [Key.postReportTitle]: "Report Content",
-    [Key.postReportMessage]:
-        "Please select a report reason. Additional details are optional.",
-    [Key.postReportReasonLabel]: "Report reason",
-    [Key.postReportReasonSpam]: "Spam",
-    [Key.postReportReasonAbuse]: "Abuse / Harassment",
-    [Key.postReportReasonHate]: "Hate Content",
-    [Key.postReportReasonViolence]: "Violence",
-    [Key.postReportReasonCopyright]: "Copyright",
-    [Key.postReportReasonOther]: "Other",
-    [Key.postReportDetailLabel]: "Additional details (optional)",
-    [Key.postReportDetailPlaceholder]:
-        "You can provide more background details here",
-    [Key.postReportSubmittingTitle]: "Submitting report",
-    [Key.postReportSubmittingText]: "Submitting...",
-    [Key.postReportSuccess]: "Report submitted. We will review it soon.",
     [Key.postActionFailed]: "Operation failed. Please try again later.",
     [Key.adminAboutBodyPlaceholder]: "Admin About Body Placeholder",
     [Key.adminAboutBodyRequired]: "Admin About Body Required",

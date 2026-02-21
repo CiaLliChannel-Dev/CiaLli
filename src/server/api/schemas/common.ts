@@ -18,26 +18,6 @@ export const WatchStatusSchema = z.enum([
 ]);
 export const AlbumLayoutSchema = z.enum(["grid", "masonry"]);
 export const AppRoleSchema = z.enum(["admin", "member"]);
-export const ReportTargetTypeSchema = z.enum([
-    "article",
-    "diary",
-    "article_comment",
-    "diary_comment",
-]);
-export const ReportReasonSchema = z.enum([
-    "spam",
-    "abuse",
-    "hate",
-    "violence",
-    "copyright",
-    "other",
-]);
-export const ReportStatusSchema = z.enum([
-    "pending",
-    "reviewed",
-    "resolved",
-    "rejected",
-]);
 export const RegistrationRequestStatusSchema = z.enum([
     "pending",
     "approved",

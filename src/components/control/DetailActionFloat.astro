@@ -80,12 +80,6 @@ const {
     >
       删除
     </button>
-    <button
-      type="button"
-      class="detail-manage-report hidden w-full text-left px-3 py-2 rounded-lg text-sm text-amber-600 dark:text-amber-400 hover:bg-black/5 dark:hover:bg-white/10"
-    >
-      举报内容
-    </button>
   </div>
 </div>
 
@@ -187,7 +181,6 @@ const {
   import {
     showAuthRequiredDialog,
     showConfirmDialog,
-    showFormDialog,
     showNoticeDialog,
   } from "@/scripts/dialogs";
   import { navigateToPage } from "@/utils/navigation-utils";
@@ -263,9 +256,6 @@ const {
       const deleteBtn = rootEl.querySelector<HTMLButtonElement>(
         ".detail-manage-delete",
       );
-      const reportBtn = rootEl.querySelector<HTMLButtonElement>(
-        ".detail-manage-report",
-      );
       const likeCountText = rootEl.querySelector<HTMLElement>(
         "[data-like-count-text]",
       );
@@ -323,13 +313,11 @@ const {
           state.isLoggedIn &&
           Boolean(state.userId) &&
           (state.isAdmin || state.userId === authorId);
-        const canReport = Boolean(contentId);
-        const canOpenPanel = canManage || canReport;
+        const canOpenPanel = canManage || state.isLoggedIn;
 
         manageBtn?.classList.toggle("hidden", !canOpenPanel);
         editBtn?.classList.toggle("hidden", !canManage);
         deleteBtn?.classList.toggle("hidden", !canManage);
-        reportBtn?.classList.toggle("hidden", !canReport);
 
         if (!canOpenPanel && isOpen) {
           panel?.classList.remove("show");
@@ -350,34 +338,6 @@ const {
           return message;
         }
         return fallback;
-      }
-
-      async function requestReportContent(input: {
-        targetType: "article" | "diary";
-        targetId: string;
-        targetUserId: string;
-        reason: string;
-        detail?: string;
-      }): Promise<void> {
-        const response = await fetch("/api/v1/me/reports", {
-          method: "POST",
-          credentials: "include",
-          headers: {
-            "content-type": "application/json",
-            "x-csrf-token": getCsrfToken(),
-          },
-          body: JSON.stringify({
-            target_type: input.targetType,
-            target_id: input.targetId,
-            target_user_id: input.targetUserId || undefined,
-            reason: input.reason,
-            detail: input.detail || undefined,
-          }),
-        });
-        const data = await response.json().catch(() => null);
-        if (!response.ok || !data?.ok) {
-          throw new Error(getApiMessage(data, "举报失败"));
-        }
       }
 
       function openPanel(): void {
@@ -475,97 +435,6 @@ const {
         } finally {
           deleteBtn.disabled = false;
           closePanel();
-        }
-      });
-
-      reportBtn?.addEventListener("click", async () => {
-        closePanel();
-        const auth = getAuthState();
-        if (!auth.isLoggedIn) {
-          showAuthRequiredDialog();
-          return;
-        }
-        const formValues = await showFormDialog({
-          ariaLabel: "举报内容",
-          message: "请选择举报原因，可选填写补充说明。",
-          confirmText: "提交举报",
-          cancelText: "取消",
-          confirmVariant: "danger",
-          fields: [
-            {
-              name: "reason",
-              label: "举报原因",
-              type: "select",
-              required: true,
-              value: "other",
-              options: [
-                { label: "垃圾信息（spam）", value: "spam" },
-                { label: "辱骂骚扰（abuse）", value: "abuse" },
-                { label: "仇恨内容（hate）", value: "hate" },
-                { label: "暴力内容（violence）", value: "violence" },
-                { label: "版权问题（copyright）", value: "copyright" },
-                { label: "其他（other）", value: "other" },
-              ],
-            },
-            {
-              name: "detail",
-              label: "补充说明（可选）",
-              type: "textarea",
-              placeholder: "可填写更多背景信息",
-              rows: 4,
-            },
-          ],
-        });
-        if (!formValues) {
-          return;
-        }
-
-        const reason = String(formValues.reason || "")
-          .trim()
-          .toLowerCase();
-        const normalizedReason = [
-          "spam",
-          "abuse",
-          "hate",
-          "violence",
-          "copyright",
-          "other",
-        ].includes(reason)
-          ? reason
-          : "other";
-        const detail = String(formValues.detail || "").trim();
-        const overlayHandle = startOverlayTask({
-          title: "正在提交举报",
-          mode: "indeterminate",
-          text: "提交中...",
-        });
-
-        try {
-          updateOverlayTask(overlayHandle, {
-            text: "正在提交举报...",
-          });
-          await requestReportContent({
-            targetType: contentType === "diary" ? "diary" : "article",
-            targetId: contentId,
-            targetUserId: authorId,
-            reason: normalizedReason,
-            detail,
-          });
-          updateOverlayTask(overlayHandle, {
-            text: "举报已提交",
-          });
-          await showNoticeDialog({
-            ariaLabel: "举报成功",
-            message: "已提交举报，我们会尽快处理。",
-          });
-        } catch (error) {
-          console.error(`[detail-action] report ${contentType} failed:`, error);
-          await showNoticeDialog({
-            ariaLabel: "举报失败",
-            message: error instanceof Error ? error.message : "举报失败",
-          });
-        } finally {
-          finishOverlayTask(overlayHandle);
         }
       });
 

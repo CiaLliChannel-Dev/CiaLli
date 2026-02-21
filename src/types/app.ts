@@ -233,40 +233,6 @@ export type AppUserBlock = {
     date_updated: string | null;
 };
 
-export type ContentReportTargetType =
-    | "article"
-    | "diary"
-    | "article_comment"
-    | "diary_comment";
-
-export type ContentReportReason =
-    | "spam"
-    | "abuse"
-    | "hate"
-    | "violence"
-    | "copyright"
-    | "other";
-
-export type ContentReportStatus =
-    | "pending"
-    | "reviewed"
-    | "resolved"
-    | "rejected";
-
-export type AppContentReport = {
-    id: string;
-    reporter_id: string;
-    target_type: ContentReportTargetType;
-    target_id: string;
-    target_user_id: string | null;
-    reason: ContentReportReason;
-    detail: string | null;
-    report_status: ContentReportStatus;
-    status: AppStatus;
-    date_created: string | null;
-    date_updated: string | null;
-};
-
 export type RegistrationRequestStatus =
     | "pending"
     | "approved"
