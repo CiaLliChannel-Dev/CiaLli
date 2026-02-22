@@ -767,7 +767,6 @@ function setupPostCardActions() {
                 });
                 return;
             }
-
         } catch (error) {
             const message =
                 error instanceof Error

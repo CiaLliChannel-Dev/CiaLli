@@ -244,13 +244,28 @@ function isSidebarProfilePatchEqual(
     left: SidebarProfilePatch,
     right: SidebarProfilePatch,
 ): boolean {
+    if (left.socialMode !== right.socialMode) {
+        return false;
+    }
+    if (left.socialLinks.length !== right.socialLinks.length) {
+        return false;
+    }
+    const linksEqual = left.socialLinks.every((link, index) => {
+        const target = right.socialLinks[index];
+        return (
+            link.platform === target?.platform &&
+            link.url === target?.url &&
+            link.label === target?.label
+        );
+    });
+
     return (
         left.uid === right.uid &&
         left.displayName === right.displayName &&
         left.bio === right.bio &&
         left.profileLink === right.profileLink &&
         left.avatarUrl === right.avatarUrl &&
-        left.socialHtml === right.socialHtml
+        linksEqual
     );
 }
 

@@ -31,7 +31,7 @@ export default defineConfig({
             animationClass: "transition-swup-",
             containers: ["main", "#right-sidebar-slot", "#sidebar"],
             smoothScrolling: false, // 禁用平滑滚动以提升性能，避免与锚点导航冲突
-            cache: true,
+            cache: false, // 关闭 Swup 页面快照缓存，避免旧页面 DOM 在客户端被回放。
             preload: true, // swup 默认鼠标悬停预加载
             accessibility: true,
             updateHead: true,
