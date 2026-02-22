@@ -260,34 +260,6 @@ const {
         "[data-like-count-text]",
       );
 
-      const getProgressOverlay = () => window.__CIALLI_PROGRESS_OVERLAY__;
-
-      const startOverlayTask = (
-        options: Record<string, unknown>,
-      ): number | null => {
-        const progressOverlay = getProgressOverlay();
-        if (!progressOverlay) return null;
-        return progressOverlay.startTask({
-          delayMs: 300,
-          ...options,
-        });
-      };
-
-      const updateOverlayTask = (
-        handle: number | null,
-        stage: Record<string, unknown>,
-      ): void => {
-        const progressOverlay = getProgressOverlay();
-        if (!progressOverlay || typeof handle !== "number") return;
-        progressOverlay.updateTask(handle, stage);
-      };
-
-      const finishOverlayTask = (handle: number | null): void => {
-        const progressOverlay = getProgressOverlay();
-        if (!progressOverlay || typeof handle !== "number") return;
-        progressOverlay.finishTask(handle);
-      };
-
       let liked = rootEl.dataset.liked === "1";
       let likeCount = Number(rootEl.dataset.likeCount || "0") || 0;
       let isOpen = false;
@@ -323,21 +295,6 @@ const {
           panel?.classList.remove("show");
           isOpen = false;
         }
-      }
-
-      function getApiMessage(data: unknown, fallback: string): string {
-        if (!data || typeof data !== "object") {
-          return fallback;
-        }
-        const maybeError = (data as { error?: unknown }).error;
-        if (!maybeError || typeof maybeError !== "object") {
-          return fallback;
-        }
-        const message = (maybeError as { message?: unknown }).message;
-        if (typeof message === "string" && message.trim()) {
-          return message;
-        }
-        return fallback;
       }
 
       function openPanel(): void {
