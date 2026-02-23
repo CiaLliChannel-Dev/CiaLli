@@ -1,12 +1,18 @@
 import { getAuthorBundle } from "@/server/api/v1/shared/author-cache";
-import { DIARY_FIELDS, safeCsv } from "@/server/api/v1/shared";
+import {
+    DIARY_FIELDS,
+    excludeSpecialArticleSlugFilter,
+    safeCsv,
+} from "@/server/api/v1/shared";
 import { cacheManager } from "@/server/cache/manager";
 import { hashParams } from "@/server/cache/key-utils";
 import { readMany } from "@/server/directus/client";
-import { initPostIdMap } from "@/utils/permalink-utils";
-import { getSortedPosts } from "@/utils/content-utils";
+import { buildPublicAssetUrl } from "@/server/directus-auth";
+import { permalinkConfig } from "@/config";
 import type { JsonObject } from "@/types/json";
 import type { AppArticle, AppDiary, AppDiaryImage } from "@/types/app";
+import type { DirectusPostEntry } from "@/utils/content-utils";
+import { initPostIdMap } from "@/utils/permalink-utils";
 import type {
     HomeFeedArticleCandidate,
     HomeFeedBuildOptions,
@@ -41,6 +47,36 @@ const RECENCY_DECAY_HOURS = 36;
 
 export const HOME_FEED_ALGO_VERSION = "home-feed-v1";
 
+const HOME_FEED_CANDIDATE_CACHE_VERSION = "home-feed-candidates-v1";
+
+const ARTICLE_FEED_FIELDS = [
+    "id",
+    "short_id",
+    "author_id",
+    "status",
+    "title",
+    "slug",
+    "summary",
+    "body_markdown",
+    "cover_file",
+    "cover_url",
+    "tags",
+    "category",
+    "is_public",
+    "published_at",
+    "date_created",
+    "date_updated",
+] as const;
+
+type HomeFeedCandidatePoolCachePayload = {
+    generatedAt: string;
+    articleCandidateCount: number;
+    diaryCandidateCount: number;
+    candidates: HomeFeedCandidate[];
+};
+
+let permalinkMapInitialized = false;
+
 type InteractionCollection =
     | "app_article_likes"
     | "app_article_comments"
@@ -53,6 +89,16 @@ type PickConstraint = {
     enforceAuthorCooldown: boolean;
     enforceTypeStreak: boolean;
 };
+
+type HomeFeedAuthor = {
+    id: string;
+    name: string;
+    display_name?: string;
+    username?: string;
+    avatar_url?: string;
+};
+
+type HomeFeedAuthorMap = Map<string, HomeFeedAuthor>;
 
 const PICK_CONSTRAINTS: PickConstraint[] = [
     { enforceAuthorCooldown: true, enforceTypeStreak: true },
@@ -211,24 +257,9 @@ function toFallbackAuthor(userId: string): {
 }
 
 function readAuthorFromMap(
-    authorMap: Map<
-        string,
-        {
-            id: string;
-            name: string;
-            display_name?: string;
-            username?: string;
-            avatar_url?: string;
-        }
-    >,
+    authorMap: HomeFeedAuthorMap,
     userId: string,
-): {
-    id: string;
-    name: string;
-    display_name?: string;
-    username?: string;
-    avatar_url?: string;
-} {
+): HomeFeedAuthor {
     const normalizedUserId = normalizeIdentity(userId);
     return (
         authorMap.get(normalizedUserId) || toFallbackAuthor(normalizedUserId)
@@ -256,6 +287,127 @@ function buildDiaryImageMap(
         map.set(diaryId, list);
     }
     return map;
+}
+
+function normalizeArticleTags(tags: AppArticle["tags"]): string[] {
+    if (!Array.isArray(tags)) {
+        return [];
+    }
+    return tags.map((entry) => String(entry || "").trim()).filter(Boolean);
+}
+
+function resolveArticlePublishedAt(article: AppArticle): Date {
+    return toSafeDate(article.published_at || article.date_created);
+}
+
+function resolveArticleUpdatedAt(article: AppArticle): Date {
+    return toSafeDate(article.date_updated || article.date_created);
+}
+
+async function ensurePermalinkPostIdMapInitialized(): Promise<void> {
+    if (!permalinkConfig.enable || permalinkMapInitialized) {
+        return;
+    }
+
+    const articleFilters: JsonObject[] = [
+        { is_public: { _eq: true } },
+        excludeSpecialArticleSlugFilter(),
+    ];
+    if (import.meta.env.PROD) {
+        articleFilters.push({ status: { _eq: "published" } });
+    }
+
+    const rows = await readMany("app_articles", {
+        filter: { _and: articleFilters } as JsonObject,
+        fields: ["id", "short_id", "published_at", "date_created"],
+        sort: ["-published_at", "-date_created"],
+        limit: 1000,
+    });
+
+    const permalinkPosts = rows
+        .map((row) => ({
+            id: normalizeIdentity(row.short_id) || normalizeIdentity(row.id),
+            data: {
+                published: resolveArticlePublishedAt(row),
+            },
+        }))
+        .filter((post) => Boolean(post.id));
+    initPostIdMap(permalinkPosts);
+    permalinkMapInitialized = true;
+}
+
+function resolveArticleTitle(article: AppArticle): string {
+    const title = normalizeIdentity(article.title);
+    if (title) {
+        return title;
+    }
+    const slug = normalizeIdentity(article.slug);
+    if (slug) {
+        return slug;
+    }
+    return normalizeIdentity(article.id) || "Untitled";
+}
+
+function resolveArticleCover(article: AppArticle): string | undefined {
+    const coverUrl = normalizeIdentity(article.cover_url);
+    if (coverUrl) {
+        return coverUrl;
+    }
+    const coverFile = normalizeIdentity(article.cover_file);
+    if (!coverFile) {
+        return undefined;
+    }
+    return buildPublicAssetUrl(coverFile, {
+        width: 1200,
+        height: 675,
+        fit: "cover",
+    });
+}
+
+function isProtectedContentBody(value: string | null | undefined): boolean {
+    return String(value || "")
+        .trim()
+        .startsWith("CL2:");
+}
+
+function buildArticleFeedEntry(
+    article: AppArticle,
+    authorMap: HomeFeedAuthorMap,
+    articleLikeCountMap: Map<string, number>,
+    articleCommentCountMap: Map<string, number>,
+): DirectusPostEntry | null {
+    const articleId = normalizeIdentity(article.id);
+    const authorId = normalizeIdentity(article.author_id);
+    if (!articleId || !authorId) {
+        return null;
+    }
+
+    const shortId = normalizeIdentity(article.short_id);
+    const routeId = shortId || articleId;
+    const publishedAt = resolveArticlePublishedAt(article);
+    const updatedAt = resolveArticleUpdatedAt(article);
+
+    return {
+        id: routeId,
+        slug: normalizeIdentity(article.slug) || null,
+        body: String(article.body_markdown || ""),
+        url: `/posts/${routeId}`,
+        data: {
+            article_id: articleId,
+            author_id: authorId,
+            author: readAuthorFromMap(authorMap, authorId),
+            title: resolveArticleTitle(article),
+            description: normalizeIdentity(article.summary) || undefined,
+            image: resolveArticleCover(article),
+            tags: normalizeArticleTags(article.tags),
+            category: normalizeIdentity(article.category) || undefined,
+            comment_count: articleCommentCountMap.get(articleId) || 0,
+            like_count: articleLikeCountMap.get(articleId) || 0,
+            published: publishedAt,
+            updated: updatedAt,
+            encrypted: isProtectedContentBody(article.body_markdown),
+        },
+    };
 }
 
 function scoreTagPreference(
@@ -688,33 +840,333 @@ export function mixHomeFeedCandidates(
     return output;
 }
 
+function hydrateArticleEntry(entry: DirectusPostEntry): DirectusPostEntry {
+    return {
+        ...entry,
+        data: {
+            ...entry.data,
+            published: toSafeDate(entry.data.published),
+            updated: toSafeDate(entry.data.updated),
+        },
+    };
+}
+
+function hydrateHomeFeedCandidate(
+    candidate: HomeFeedCandidate,
+): HomeFeedCandidate {
+    if (candidate.type === "article") {
+        return {
+            ...candidate,
+            publishedAt: toSafeDate(candidate.publishedAt),
+            entry: hydrateArticleEntry(candidate.entry),
+        };
+    }
+    return {
+        ...candidate,
+        publishedAt: toSafeDate(candidate.publishedAt),
+    };
+}
+
+function hydrateHomeFeedItem(item: HomeFeedItem): HomeFeedItem {
+    if (item.type === "article") {
+        return {
+            ...item,
+            publishedAt: toSafeDate(item.publishedAt),
+            entry: hydrateArticleEntry(item.entry),
+        };
+    }
+    return {
+        ...item,
+        publishedAt: toSafeDate(item.publishedAt),
+    };
+}
+
+function hydrateHomeFeedCandidatePool(
+    payload: HomeFeedCandidatePoolCachePayload,
+): HomeFeedCandidatePoolCachePayload {
+    return {
+        ...payload,
+        candidates: payload.candidates.map((candidate) =>
+            hydrateHomeFeedCandidate(candidate),
+        ),
+    };
+}
+
 function hydrateHomeFeedResult(
     result: HomeFeedBuildResult,
 ): HomeFeedBuildResult {
     return {
         ...result,
-        items: result.items.map((item) => {
-            if (item.type === "article") {
-                return {
-                    ...item,
-                    publishedAt: toSafeDate(item.publishedAt),
-                    entry: {
-                        ...item.entry,
-                        data: {
-                            ...item.entry.data,
-                            published: toSafeDate(item.entry.data.published),
-                            updated: toSafeDate(item.entry.data.updated),
-                        },
-                    },
-                };
-            }
-
-            return {
-                ...item,
-                publishedAt: toSafeDate(item.publishedAt),
-            };
-        }),
+        items: result.items.map((item) => hydrateHomeFeedItem(item)),
     };
+}
+
+function hasPreferenceProfile(profile: HomeFeedPreferenceProfile): boolean {
+    return (
+        profile.authorWeights.size > 0 ||
+        profile.tagWeights.size > 0 ||
+        profile.categoryWeights.size > 0
+    );
+}
+
+function applyPreferenceProfileToCandidates(
+    candidates: HomeFeedCandidate[],
+    profile: HomeFeedPreferenceProfile,
+): HomeFeedCandidate[] {
+    if (!hasPreferenceProfile(profile)) {
+        return candidates;
+    }
+
+    return candidates.map((candidate) => {
+        if (candidate.type === "article") {
+            return {
+                ...candidate,
+                personalizationScore: scoreArticlePersonalization(
+                    candidate.authorId,
+                    safeCsv(candidate.entry.data.tags),
+                    candidate.entry.data.category,
+                    profile,
+                ),
+            };
+        }
+        return {
+            ...candidate,
+            personalizationScore: scoreDiaryPersonalization(
+                candidate.authorId,
+                profile,
+            ),
+        };
+    });
+}
+
+async function buildHomeFeedCandidatePool(options: {
+    articleCandidateLimit: number;
+    diaryCandidateLimit: number;
+    engagementWindowHours: number;
+    now: Date;
+}): Promise<HomeFeedCandidatePoolCachePayload> {
+    const articleFilters: JsonObject[] = [
+        { is_public: { _eq: true } },
+        excludeSpecialArticleSlugFilter(),
+    ];
+    if (import.meta.env.PROD) {
+        articleFilters.push({ status: { _eq: "published" } });
+    }
+
+    const [articleRows, diaryRows] = await Promise.all([
+        readMany("app_articles", {
+            filter: { _and: articleFilters } as JsonObject,
+            fields: [...ARTICLE_FEED_FIELDS],
+            sort: ["-published_at", "-date_created"],
+            limit: options.articleCandidateLimit,
+        }),
+        readMany("app_diaries", {
+            filter: {
+                _and: [
+                    { status: { _eq: "published" } },
+                    { praviate: { _eq: true } },
+                ],
+            } as JsonObject,
+            fields: [...DIARY_FIELDS],
+            sort: ["-date_created"],
+            limit: options.diaryCandidateLimit,
+        }),
+    ]);
+
+    const articleIds = Array.from(
+        new Set(
+            articleRows.map((row) => normalizeIdentity(row.id)).filter(Boolean),
+        ),
+    );
+    const diaryIds = Array.from(
+        new Set(
+            diaryRows.map((row) => normalizeIdentity(row.id)).filter(Boolean),
+        ),
+    );
+    const articleAuthorIds = Array.from(
+        new Set(
+            articleRows
+                .map((row) => normalizeIdentity(row.author_id))
+                .filter(Boolean),
+        ),
+    );
+    const diaryAuthorIds = Array.from(
+        new Set(
+            diaryRows
+                .map((row) => normalizeIdentity(row.author_id))
+                .filter(Boolean),
+        ),
+    );
+    const windowStartIso = new Date(
+        options.now.getTime() - options.engagementWindowHours * 60 * 60 * 1000,
+    ).toISOString();
+
+    const [
+        articleAuthorMap,
+        diaryAuthorMap,
+        articleLikeCountMap,
+        articleCommentCountMap,
+        articleLike72hMap,
+        articleComment72hMap,
+        diaryImages,
+        diaryLikeCountMap,
+        diaryCommentCountMap,
+        diaryLike72hMap,
+        diaryComment72hMap,
+    ] = await Promise.all([
+        getAuthorBundle(articleAuthorIds),
+        getAuthorBundle(diaryAuthorIds),
+        fetchInteractionCountMap("app_article_likes", "article_id", articleIds),
+        fetchInteractionCountMap(
+            "app_article_comments",
+            "article_id",
+            articleIds,
+            {
+                requirePublic: true,
+            },
+        ),
+        fetchInteractionCountMap(
+            "app_article_likes",
+            "article_id",
+            articleIds,
+            {
+                windowStartIso,
+            },
+        ),
+        fetchInteractionCountMap(
+            "app_article_comments",
+            "article_id",
+            articleIds,
+            {
+                requirePublic: true,
+                windowStartIso,
+            },
+        ),
+        diaryIds.length > 0
+            ? readMany("app_diary_images", {
+                  filter: {
+                      _and: [
+                          { diary_id: { _in: diaryIds } },
+                          { status: { _eq: "published" } },
+                          { is_public: { _eq: true } },
+                      ],
+                  } as JsonObject,
+                  sort: ["sort", "-date_created"],
+                  limit: -1,
+              })
+            : Promise.resolve([] as AppDiaryImage[]),
+        fetchInteractionCountMap("app_diary_likes", "diary_id", diaryIds),
+        fetchInteractionCountMap("app_diary_comments", "diary_id", diaryIds, {
+            requirePublic: true,
+        }),
+        fetchInteractionCountMap("app_diary_likes", "diary_id", diaryIds, {
+            windowStartIso,
+        }),
+        fetchInteractionCountMap("app_diary_comments", "diary_id", diaryIds, {
+            requirePublic: true,
+            windowStartIso,
+        }),
+    ]);
+
+    const articleEntries = articleRows
+        .map((row) =>
+            buildArticleFeedEntry(
+                row,
+                articleAuthorMap,
+                articleLikeCountMap,
+                articleCommentCountMap,
+            ),
+        )
+        .filter((entry): entry is DirectusPostEntry => entry !== null);
+
+    const articleCandidates: HomeFeedArticleCandidate[] = articleEntries.map(
+        (entry) => ({
+            type: "article",
+            id: normalizeIdentity(entry.data.article_id),
+            authorId: normalizeIdentity(entry.data.author_id),
+            publishedAt: toSafeDate(entry.data.published),
+            entry,
+            likes72h: articleLike72hMap.get(entry.data.article_id) || 0,
+            comments72h: articleComment72hMap.get(entry.data.article_id) || 0,
+            qualityScore: calculateArticleQualityScore(entry),
+            personalizationScore: 0,
+        }),
+    );
+
+    const diaryImageMap = buildDiaryImageMap(diaryImages);
+    const diaryEntries: HomeFeedDiaryEntry[] = diaryRows.map((row) => ({
+        ...row,
+        author: readAuthorFromMap(diaryAuthorMap, row.author_id),
+        images: diaryImageMap.get(row.id) || [],
+        comment_count: diaryCommentCountMap.get(row.id) || 0,
+        like_count: diaryLikeCountMap.get(row.id) || 0,
+    }));
+
+    const diaryCandidates: HomeFeedDiaryCandidate[] = diaryEntries
+        .map((entry) => {
+            const diaryId = normalizeIdentity(entry.id);
+            const authorId = normalizeIdentity(entry.author_id);
+            if (!diaryId || !authorId) {
+                return null;
+            }
+            return {
+                type: "diary",
+                id: diaryId,
+                authorId,
+                publishedAt: toSafeDate(
+                    entry.date_created || entry.date_updated,
+                ),
+                entry,
+                likes72h: diaryLike72hMap.get(entry.id) || 0,
+                comments72h: diaryComment72hMap.get(entry.id) || 0,
+                qualityScore: calculateDiaryQualityScore(entry),
+                personalizationScore: 0,
+            };
+        })
+        .filter(
+            (candidate): candidate is HomeFeedDiaryCandidate =>
+                candidate !== null,
+        );
+
+    return {
+        generatedAt: options.now.toISOString(),
+        articleCandidateCount: articleCandidates.length,
+        diaryCandidateCount: diaryCandidates.length,
+        candidates: [...articleCandidates, ...diaryCandidates],
+    };
+}
+
+async function loadHomeFeedCandidatePool(options: {
+    articleCandidateLimit: number;
+    diaryCandidateLimit: number;
+    engagementWindowHours: number;
+    algoVersion: string;
+    now: Date;
+}): Promise<HomeFeedCandidatePoolCachePayload> {
+    const candidateCacheKey = hashParams({
+        algoVersion: options.algoVersion,
+        cacheVersion: HOME_FEED_CANDIDATE_CACHE_VERSION,
+        articleCandidateLimit: options.articleCandidateLimit,
+        diaryCandidateLimit: options.diaryCandidateLimit,
+        engagementWindowHours: options.engagementWindowHours,
+    });
+    const cached = await cacheManager.get<HomeFeedCandidatePoolCachePayload>(
+        "home-feed-candidates",
+        candidateCacheKey,
+    );
+    if (cached) {
+        return hydrateHomeFeedCandidatePool(cached);
+    }
+
+    // 候选池按“无用户上下文”缓存，登录态只做轻量个性化重排，避免重复重查询。
+    const payload = await buildHomeFeedCandidatePool({
+        articleCandidateLimit: options.articleCandidateLimit,
+        diaryCandidateLimit: options.diaryCandidateLimit,
+        engagementWindowHours: options.engagementWindowHours,
+        now: options.now,
+    });
+    void cacheManager.set("home-feed-candidates", candidateCacheKey, payload);
+    return payload;
 }
 
 export async function buildHomeFeed(
@@ -750,12 +1202,17 @@ export async function buildHomeFeed(
     const algoVersion =
         normalizeIdentity(options.algoVersion) || HOME_FEED_ALGO_VERSION;
     const now = options.now ? toSafeDate(options.now) : new Date();
+    await ensurePermalinkPostIdMapInitialized();
 
     const cacheKey = hashParams({
         viewerId: viewerId || "guest",
         limit,
+        outputLimit,
+        articleCandidateLimit,
+        diaryCandidateLimit,
+        engagementWindowHours,
+        personalizationLookbackDays,
         algoVersion,
-        windowHours: engagementWindowHours,
     });
     const cached = await cacheManager.get<HomeFeedBuildResult>(
         "home-feed",
@@ -765,183 +1222,29 @@ export async function buildHomeFeed(
         return hydrateHomeFeedResult(cached);
     }
 
-    const [allArticles, diaryRows, preferenceProfile] = await Promise.all([
-        getSortedPosts(),
-        readMany("app_diaries", {
-            filter: {
-                _and: [
-                    { status: { _eq: "published" } },
-                    { praviate: { _eq: true } },
-                ],
-            } as JsonObject,
-            fields: [...DIARY_FIELDS],
-            sort: ["-date_created"],
-            limit: diaryCandidateLimit,
+    const [candidatePool, preferenceProfile] = await Promise.all([
+        loadHomeFeedCandidatePool({
+            articleCandidateLimit,
+            diaryCandidateLimit,
+            engagementWindowHours,
+            algoVersion,
+            now,
         }),
         viewerId
             ? loadPreferenceProfile(viewerId, now, personalizationLookbackDays)
             : Promise.resolve(createEmptyPreferenceProfile()),
     ]);
 
-    // 关键链路：继续使用完整文章列表初始化 permalink 序号映射，避免序号链接漂移。
-    initPostIdMap(allArticles);
-
-    const articleEntries = allArticles.slice(0, articleCandidateLimit);
-    const articleIds = Array.from(
-        new Set(
-            articleEntries
-                .map((entry) =>
-                    normalizeIdentity(entry.data.article_id || entry.id),
-                )
-                .filter(Boolean),
-        ),
-    );
-    const diaryIds = Array.from(
-        new Set(
-            diaryRows.map((row) => normalizeIdentity(row.id)).filter(Boolean),
-        ),
-    );
-    const diaryAuthorIds = Array.from(
-        new Set(
-            diaryRows
-                .map((row) => normalizeIdentity(row.author_id))
-                .filter(Boolean),
-        ),
-    );
-
-    const windowStartIso = new Date(
-        now.getTime() - engagementWindowHours * 60 * 60 * 1000,
-    ).toISOString();
-
-    const [
-        articleLike72hMap,
-        articleComment72hMap,
-        diaryImages,
-        diaryAuthorMap,
-        diaryLikeCountMap,
-        diaryCommentCountMap,
-        diaryLike72hMap,
-        diaryComment72hMap,
-    ] = await Promise.all([
-        fetchInteractionCountMap(
-            "app_article_likes",
-            "article_id",
-            articleIds,
-            { windowStartIso },
-        ),
-        fetchInteractionCountMap(
-            "app_article_comments",
-            "article_id",
-            articleIds,
-            {
-                requirePublic: true,
-                windowStartIso,
-            },
-        ),
-        diaryIds.length > 0
-            ? readMany("app_diary_images", {
-                  filter: {
-                      _and: [
-                          { diary_id: { _in: diaryIds } },
-                          { status: { _eq: "published" } },
-                          { is_public: { _eq: true } },
-                      ],
-                  } as JsonObject,
-                  sort: ["sort", "-date_created"],
-                  limit: -1,
-              })
-            : Promise.resolve([] as AppDiaryImage[]),
-        getAuthorBundle(diaryAuthorIds),
-        fetchInteractionCountMap("app_diary_likes", "diary_id", diaryIds),
-        fetchInteractionCountMap("app_diary_comments", "diary_id", diaryIds, {
-            requirePublic: true,
-        }),
-        fetchInteractionCountMap("app_diary_likes", "diary_id", diaryIds, {
-            windowStartIso,
-        }),
-        fetchInteractionCountMap("app_diary_comments", "diary_id", diaryIds, {
-            requirePublic: true,
-            windowStartIso,
-        }),
-    ]);
-
-    const diaryImageMap = buildDiaryImageMap(diaryImages);
-    const diaryEntries: HomeFeedDiaryEntry[] = diaryRows.map((row) => ({
-        ...row,
-        author: readAuthorFromMap(diaryAuthorMap, row.author_id),
-        images: diaryImageMap.get(row.id) || [],
-        comment_count: diaryCommentCountMap.get(row.id) || 0,
-        like_count: diaryLikeCountMap.get(row.id) || 0,
-    }));
-
-    const articleCandidates: HomeFeedArticleCandidate[] = articleEntries
-        .map((entry) => {
-            const articleId = normalizeIdentity(
-                entry.data.article_id || entry.id,
-            );
-            const authorId = normalizeIdentity(entry.data.author_id);
-            if (!articleId || !authorId) {
-                return null;
-            }
-            const tags = safeCsv(entry.data.tags);
-            return {
-                type: "article",
-                id: articleId,
-                authorId,
-                publishedAt: toSafeDate(entry.data.published),
-                entry,
-                likes72h: articleLike72hMap.get(articleId) || 0,
-                comments72h: articleComment72hMap.get(articleId) || 0,
-                qualityScore: calculateArticleQualityScore(entry),
-                personalizationScore: scoreArticlePersonalization(
-                    authorId,
-                    tags,
-                    entry.data.category,
-                    preferenceProfile,
-                ),
-            };
-        })
-        .filter(
-            (candidate): candidate is HomeFeedArticleCandidate =>
-                candidate !== null,
-        );
-
-    const diaryCandidates: HomeFeedDiaryCandidate[] = diaryEntries
-        .map((entry) => {
-            const diaryId = normalizeIdentity(entry.id);
-            const authorId = normalizeIdentity(entry.author_id);
-            if (!diaryId || !authorId) {
-                return null;
-            }
-            return {
-                type: "diary",
-                id: diaryId,
-                authorId,
-                publishedAt: toSafeDate(
-                    entry.date_created || entry.date_updated,
-                ),
-                entry,
-                likes72h: diaryLike72hMap.get(diaryId) || 0,
-                comments72h: diaryComment72hMap.get(diaryId) || 0,
-                qualityScore: calculateDiaryQualityScore(entry),
-                personalizationScore: scoreDiaryPersonalization(
-                    authorId,
-                    preferenceProfile,
-                ),
-            };
-        })
-        .filter(
-            (candidate): candidate is HomeFeedDiaryCandidate =>
-                candidate !== null,
-        );
-
-    const scoredCandidates = scoreHomeFeedCandidates(
-        [...articleCandidates, ...diaryCandidates],
-        {
-            now,
-            isLoggedIn: Boolean(viewerId),
-        },
-    );
+    const finalCandidates = viewerId
+        ? applyPreferenceProfileToCandidates(
+              candidatePool.candidates,
+              preferenceProfile,
+          )
+        : candidatePool.candidates;
+    const scoredCandidates = scoreHomeFeedCandidates(finalCandidates, {
+        now,
+        isLoggedIn: Boolean(viewerId),
+    });
     // 评分后再混排，保证每种类型都优先按自身得分顺序出队。
     const items = mixHomeFeedCandidates(scoredCandidates, limit);
 
@@ -954,8 +1257,8 @@ export async function buildHomeFeed(
             outputLimit,
             articleCandidateLimit,
             diaryCandidateLimit,
-            articleCandidateCount: articleCandidates.length,
-            diaryCandidateCount: diaryCandidates.length,
+            articleCandidateCount: candidatePool.articleCandidateCount,
+            diaryCandidateCount: candidatePool.diaryCandidateCount,
             engagementWindowHours,
             personalizationLookbackDays,
             algoVersion,
@@ -963,6 +1266,5 @@ export async function buildHomeFeed(
     };
 
     void cacheManager.set("home-feed", cacheKey, result);
-
     return result;
 }
