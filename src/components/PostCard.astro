@@ -32,11 +32,13 @@ const {
 const url = getPostUrl(entry);
 const hasCover = typeof image === "string" && image.trim().length > 0;
 const coverWidth = "28%";
-const bodyText = String(entry.body || "")
-  .replace(/<[^>]+>/g, " ")
-  .replace(/\s+/g, " ")
-  .trim();
-const excerpt = description || bodyText.slice(0, 140) || "";
+const bodyText = entry.data.encrypted
+  ? ""
+  : String(entry.body || "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+const excerpt = description || bodyText.slice(0, 30) || "";
 const { displayName: authorDisplayName, username: authorHandle } =
   resolveAuthorIdentity(
     {
