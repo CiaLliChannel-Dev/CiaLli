@@ -214,7 +214,7 @@ const registerI18n = {
     data-enter-skeleton-target="auth-register"
   >
     <div data-enter-skeleton-inline-content>
-      <div class="card-base rounded-(--radius-large) p-6 p-8 space-y-5">
+      <div class="card-base rounded-(--radius-large) p-6 space-y-5">
         <div class="flex items-center gap-3">
           <div
             class="w-12 h-12 rounded-2xl bg-(--btn-regular-bg) flex items-center justify-center"
@@ -287,7 +287,7 @@ const registerI18n = {
                 {currentRegistrationStatus?.description ||
                   i18n(I18nKey.authRegisterStatusUpdated)}
               </p>
-              <div class="grid grid-cols-1 grid-cols-2 gap-3 text-sm">
+              <div class="grid grid-cols-1 gap-3 text-sm">
                 <div class="rounded-lg border border-(--line-divider) bg-black/5 dark:bg-white/5 px-3 py-2.5">
                   <p class="text-60 text-xs mb-1">
                     {i18n(I18nKey.authEmailLabel)}
@@ -552,7 +552,7 @@ const registerI18n = {
       </div>
     </div>
     <div data-enter-skeleton-inline-placeholder aria-hidden="true">
-      <div class="card-base rounded-(--radius-large) p-6 p-8 space-y-5">
+      <div class="card-base rounded-(--radius-large) p-6 space-y-5">
         <div class="flex items-center gap-3">
           <div class="md3-skeleton-block w-12 h-12 rounded-2xl"></div>
           <div class="space-y-2 flex-1">
@@ -627,16 +627,15 @@ const registerI18n = {
   </div>
 
   <div
-    slot="modal"
     id="register-avatar-crop-modal"
     class="fixed inset-0 z-9999 hidden items-center justify-center bg-black/70 px-4 py-5"
     tabindex="-1"
   >
     <div
-      class="card-base w-full max-w-xl rounded-(--radius-large) border border-(--line-divider) p-5 p-6 space-y-4 text-75"
+      class="card-base w-full max-w-xl rounded-(--radius-large) border border-(--line-divider) p-5 space-y-4 text-75"
     >
       <div class="flex items-center gap-2">
-        <h3 class="text-lg text-xl font-semibold text-90">
+        <h3 class="text-lg font-semibold text-90">
           {i18n(I18nKey.authRegisterCropAvatarTitle)}
         </h3>
       </div>
@@ -715,7 +714,32 @@ const registerI18n = {
     import "@/scripts/dialogs";
   </script>
 
-  <script is:inline define:vars={{ defaultAvatarPreviewSrc, registerI18n }}>
+  <div
+    id="register-page-config"
+    data-default-avatar-src={defaultAvatarPreviewSrc}
+    data-register-i18n={JSON.stringify(registerI18n)}
+    hidden
+  >
+  </div>
+
+  <script>
+    import { setupPageInit } from "@/utils/page-init";
+
+    let defaultAvatarPreviewSrc = "";
+    let registerI18n: Record<string, string> = {};
+
+    function readPageConfig() {
+      const el = document.getElementById("register-page-config");
+      if (el) {
+        defaultAvatarPreviewSrc =
+          el.getAttribute("data-default-avatar-src") ?? "";
+        registerI18n = JSON.parse(
+          el.getAttribute("data-register-i18n") ?? "{}",
+        );
+      }
+    }
+
+    readPageConfig();
     const API_REGISTER = "/api/v1/public/registration-requests";
     const API_REGISTER_CHECK = "/api/v1/public/registration-check";
     const API_REGISTER_SESSION = "/api/v1/public/registration-session";
@@ -759,7 +783,7 @@ const registerI18n = {
     const AVATAR_OUTPUT_SIZE = 512;
     const AVATAR_ZOOM_MIN = 100;
     const AVATAR_ZOOM_MAX = 300;
-    const DEFAULT_AVATAR_SRC = String(defaultAvatarPreviewSrc || "").trim();
+    let DEFAULT_AVATAR_SRC = String(defaultAvatarPreviewSrc || "").trim();
 
     function bindCurrentAvatarFallback() {
       const currentAvatarEl = document.getElementById(
@@ -829,7 +853,13 @@ const registerI18n = {
       element.classList.add("text-60");
     }
 
-    async function requestRegistrationCheck({ email, username }) {
+    async function requestRegistrationCheck({
+      email,
+      username,
+    }: {
+      email?: string;
+      username?: string;
+    }) {
       const params = new URLSearchParams();
       if (email) {
         params.set("email", email);
@@ -963,22 +993,34 @@ const registerI18n = {
         return;
       }
 
-      const emailEl = document.getElementById("register-email");
+      const emailEl = document.getElementById(
+        "register-email",
+      ) as HTMLInputElement | null;
       const emailHintEl = document.getElementById("register-email-hint");
-      const usernameEl = document.getElementById("register-username");
+      const usernameEl = document.getElementById(
+        "register-username",
+      ) as HTMLInputElement | null;
       const usernameHintEl = document.getElementById("register-username-hint");
-      const displayNameEl = document.getElementById("register-display-name");
-      const passwordEl = document.getElementById("register-password");
+      const displayNameEl = document.getElementById(
+        "register-display-name",
+      ) as HTMLInputElement | null;
+      const passwordEl = document.getElementById(
+        "register-password",
+      ) as HTMLInputElement | null;
       const passwordHintEl = document.getElementById("register-password-hint");
       const passwordToggleEl = document.getElementById(
         "register-password-toggle",
-      );
-      const reasonEl = document.getElementById("register-reason");
-      const submitBtn = document.getElementById("register-submit");
+      ) as HTMLButtonElement | null;
+      const reasonEl = document.getElementById(
+        "register-reason",
+      ) as HTMLTextAreaElement | null;
+      const submitBtn = document.getElementById(
+        "register-submit",
+      ) as HTMLButtonElement | null;
       const submitText = document.getElementById("register-submit-text");
       const avatarPreviewEl = document.getElementById(
         "register-avatar-preview",
-      );
+      ) as HTMLImageElement | null;
       const avatarUploadBtn = document.getElementById(
         "register-avatar-upload-btn",
       );
@@ -989,23 +1031,25 @@ const registerI18n = {
       const cropViewport = document.getElementById(
         "register-avatar-crop-viewport",
       );
-      const cropImage = document.getElementById("register-avatar-crop-image");
+      const cropImage = document.getElementById(
+        "register-avatar-crop-image",
+      ) as HTMLImageElement | null;
       const cropEmpty = document.getElementById("register-avatar-crop-empty");
       const cropFileInput = document.getElementById(
         "register-avatar-crop-file",
-      );
+      ) as HTMLInputElement | null;
       const cropSelectBtn = document.getElementById(
         "register-avatar-crop-select-btn",
       );
       const cropApplyBtn = document.getElementById(
         "register-avatar-crop-apply-btn",
-      );
+      ) as HTMLButtonElement | null;
       const cropCancelBtn = document.getElementById(
         "register-avatar-crop-cancel-btn",
       );
       const cropZoomInput = document.getElementById(
         "register-avatar-crop-zoom",
-      );
+      ) as HTMLInputElement | null;
       const cropMsg = document.getElementById("register-avatar-crop-msg");
 
       if (
@@ -1058,7 +1102,7 @@ const registerI18n = {
       setAvatarPreviewSrc(DEFAULT_AVATAR_SRC);
 
       let avatarFileId = "";
-      let pendingAvatarBlob = null;
+      let pendingAvatarBlob: Blob | null = null;
       let pendingAvatarPreviewUrl = "";
       let avatarUploading = false;
       let emailCheckSeq = 0;
@@ -1077,7 +1121,7 @@ const registerI18n = {
       let cropScale = 1;
       let cropOffsetX = 0;
       let cropOffsetY = 0;
-      let cropPointerId = null;
+      let cropPointerId: number | null = null;
       let cropPointerX = 0;
       let cropPointerY = 0;
 
@@ -1462,7 +1506,7 @@ const registerI18n = {
         cropImage.src = nextObjectUrl;
       };
 
-      const buildCropBlob = async () => {
+      const buildCropBlob = async (): Promise<Blob | null> => {
         if (!cropLoaded || cropViewportSize <= 0) {
           return null;
         }
@@ -1484,12 +1528,12 @@ const registerI18n = {
           cropImageWidth * cropScale * ratio,
           cropImageHeight * cropScale * ratio,
         );
-        return await new Promise((resolve) => {
+        return await new Promise<Blob | null>((resolve) => {
           canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.92);
         });
       };
 
-      const uploadCroppedAvatar = async (blob) => {
+      const uploadCroppedAvatar = async (blob: Blob) => {
         const avatarTitleBase = `Avatar-${toSafeFileLabel(String(emailEl.value || "").trim() || "unknown")}`;
         const formData = new FormData();
         formData.append("file", blob, `${avatarTitleBase}.jpg`);
@@ -1865,12 +1909,29 @@ const registerI18n = {
     }
 
     function initPage() {
+      readPageConfig();
+      DEFAULT_AVATAR_SRC = String(defaultAvatarPreviewSrc || "").trim();
+
+      const oldCropModal = document.body.querySelector(
+        ":scope > #register-avatar-crop-modal",
+      );
+      if (oldCropModal) {
+        oldCropModal.remove();
+      }
+      const cropModal = document.getElementById("register-avatar-crop-modal");
+      if (cropModal) {
+        document.body.appendChild(cropModal);
+      }
+
       bindCurrentAvatarFallback();
       initRegisterPage();
       initRegistrationStatusPage();
     }
 
-    initPage();
-    document.addEventListener("astro:after-swap", initPage);
+    setupPageInit({
+      key: "auth-register-page",
+      init: initPage,
+    });
   </script>
 </MainGridLayout>
+
