@@ -1156,8 +1156,6 @@ const registerI18n = {
       let usernameCheckSeq = 0;
       let emailCheckTimer = 0;
       let usernameCheckTimer = 0;
-      let emailCheckPassed = false;
-      let usernameCheckPassed = false;
       let passwordCheckPassed = false;
       let cropObjectUrl = "";
       let cropLoaded = false;
@@ -1188,10 +1186,16 @@ const registerI18n = {
       const PASSWORD_PATTERN = /^[A-Za-z0-9@_]+$/;
       const PASSWORD_MIN_LENGTH = 8;
       const PASSWORD_MAX_LENGTH = 20;
+      const ACCOUNT_CHECK_DEBOUNCE_MS = 2000;
 
       const validateEmailField = async (force = false) => {
         const value = String(emailEl.value || "").trim();
-        emailCheckPassed = false;
+        // 邮箱变化时先清理待执行定时器，避免重复请求积压。
+        window.clearTimeout(emailCheckTimer);
+        if (!force) {
+          // 输入中的新值要使旧请求结果失效，防止旧提示覆盖新状态。
+          emailCheckSeq += 1;
+        }
         if (!value) {
           setFieldHint(emailHintEl, registerI18n.emailRequired, "default");
           return false;
@@ -1211,7 +1215,6 @@ const registerI18n = {
             }
             const result = data?.email;
             if (result?.valid && result?.available) {
-              emailCheckPassed = true;
               setFieldHint(emailHintEl, registerI18n.emailAvailable, "success");
               return true;
             }
@@ -1239,16 +1242,21 @@ const registerI18n = {
         if (force) {
           return await run();
         }
-        window.clearTimeout(emailCheckTimer);
         emailCheckTimer = window.setTimeout(() => {
+          emailCheckTimer = 0;
           void run();
-        }, 350);
+        }, ACCOUNT_CHECK_DEBOUNCE_MS);
         return false;
       };
 
       const validateUsernameField = async (force = false) => {
         const value = String(usernameEl.value || "").trim();
-        usernameCheckPassed = false;
+        // 用户名发生变化时立即清理待执行定时器，避免积压重复请求。
+        window.clearTimeout(usernameCheckTimer);
+        if (!force) {
+          // 输入中的值变化应让旧请求结果失效，防止旧值覆盖最新提示。
+          usernameCheckSeq += 1;
+        }
         if (!value) {
           setFieldHint(
             usernameHintEl,
@@ -1276,7 +1284,6 @@ const registerI18n = {
             }
             const result = data?.username;
             if (result?.valid && result?.available) {
-              usernameCheckPassed = true;
               setFieldHint(
                 usernameHintEl,
                 registerI18n.usernameAvailable,
@@ -1308,10 +1315,10 @@ const registerI18n = {
         if (force) {
           return await run();
         }
-        window.clearTimeout(usernameCheckTimer);
         usernameCheckTimer = window.setTimeout(() => {
+          usernameCheckTimer = 0;
           void run();
-        }, 350);
+        }, ACCOUNT_CHECK_DEBOUNCE_MS);
         return false;
       };
 
@@ -1759,10 +1766,8 @@ const registerI18n = {
           return;
         }
         const [emailAvailable, usernameAvailable] = await Promise.all([
-          emailCheckPassed ? Promise.resolve(true) : validateEmailField(true),
-          usernameCheckPassed
-            ? Promise.resolve(true)
-            : validateUsernameField(true),
+          validateEmailField(true),
+          validateUsernameField(true),
         ]);
         if (!emailAvailable || !usernameAvailable) {
           setPageMessage(registerI18n.fixAccountFieldFirst, "error");

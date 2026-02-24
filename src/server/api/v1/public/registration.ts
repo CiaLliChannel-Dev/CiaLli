@@ -386,7 +386,7 @@ export async function handlePublicRegistrationCheck(
     }
 
     const ip = getClientIp(context.request.headers);
-    const rateResult = await applyRateLimit(ip, "auth");
+    const rateResult = await applyRateLimit(ip, "registration-check");
     if (!rateResult.ok) {
         return rateLimitResponse(rateResult);
     }
