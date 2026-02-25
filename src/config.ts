@@ -19,15 +19,11 @@ export const systemSiteConfig: SystemSiteConfig = {
     font: {
         asciiFont: {
             fontFamily: "ZenMaruGothic-Medium",
-            fontWeight: "400",
-            localFonts: ["ZenMaruGothic-Medium.woff2"],
-            enableCompress: false,
+            fontWeight: "500",
         },
         cjkFont: {
             fontFamily: "LoliTi-SecondEdition",
-            fontWeight: "500",
-            localFonts: ["LoliTi-SecondEdition.woff2"],
-            enableCompress: false,
+            fontWeight: "400",
         },
     },
     pageScaling: {

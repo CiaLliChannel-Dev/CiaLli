@@ -10,22 +10,6 @@
 @import "./overlay-dialog.css";
 @import "./toggle.css";
 @import "tailwindcss";
-/* 导入 ZenMaruGothic-Medium 字体 */
-@font-face {
-  font-family: "ZenMaruGothic-Medium";
-  src: url("/assets/font/ZenMaruGothic-Medium.woff2") format("woff2");
-  font-weight: 500;
-  font-display: swap;
-}
-
-/* 导入 LoliTi-SecondEdition 字体 */
-@font-face {
-  font-family: "LoliTi-SecondEdition";
-  src: url("/assets/font/LoliTi-SecondEdition.woff2") format("woff2");
-  font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-}
 
 @config "../../tailwind.config.mjs";
 

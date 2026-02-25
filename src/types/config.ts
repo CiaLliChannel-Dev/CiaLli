@@ -44,14 +44,10 @@ export type SiteConfig = {
         asciiFont: {
             fontFamily: string;
             fontWeight: string | number;
-            localFonts: string[];
-            enableCompress: boolean;
         };
         cjkFont: {
             fontFamily: string;
             fontWeight: string | number;
-            localFonts: string[];
-            enableCompress: boolean;
         };
     };
 
