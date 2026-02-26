@@ -561,7 +561,9 @@ async function fetchSiteSettingsWithRetry(): Promise<{
     } catch (firstError) {
         console.warn(
             "[site-settings] 首次拉取失败，立即重试一次:",
-            firstError instanceof Error ? firstError.message : String(firstError),
+            firstError instanceof Error
+                ? firstError.message
+                : String(firstError),
         );
         return await readSiteSettingsRow();
     }

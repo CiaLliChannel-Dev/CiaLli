@@ -286,7 +286,10 @@ export async function handleMeArticles(
             ) {
                 await cleanupOrphanDirectusFiles([prevCoverFile]);
             }
-            if (input.body_markdown !== undefined && prevBodyFileIds.length > 0) {
+            if (
+                input.body_markdown !== undefined &&
+                prevBodyFileIds.length > 0
+            ) {
                 const nextBodyFileIds = new Set(
                     extractDirectusFileIdsFromUnknown(input.body_markdown),
                 );

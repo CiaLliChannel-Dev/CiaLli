@@ -231,13 +231,10 @@ async function loadUserByAccessToken(
         const isAuthError =
             error instanceof DirectusAuthError &&
             (error.directusStatus === 401 || error.directusStatus === 403);
-        if (!isAuthError) {
-            console.error(
-                "[auth/session] loadUserByAccessToken failed:",
-                error,
-            );
+        if (isAuthError) {
+            return null;
         }
-        return null;
+        throw error;
     }
 }
 
@@ -278,11 +275,15 @@ export async function getSessionUser(
     const accessToken =
         context.cookies.get(DIRECTUS_ACCESS_COOKIE_NAME)?.value || "";
     if (accessToken) {
-        const user = await loadUserByAccessToken(accessToken);
-        if (user) {
-            return user;
+        try {
+            const user = await loadUserByAccessToken(accessToken);
+            if (user) {
+                return user;
+            }
+            clearCookie(context, DIRECTUS_ACCESS_COOKIE_NAME);
+        } catch {
+            return null;
         }
-        clearCookie(context, DIRECTUS_ACCESS_COOKIE_NAME);
     }
 
     const refreshToken =
@@ -297,14 +298,23 @@ export async function getSessionUser(
             context.cookies.get(REMEMBER_COOKIE_NAME)?.value ?? undefined;
         const sessionOnly = isSessionOnlyMode(rememberValue);
         setSessionCookies(context, tokens, sessionOnly);
-        const user = await loadUserByAccessToken(tokens.accessToken);
-        if (!user) {
-            clearSession(context);
+        try {
+            const user = await loadUserByAccessToken(tokens.accessToken);
+            if (!user) {
+                clearSession(context);
+                return null;
+            }
+            return user;
+        } catch {
             return null;
         }
-        return user;
-    } catch {
-        clearSession(context);
+    } catch (error) {
+        const isDefinitiveAuthError =
+            error instanceof DirectusAuthError &&
+            (error.directusStatus === 401 || error.directusStatus === 403);
+        if (isDefinitiveAuthError) {
+            clearSession(context);
+        }
         return null;
     }
 }
