@@ -2,19 +2,20 @@
 
 ## 目标与技术栈
 
-- 项目类型：基于 Directus 的全栈BBS站点（Astro + Svelte + Tailwind + TypeScript）
+- 项目简介：基于 Mizuki 和 Directus SDK 开发的内容社区
 - 包管理器：仅使用 `pnpm`
 - 构建输出：Astro `output: "static"`
 
 ## 最高优先级规则
 
-- 先复用、后新增：实现功能前先检索现有模块，避免重复实现
+- 探索模式下，可按需查阅项目 Wiki 文档（CiaLli.wiki/Home.md）避免全量探索和盲目探索
+- 实现功能前先检索现有模块，避免重复实现
 - 关键代码需要写注释（中文）
 - 后端数据访问优先走 Directus SDK 与现有封装，不要在 API Handler 中散落直连逻辑
 - 删除字段/链路时按用户要求直接收敛，不额外保留兼容层
 - 禁止引入 `any`、`as any`、隐式 `any` 与类型抑制注释
 
-## 项目关键链路（按现状）
+## 项目关键链路
 
 - 页面入口：`src/pages/**`
 - BFF 入口：`src/pages/api/v1/[...segments].ts` → `src/server/api/v1.ts`
@@ -81,21 +82,3 @@ pnpm check && pnpm lint && pnpm build && pnpm format
 ```bash
 pnpm test
 ```
-
-## Wiki 使用指引（按需查阅）
-
-- 架构：`CiaLli.wiki/Architecture-Overview.md`
-- 数据模型：`CiaLli.wiki/Data-Model.md`
-- API：`CiaLli.wiki/API-Reference.md`
-- 认证与权限：`CiaLli.wiki/Auth-and-Permissions.md`
-- Directus：`CiaLli.wiki/Directus-Overview.md`
-- Markdown：`CiaLli.wiki/Markdown-Guidance.md`
-- 校验：`CiaLli.wiki/Validation.md`
-- 领域层：`CiaLli.wiki/Domain-Layer.md`
-- 配置：`CiaLli.wiki/Configuration.md`
-- 测试：`CiaLli.wiki/Testing.md`
-
-## 环境变量（必需）
-
-- `DIRECTUS_URL`
-- `DIRECTUS_STATIC_TOKEN`

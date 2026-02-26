@@ -39,7 +39,7 @@ const CATEGORY_CONFIG: Record<RateLimitCategory, CategoryConfig> = {
         prefix: "cialli:rl:registration-check",
     },
     write: { limit: 60, windowSeconds: 60, prefix: "cialli:rl:write" },
-    upload: { limit: 20, windowSeconds: 60, prefix: "cialli:rl:upload" },
+    upload: { limit: 60, windowSeconds: 60, prefix: "cialli:rl:upload" },
     comment: { limit: 15, windowSeconds: 60, prefix: "cialli:rl:comment" },
     "admin-write": {
         limit: 120,

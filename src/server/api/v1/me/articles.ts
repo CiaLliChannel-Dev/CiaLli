@@ -30,6 +30,7 @@ import {
 } from "../shared";
 import {
     cleanupOrphanDirectusFiles,
+    extractDirectusFileIdsFromUnknown,
     normalizeDirectusFileId,
 } from "../shared/file-cleanup";
 import { bindFileOwnerToUser, renderMeMarkdownPreview } from "./_helpers";
@@ -212,6 +213,10 @@ export async function handleMeArticles(
             const payload: JsonObject = {};
             const prevCoverFile = normalizeDirectusFileId(target.cover_file);
             let nextCoverFile = prevCoverFile;
+            const prevBodyFileIds =
+                input.body_markdown !== undefined
+                    ? extractDirectusFileIdsFromUnknown(target.body_markdown)
+                    : [];
 
             if (input.title !== undefined) {
                 payload.title = input.title;
@@ -281,6 +286,17 @@ export async function handleMeArticles(
             ) {
                 await cleanupOrphanDirectusFiles([prevCoverFile]);
             }
+            if (input.body_markdown !== undefined && prevBodyFileIds.length > 0) {
+                const nextBodyFileIds = new Set(
+                    extractDirectusFileIdsFromUnknown(input.body_markdown),
+                );
+                const removedBodyFileIds = prevBodyFileIds.filter(
+                    (id) => !nextBodyFileIds.has(id),
+                );
+                if (removedBodyFileIds.length > 0) {
+                    await cleanupOrphanDirectusFiles(removedBodyFileIds);
+                }
+            }
             void cacheManager.invalidateByDomain("article-list");
             void cacheManager.invalidate("article-detail", id);
             void cacheManager.invalidateByDomain("home-feed");
@@ -289,9 +305,16 @@ export async function handleMeArticles(
 
         if (context.request.method === "DELETE") {
             const coverFile = normalizeDirectusFileId(target.cover_file);
+            const bodyFileIds = extractDirectusFileIdsFromUnknown(
+                target.body_markdown,
+            );
             await deleteOne("app_articles", id);
-            if (coverFile) {
-                await cleanupOrphanDirectusFiles([coverFile]);
+            const allFileIds = [
+                ...(coverFile ? [coverFile] : []),
+                ...bodyFileIds,
+            ];
+            if (allFileIds.length > 0) {
+                await cleanupOrphanDirectusFiles(allFileIds);
             }
             void cacheManager.invalidateByDomain("article-list");
             void cacheManager.invalidate("article-detail", id);
