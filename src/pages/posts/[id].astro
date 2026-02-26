@@ -343,6 +343,7 @@ const publishedMetaText = formatArticleMetaDate(article?.published_at);
           likeCount={articleLikeCount}
           commentCount={articleCommentCount}
           likedByViewer={articleLikedByViewer}
+          dockToBackTop={true}
           editHref={`/posts/${encodeURIComponent(article.short_id || rawId)}/edit`}
           deleteEndpoint={`/api/v1/me/articles/${encodeURIComponent(article.id)}`}
           deleteConfirmMessage={i18n(I18nKey.articleDeleteConfirm)}

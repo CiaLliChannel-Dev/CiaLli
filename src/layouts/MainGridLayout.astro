@@ -507,6 +507,11 @@ const hasCarousel =
               </div>
             </div>
           </div>
+          <!--
+            详情页右侧互动控件专用挂载锚点：
+            放在 #content-wrapper 外，避免其 transform 影响 fixed 定位
+          -->
+          <div id="detail-action-float-anchor" aria-hidden="true"></div>
         </main>
       </div>
 
@@ -780,6 +785,12 @@ const hasCarousel =
   body[data-layout-mode="none"] #content-wrapper,
   body[data-layout-mode="collapsed"] #content-wrapper {
     overflow-anchor: none;
+  }
+
+  :global(#detail-action-float-anchor) {
+    position: relative;
+    width: 0;
+    height: 0;
   }
 
   #top-row {
