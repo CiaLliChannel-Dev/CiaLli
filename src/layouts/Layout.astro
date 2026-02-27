@@ -621,7 +621,9 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
       <!-- Music Player - 仅在启用时加载 -->
       {
         musicPlayerSettings.enable && (
-          <MusicPlayer musicPlayer={musicPlayerSettings} client:idle />
+          <div id="music-player-shell" transition:persist>
+            <MusicPlayer musicPlayer={musicPlayerSettings} client:idle />
+          </div>
         )
       }
 

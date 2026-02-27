@@ -21,6 +21,7 @@ const BANNER_TO_SPEC_TRANSITION_ACTIVE_CLASS =
 const BANNER_TO_SPEC_NAVBAR_SYNC_CLASS = "layout-banner-to-spec-navbar-sync";
 const BANNER_TO_SPEC_NAVBAR_COMMIT_FREEZE_CLASS =
     "layout-banner-to-spec-navbar-commit-freeze";
+const SPEC_TO_BANNER_TRANSITION_CLASS = "layout-spec-to-banner-transition";
 const BANNER_TO_SPEC_SHIFT_VAR = "--layout-banner-route-up-shift";
 const BANNER_TO_SPEC_BANNER_EXTRA_SHIFT_VAR =
     "--layout-banner-route-banner-extra-shift";
@@ -42,6 +43,7 @@ const ROOT_RUNTIME_CLASSES_TO_PRESERVE = [
     BANNER_TO_SPEC_TRANSITION_ACTIVE_CLASS,
     BANNER_TO_SPEC_NAVBAR_SYNC_CLASS,
     BANNER_TO_SPEC_NAVBAR_COMMIT_FREEZE_CLASS,
+    SPEC_TO_BANNER_TRANSITION_CLASS,
 ] as const;
 const ROOT_RUNTIME_STYLE_PROPERTIES_TO_PRESERVE = [
     "font-size",
@@ -80,6 +82,14 @@ function isCurrentHomeRoute(body: HTMLElement): boolean {
 function normalizePathname(pathname: string): string {
     const normalized = pathname.replace(/\/+$/, "");
     return normalized === "" ? "/" : normalized;
+}
+
+function isSameNavigationTarget(from: URL, to: URL): boolean {
+    return (
+        normalizePathname(from.pathname) === normalizePathname(to.pathname) &&
+        from.search === to.search &&
+        from.hash === to.hash
+    );
 }
 
 function parseCssLengthToPx(lengthValue: string): number | null {
@@ -397,6 +407,7 @@ export function setupTransitionIntentSource(
         root.classList.remove(BANNER_TO_SPEC_TRANSITION_PREPARING_CLASS);
         root.classList.remove(BANNER_TO_SPEC_TRANSITION_ACTIVE_CLASS);
         root.classList.remove(BANNER_TO_SPEC_NAVBAR_SYNC_CLASS);
+        root.classList.remove(SPEC_TO_BANNER_TRANSITION_CLASS);
         if (!options?.preserveNavbarCommitFreeze) {
             root.classList.remove(BANNER_TO_SPEC_NAVBAR_COMMIT_FREEZE_CLASS);
         }
@@ -430,10 +441,15 @@ export function setupTransitionIntentSource(
 
     const dispatchRouteChangeWithNavbarCommitFreeze = (): boolean => {
         const commitRouteChange = (): void => {
+            // spec -> home 期间先冻结为 spec 布局，切换提交时需按顶部状态计算，
+            // 避免 navbar 在一帧内出现 scrolled -> unscrolled 的闪烁跳变
+            const routeScrollTop = pendingSpecToBannerFreeze
+                ? 0
+                : document.documentElement.scrollTop;
             deps.controller.dispatch({
                 type: "ROUTE_CHANGED",
                 path: window.location.pathname,
-                scrollTop: document.documentElement.scrollTop,
+                scrollTop: routeScrollTop,
                 viewportWidth: window.innerWidth,
                 reason: "route-change",
             });
@@ -473,6 +489,20 @@ export function setupTransitionIntentSource(
     // ===== astro:before-preparation (replaces visit:start + link:click) =====
     document.addEventListener("astro:before-preparation", (event: Event) => {
         const e = event as BeforePreparationEvent;
+        if (isSameNavigationTarget(e.from, e.to)) {
+            navigationInProgress = false;
+            didReplaceContentDuringVisit = false;
+            pendingBannerToSpecRoutePath = null;
+            pendingSidebarProfilePatch = null;
+            pendingBannerToSpecNewDocument = null;
+            pendingSpecToBannerFreeze = false;
+            bannerToSpecAnimationStartedAt = null;
+            clearBannerToSpecTransitionVisualState();
+            setAwaitingReplaceState(false);
+            setPageHeightExtendVisible(false);
+            return;
+        }
+
         const targetPathname = normalizePathname(e.to.pathname);
 
         navigationInProgress = true;
@@ -521,6 +551,10 @@ export function setupTransitionIntentSource(
         // Spec-to-banner: Astro 会在 swap 时直接带入首页 SSR 的 banner 布局，
         // 需要先冻结为 spec 布局，等 route commit 后再切到 banner，才能恢复原有回场动画
         pendingSpecToBannerFreeze = !currentIsHome && isTargetHome;
+        document.documentElement.classList.toggle(
+            SPEC_TO_BANNER_TRANSITION_CLASS,
+            pendingSpecToBannerFreeze,
+        );
 
         const toc = document.getElementById("toc-wrapper");
         if (toc) {
@@ -533,6 +567,13 @@ export function setupTransitionIntentSource(
         const e = event as BeforeSwapEvent;
         const newDocument = e.newDocument;
         pendingBannerToSpecNewDocument = newDocument;
+
+        // #top-row 采用 transition:persist 后会跨页面复用同一节点，
+        // 若保留 onload-animation，某些导航路径会在重挂接时重放一次入场动画
+        const topRow = document.getElementById("top-row");
+        if (topRow instanceof HTMLElement) {
+            stripOnloadAnimationClasses(topRow);
+        }
 
         syncRootRuntimeStateToIncomingDocument(newDocument);
 

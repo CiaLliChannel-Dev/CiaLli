@@ -40,6 +40,37 @@ export function navigateToPage(
         return;
     }
 
+    // 站内同 URL 导航直接忽略，避免重复触发过渡与组件重挂载。
+    try {
+        const target = new URL(url, window.location.origin);
+        const current = new URL(window.location.href);
+        const isSameOrigin = target.origin === current.origin;
+        const isSamePathAndSearch =
+            target.pathname === current.pathname &&
+            target.search === current.search;
+
+        if (
+            isSameOrigin &&
+            isSamePathAndSearch &&
+            target.hash &&
+            target.hash !== current.hash
+        ) {
+            history.pushState(null, "", target.hash);
+            scrollToHashBelowTocBaseline(target.hash, { behavior: "smooth" });
+            return;
+        }
+
+        if (
+            isSameOrigin &&
+            isSamePathAndSearch &&
+            target.hash === current.hash
+        ) {
+            return;
+        }
+    } catch {
+        // ignore invalid relative URL parsing and continue navigation fallback
+    }
+
     // 强制整页跳转
     if (options?.force) {
         fallbackNavigation(url, options);

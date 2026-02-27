@@ -190,7 +190,11 @@ const hasCarousel =
   <IconifyLoader />
 
   <slot slot="head" name="head" />
-  <div id="top-row" class="z-50 pointer-events-none fixed top-0 left-0 right-0">
+  <div
+    id="top-row"
+    class="z-50 pointer-events-none fixed top-0 left-0 right-0"
+    transition:persist
+  >
     <div id="navbar-wrapper" class="pointer-events-auto">
       <Navbar />
     </div>

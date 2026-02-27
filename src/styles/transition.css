@@ -1,39 +1,5 @@
 /* Page transition animations - View Transitions API */
 
-html:not(.is-theme-transitioning)::view-transition-group(root) {
-  animation-duration: 300ms;
-}
-
-html:not(.is-theme-transitioning)::view-transition-old(root) {
-  animation: vt-slide-out 300ms cubic-bezier(0.55, 0.055, 0.675, 0.19) both;
-}
-
-html:not(.is-theme-transitioning)::view-transition-new(root) {
-  animation: vt-slide-in 300ms cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
-}
-
-@keyframes vt-slide-out {
-  from {
-    opacity: 1;
-    transform: translateY(0) translateX(0);
-  }
-  to {
-    opacity: 0;
-    transform: translateY(-1rem) translateX(-0.5rem);
-  }
-}
-
-@keyframes vt-slide-in {
-  from {
-    opacity: 0;
-    transform: translateY(1.5rem) translateX(0.5rem);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) translateX(0);
-  }
-}
-
 /* 主要内容区域的过渡动画 */
 .transition-main {
   transition:
@@ -161,6 +127,13 @@ html.layout-banner-to-spec-transition::view-transition-new(root) {
   animation: none;
 }
 
+/* spec-to-banner 回场：关闭默认 root 交叉淡化，避免整屏瞬时闪烁 */
+html.layout-spec-to-banner-transition::view-transition-group(root),
+html.layout-spec-to-banner-transition::view-transition-old(root),
+html.layout-spec-to-banner-transition::view-transition-new(root) {
+  animation: none;
+}
+
 html.layout-banner-to-spec-transition::view-transition-group(banner-route-main-panel),
 html.layout-banner-to-spec-transition::view-transition-group(banner-route-banner) {
   animation-duration: 920ms;
@@ -186,11 +159,5 @@ html.layout-banner-to-spec-transition::view-transition-new(banner-route-banner) 
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
-  }
-
-  html:not(.is-theme-transitioning)::view-transition-old(root),
-  html:not(.is-theme-transitioning)::view-transition-new(root),
-  html:not(.is-theme-transitioning)::view-transition-group(root) {
-    animation-duration: 0.01ms !important;
   }
 }
