@@ -27,6 +27,8 @@ const BANNER_TO_SPEC_BANNER_EXTRA_SHIFT_VAR =
     "--layout-banner-route-banner-extra-shift";
 const BANNER_TO_SPEC_TRANSITION_DURATION_VAR =
     "--layout-banner-route-transition-duration";
+const BANNER_TO_SPEC_VT_DURATION_VAR =
+    "--layout-banner-route-vt-duration";
 const BANNER_TO_SPEC_MAIN_PANEL_VT_NAME = "banner-route-main-panel";
 const BANNER_TO_SPEC_BANNER_VT_NAME = "banner-route-banner";
 const ENTER_SKELETON_AWAITING_REPLACE_CLASS = "enter-skeleton-awaiting-replace";
@@ -52,6 +54,7 @@ const ROOT_RUNTIME_STYLE_PROPERTIES_TO_PRESERVE = [
     BANNER_TO_SPEC_SHIFT_VAR,
     BANNER_TO_SPEC_BANNER_EXTRA_SHIFT_VAR,
     BANNER_TO_SPEC_TRANSITION_DURATION_VAR,
+    BANNER_TO_SPEC_VT_DURATION_VAR,
 ] as const;
 const ROOT_RUNTIME_DATA_ATTRIBUTES_TO_PRESERVE = [
     "data-desktop-unsupported",
@@ -414,6 +417,7 @@ export function setupTransitionIntentSource(
         root.style.removeProperty(BANNER_TO_SPEC_SHIFT_VAR);
         root.style.removeProperty(BANNER_TO_SPEC_BANNER_EXTRA_SHIFT_VAR);
         root.style.removeProperty(BANNER_TO_SPEC_TRANSITION_DURATION_VAR);
+        root.style.removeProperty(BANNER_TO_SPEC_VT_DURATION_VAR);
         setPageHeightExtendVisible(false);
         clearBannerToSpecViewTransitionNames(document);
     };
@@ -426,12 +430,6 @@ export function setupTransitionIntentSource(
             return;
         }
         const root = document.documentElement;
-        if (pendingBannerToSpecNewDocument) {
-            applyBannerToSpecShiftVariables(
-                pendingBannerToSpecNewDocument,
-                root,
-            );
-        }
         forceNavbarScrolledForBannerToSpecTransition();
         root.classList.remove(BANNER_TO_SPEC_TRANSITION_PREPARING_CLASS);
         root.classList.add(BANNER_TO_SPEC_TRANSITION_ACTIVE_CLASS);
@@ -544,6 +542,12 @@ export function setupTransitionIntentSource(
             root.classList.add(BANNER_TO_SPEC_TRANSITION_PREPARING_CLASS);
             setBannerToSpecViewTransitionNames(document);
             setPageHeightExtendVisible(true);
+
+            // Force reflow so the browser computes the initial (PREPARING) state,
+            // then immediately transition to ACTIVE to start the 920ms CSS transition
+            // during fetch rather than waiting for after-swap.
+            void root.offsetHeight;
+            startBannerToSpecMoveTransition();
         } else {
             setPageHeightExtendVisible(false);
         }
@@ -560,6 +564,10 @@ export function setupTransitionIntentSource(
         if (toc) {
             toc.classList.add("toc-not-ready");
         }
+
+        // Immediately activate skeleton so the user sees visual feedback
+        // during the fetch phase, not just after swap.
+        activateEnterSkeleton();
     });
 
     // ===== astro:before-swap (replaces before:content:replace + content:scroll + animation:out:start) =====
@@ -638,8 +646,36 @@ export function setupTransitionIntentSource(
         }
 
         // ----- Banner-to-spec: recalculate shift with actual newDocument -----
-        if (pendingBannerToSpecRoutePath) {
+        // Only recalculate if the CSS transition hasn't started yet;
+        // otherwise, recalculating would cause a visual jump mid-animation.
+        if (
+            pendingBannerToSpecRoutePath &&
+            bannerToSpecAnimationStartedAt === null
+        ) {
             applyBannerToSpecShiftVariables(newDocument);
+        }
+
+        // Calculate remaining CSS transition time → set as VT animation duration
+        // for seamless CSS-transition-to-VT-animation handoff.
+        if (
+            pendingBannerToSpecRoutePath &&
+            bannerToSpecAnimationStartedAt !== null
+        ) {
+            const elapsed =
+                performance.now() - bannerToSpecAnimationStartedAt;
+            const remaining = Math.max(
+                50,
+                BANNER_TO_SPEC_TRANSITION_DURATION_MS - elapsed,
+            );
+            const durationValue = `${Math.ceil(remaining)}ms`;
+            document.documentElement.style.setProperty(
+                BANNER_TO_SPEC_VT_DURATION_VAR,
+                durationValue,
+            );
+            newDocument.documentElement.style.setProperty(
+                BANNER_TO_SPEC_VT_DURATION_VAR,
+                durationValue,
+            );
         }
 
         // ----- Custom swap: sidebar preservation + scroll suppression -----

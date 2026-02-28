@@ -136,7 +136,7 @@ html.layout-spec-to-banner-transition::view-transition-new(root) {
 
 html.layout-banner-to-spec-transition::view-transition-group(banner-route-main-panel),
 html.layout-banner-to-spec-transition::view-transition-group(banner-route-banner) {
-  animation-duration: 920ms;
+  animation-duration: var(--layout-banner-route-vt-duration, 920ms);
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -144,7 +144,7 @@ html.layout-banner-to-spec-transition::view-transition-old(banner-route-main-pan
 html.layout-banner-to-spec-transition::view-transition-old(banner-route-banner),
 html.layout-banner-to-spec-transition::view-transition-new(banner-route-main-panel),
 html.layout-banner-to-spec-transition::view-transition-new(banner-route-banner) {
-  animation-duration: 920ms;
+  animation-duration: var(--layout-banner-route-vt-duration, 920ms);
   animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
 }
 

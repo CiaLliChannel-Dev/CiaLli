@@ -607,6 +607,23 @@ const hasCarousel =
     will-change: transform;
   }
 
+  :global(
+    html.layout-banner-to-spec-transition.layout-banner-to-spec-transition-active
+  ) .main-panel-wrapper {
+    transform: translateY(
+      calc(-1 * var(--layout-banner-route-up-shift, 0px))
+    );
+  }
+
+  :global(
+    html.layout-banner-to-spec-transition.layout-banner-to-spec-transition-active
+  ) #banner-wrapper {
+    transform: translateY(
+      calc(-1 * var(--layout-banner-route-banner-extra-shift, 0px))
+    );
+    opacity: 0;
+  }
+
   :global(html.layout-banner-to-spec-transition .transition-main),
   :global(html.layout-banner-to-spec-transition .transition-leaving),
   :global(html.layout-banner-to-spec-transition .transition-fade) {
