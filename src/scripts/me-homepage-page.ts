@@ -12,61 +12,17 @@ import {
     updateTask,
     type ProgressTaskHandle,
 } from "@/scripts/progress-overlay-manager";
-import { getCsrfToken } from "@/utils/csrf";
+import {
+    getApiErrorMessage,
+    requestApi as api,
+    type ApiResult,
+} from "@/scripts/http-client";
 import {
     clamp,
     buildAssetUrl,
     buildLoginRedirectHref,
     extractFileId,
 } from "@/scripts/dom-helpers";
-
-// ---------------------------------------------------------------------------
-// 共享工具
-// ---------------------------------------------------------------------------
-
-const normalizeApiUrl = (input: string): string => {
-    const [pathname, search = ""] = String(input || "").split("?");
-    const normalizedPath = pathname.endsWith("/")
-        ? pathname.slice(0, -1)
-        : pathname;
-    return search ? `${normalizedPath}?${search}` : normalizedPath;
-};
-
-interface ApiResult {
-    response: Response;
-    data: Record<string, unknown> | null;
-}
-
-const api = async (url: string, init: RequestInit = {}): Promise<ApiResult> => {
-    const isFormData =
-        typeof FormData !== "undefined" &&
-        Boolean(init.body) &&
-        init.body instanceof FormData;
-    const response = await fetch(normalizeApiUrl(url), {
-        credentials: "include",
-        headers: {
-            Accept: "application/json",
-            "x-csrf-token": getCsrfToken(),
-            ...(init.body && !isFormData
-                ? { "Content-Type": "application/json" }
-                : {}),
-            ...((init.headers as Record<string, string>) || {}),
-        },
-        ...init,
-    });
-    const data: Record<string, unknown> | null = await response
-        .json()
-        .catch(() => null);
-    return { response, data };
-};
-
-const getErrorMessage = (
-    data: Record<string, unknown> | null,
-    fallback: string,
-): string => {
-    const error = data?.error as Record<string, unknown> | undefined;
-    return (error?.message as string | undefined) || fallback;
-};
 
 // ---------------------------------------------------------------------------
 // 常量
@@ -795,7 +751,7 @@ export function initMeHomepagePage(): void {
                         )?.id
                     ) {
                         setHeaderMsg(
-                            getErrorMessage(
+                            getApiErrorMessage(
                                 uploadResult.data,
                                 t(I18nKey.meHomepageHeaderUploadFailed),
                             ),
@@ -823,7 +779,7 @@ export function initMeHomepagePage(): void {
                 });
                 if (!response.ok || !data?.ok) {
                     setHeaderMsg(
-                        getErrorMessage(data, t(I18nKey.commonSaveFailed)),
+                        getApiErrorMessage(data, t(I18nKey.commonSaveFailed)),
                     );
                     return;
                 }
@@ -994,7 +950,7 @@ export function initMeHomepagePage(): void {
                         );
                         if (!response.ok || !data?.ok) {
                             setSectionMsg(
-                                getErrorMessage(
+                                getApiErrorMessage(
                                     data,
                                     t(I18nKey.commonSaveFailed),
                                 ),
@@ -1067,7 +1023,7 @@ export function initMeHomepagePage(): void {
                         );
                         if (!response.ok || !data?.ok) {
                             setBangumiMsg(
-                                getErrorMessage(
+                                getApiErrorMessage(
                                     data,
                                     t(I18nKey.commonSaveFailed),
                                 ),

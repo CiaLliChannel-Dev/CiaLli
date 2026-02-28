@@ -12,6 +12,7 @@
 import type { UploadPurpose } from "@/constants/upload-limits";
 import { UPLOAD_LIMITS, UPLOAD_LIMIT_LABELS } from "@/constants/upload-limits";
 import I18nKey from "@/i18n/i18nKey";
+import { JPEG_QUALITY_STEPS } from "@/constants/image";
 import { runWithTask } from "@/scripts/progress-overlay-manager";
 import { getApiErrorMessage, requestApi as api } from "@/scripts/http-client";
 import { t, tFmt } from "@/scripts/i18n-runtime";
@@ -1525,7 +1526,7 @@ export function initSiteSettingsPage(): void {
             );
             return blob && blob.size <= CROP_OUTPUT_MAX_BYTES ? blob : null;
         }
-        const qualities = [0.9, 0.82, 0.75];
+        const qualities = JPEG_QUALITY_STEPS;
         for (const quality of qualities) {
             const blob = await buildCropBlob(
                 outputWidth,

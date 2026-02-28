@@ -8,7 +8,7 @@ import {
     normalizeMarkdownPreviewHtml,
 } from "@/scripts/markdown-preview-client";
 import { runWithTask } from "@/scripts/progress-overlay-manager";
-import { getCsrfToken } from "@/utils/csrf";
+import { getApiErrorMessage, requestApi as api } from "@/scripts/http-client";
 
 type EditorMode = "edit" | "preview";
 type ToolbarAction =
@@ -19,11 +19,6 @@ type ToolbarAction =
     | "quote"
     | "inline-code"
     | "code-block";
-
-type ApiResult = {
-    response: Response;
-    data: Record<string, unknown> | null;
-};
 
 type RuntimeWindow = Window &
     typeof globalThis & {
@@ -42,14 +37,6 @@ const TOOLBAR_ACTIONS = new Set<ToolbarAction>([
 
 const DATA_BOUND = "data-admin-about-bound";
 
-function normalizeApiUrl(input: string): string {
-    const [pathname, search = ""] = String(input || "").split("?");
-    const normalizedPath = pathname.endsWith("/")
-        ? pathname.slice(0, -1)
-        : pathname;
-    return search ? `${normalizedPath}?${search}` : normalizedPath;
-}
-
 function toRecord(value: unknown): Record<string, unknown> | null {
     if (!value || typeof value !== "object" || Array.isArray(value)) {
         return null;
@@ -64,34 +51,8 @@ function toStringValue(value: unknown): string {
     return "";
 }
 
-function getApiMessage(
-    data: Record<string, unknown> | null,
-    fallback: string,
-): string {
-    const error = toRecord(data?.error);
-    const message = toStringValue(error?.message);
-    return message || fallback;
-}
-
 function isToolbarAction(value: string): value is ToolbarAction {
     return TOOLBAR_ACTIONS.has(value as ToolbarAction);
-}
-
-async function api(url: string, init: RequestInit = {}): Promise<ApiResult> {
-    const response = await fetch(normalizeApiUrl(url), {
-        credentials: "include",
-        headers: {
-            Accept: "application/json",
-            "x-csrf-token": getCsrfToken(),
-            ...(init.body ? { "Content-Type": "application/json" } : {}),
-            ...((init.headers as Record<string, string>) || {}),
-        },
-        ...init,
-    });
-    const data: Record<string, unknown> | null = await response
-        .json()
-        .catch(() => null);
-    return { response, data };
 }
 
 export function initAdminAboutPage(): void {
@@ -526,7 +487,9 @@ export function initAdminAboutPage(): void {
             );
             if (!response.ok || !data?.ok) {
                 setMsg("");
-                setError(getApiMessage(data, t(I18nKey.adminAboutLoadFailed)));
+                setError(
+                    getApiErrorMessage(data, t(I18nKey.adminAboutLoadFailed)),
+                );
                 return;
             }
             const about = toRecord(data.about);
@@ -588,7 +551,10 @@ export function initAdminAboutPage(): void {
                     if (!response.ok || !data?.ok) {
                         setMsg("");
                         setError(
-                            getApiMessage(data, t(I18nKey.commonSaveFailed)),
+                            getApiErrorMessage(
+                                data,
+                                t(I18nKey.commonSaveFailed),
+                            ),
                         );
                         return;
                     }

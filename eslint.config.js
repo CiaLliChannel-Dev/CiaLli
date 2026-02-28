@@ -53,11 +53,20 @@ export default tseslint.config(
             eqeqeq: ["warn", "always"],
             "no-implicit-coercion": "error",
             "prefer-const": "error",
+            "max-lines": [
+                "warn",
+                { max: 500, skipBlankLines: true, skipComments: true },
+            ],
+            "max-lines-per-function": [
+                "warn",
+                { max: 200, skipBlankLines: true, skipComments: true },
+            ],
+            complexity: ["warn", { max: 15 }],
             "@typescript-eslint/consistent-type-imports": [
                 "warn",
                 { prefer: "type-imports", disallowTypeAnnotations: false },
             ],
-            "@typescript-eslint/no-explicit-any": "warn",
+            "@typescript-eslint/no-explicit-any": "error",
             "@typescript-eslint/no-unused-vars": [
                 "warn",
                 { argsIgnorePattern: "^_", varsIgnorePattern: "^_" },

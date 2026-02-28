@@ -3,30 +3,7 @@ import { t, tFmt } from "@/scripts/i18n-runtime";
 import { showConfirmDialog } from "@/scripts/dialogs";
 import { showOverlayDialog } from "@/scripts/overlay-dialog";
 import { runWithTask } from "@/scripts/progress-overlay-manager";
-import { getCsrfToken } from "@/utils/csrf";
-
-const normalizeApiUrl = (input: string): string => {
-    const [pathname, search = ""] = String(input || "").split("?");
-    const normalizedPath = pathname.endsWith("/")
-        ? pathname.slice(0, -1)
-        : pathname;
-    return search ? `${normalizedPath}?${search}` : normalizedPath;
-};
-
-const api = async (url: string, init: RequestInit = {}) => {
-    const response = await fetch(normalizeApiUrl(url), {
-        credentials: "include",
-        headers: {
-            Accept: "application/json",
-            "x-csrf-token": getCsrfToken(),
-            ...(init.body ? { "Content-Type": "application/json" } : {}),
-            ...((init.headers as Record<string, string>) || {}),
-        },
-        ...init,
-    });
-    const data = await response.json().catch(() => null);
-    return { response, data };
-};
+import { getApiErrorMessage, requestApi as api } from "@/scripts/http-client";
 
 const getUsersTableBody = (): HTMLTableSectionElement | null =>
     document.getElementById(
@@ -85,7 +62,7 @@ const resolveErrorMessage = (data: UnknownRecord | null, fallback: string) => {
     if (code === "REGISTRATION_STATUS_CONFLICT") {
         return t(I18nKey.adminUsersRegistrationStatusConflict);
     }
-    return String(error?.message || fallback || t(I18nKey.commonRequestFailed));
+    return getApiErrorMessage(data, fallback || t(I18nKey.commonRequestFailed));
 };
 
 let registrationRequestMap = new Map<string, UnknownRecord>();
@@ -186,7 +163,7 @@ const loadUsers = async () => {
         renderUsersRows([]);
         return;
     }
-    renderUsersRows(data.items || []);
+    renderUsersRows((data.items as UnknownRecord[]) || []);
 };
 
 const loadRegisterSwitch = async () => {
@@ -198,7 +175,9 @@ const loadRegisterSwitch = async () => {
         );
         return;
     }
-    const enabled = Boolean(data?.settings?.auth?.register_enabled);
+    const settings = data?.settings as UnknownRecord | undefined;
+    const auth = settings?.auth as UnknownRecord | undefined;
+    const enabled = Boolean(auth?.register_enabled);
     if (registerEnabledInput) {
         registerEnabledInput.checked = enabled;
     }
@@ -227,7 +206,7 @@ const loadRegistrationRequests = async () => {
         return;
     }
     setRegistrationMessage("");
-    renderRegistrationRows(data.items || []);
+    renderRegistrationRows((data.items as UnknownRecord[]) || []);
 };
 
 const showRegistrationDetailDialog = async (

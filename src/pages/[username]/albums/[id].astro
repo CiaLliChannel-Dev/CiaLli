@@ -6,6 +6,11 @@ import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import { buildPublicAssetUrl } from "@/server/directus-auth";
 import {
+  ALBUM_MASONRY_WIDTH,
+  ALBUM_GRID_WIDTH,
+  ALBUM_GRID_HEIGHT,
+} from "@/constants/image";
+import {
   loadProfileForViewer,
   loadUserAlbumDetail,
   profileToSidebarData,
@@ -94,12 +99,12 @@ function photoUrl(
   if (photo.file_id) {
     if (layout === "masonry") {
       return buildPublicAssetUrl(photo.file_id, {
-        width: 1920,
+        width: ALBUM_MASONRY_WIDTH,
       });
     }
     return buildPublicAssetUrl(photo.file_id, {
-      width: 1200,
-      height: 900,
+      width: ALBUM_GRID_WIDTH,
+      height: ALBUM_GRID_HEIGHT,
       fit: "cover",
     });
   }
@@ -115,7 +120,7 @@ function photoPreviewUrl(photo: {
   }
   if (photo.file_id) {
     return buildPublicAssetUrl(photo.file_id, {
-      width: 1920,
+      width: ALBUM_MASONRY_WIDTH,
     });
   }
   return null;
