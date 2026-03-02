@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "pnpm font:build && astro dev",
     "start": "pnpm font:build && astro dev",
-    "check": "pnpm font:build && node scripts/check-desktop-only.mjs && node scripts/check-i18n-hardcoded.mjs && astro check",
+    "check": "pnpm font:build && node scripts/check-desktop-only.mjs && node scripts/check-i18n-hardcoded.mjs && node scripts/check-i18n-structure.mjs && astro check",
     "check:i18n": "node scripts/check-i18n-hardcoded.mjs",
     "check:desktop-only": "node scripts/check-desktop-only.mjs",
     "build": "pnpm font:build && astro build",
@@ -21,7 +21,8 @@
     "test:coverage": "vitest run --coverage",
     "test:unit": "vitest run --testPathPattern='domain|shared|schemas|constants'",
     "test:integration": "vitest run --testPathPattern='api/v1/__tests__|api/__tests__'",
-    "prepare": "husky"
+    "prepare": "husky",
+    "check:i18n:structure": "node scripts/check-i18n-structure.mjs"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.6",

@@ -259,6 +259,110 @@ function mapRegistrationCheckError(
     throw error;
 }
 
+async function handleRegistrationCreate(
+    context: APIContext,
+): Promise<Response> {
+    assertRegisterEnabled(context);
+    const body = await parseJsonBody(context.request);
+    const email = parseRegistrationEmail(body.email);
+    const username = normalizeRequestedUsername(
+        toStringValue(body.username).trim(),
+    );
+    const displayName = validateDisplayName(
+        toStringValue(body.display_name).trim(),
+    );
+    const registrationPassword = parseRegistrationPassword(body.password);
+    const registrationReason = parseRegistrationReason(
+        body.registration_reason,
+    );
+    const avatarFileRaw = toStringValue(body.avatar_file).trim();
+    const avatarFile = avatarFileRaw ? parseRouteId(avatarFileRaw) : null;
+
+    await assertNoPendingRegistrationConflict(email, username);
+    await Promise.all([
+        assertRegistrationEmailAvailable(email),
+        assertRegistrationUsernameAvailable(username),
+    ]);
+
+    const created = await createOne("app_user_registration_requests", {
+        status: "published",
+        email,
+        username,
+        display_name: displayName,
+        registration_password: registrationPassword,
+        avatar_file: avatarFile,
+        registration_reason: registrationReason,
+        request_status: "pending",
+        reviewed_by: null,
+        reviewed_at: null,
+        reject_reason: null,
+        approved_user_id: null,
+    });
+
+    if (created?.id) {
+        setRegistrationRequestCookie(context, created.id);
+    }
+
+    return ok({ item: created });
+}
+
+async function handleRegistrationCancel(
+    context: APIContext,
+    segments: string[],
+): Promise<Response> {
+    assertRegisterEnabled(context);
+
+    const requestId = parseRouteId(segments[2]);
+    if (!requestId) {
+        return fail("缺少申请 ID", 400);
+    }
+    const cookieRequestId = normalizeRegistrationRequestId(
+        context.cookies.get(REGISTRATION_REQUEST_COOKIE_NAME)?.value,
+    );
+    if (!cookieRequestId || cookieRequestId !== requestId) {
+        throw forbidden(
+            "REGISTRATION_REQUEST_FORBIDDEN",
+            "无法操作当前申请，请刷新后重试",
+        );
+    }
+
+    const body = await parseJsonBody(context.request);
+    const action = String(body.action || "").trim();
+    if (action !== "cancel") {
+        throw badRequest("REGISTRATION_ACTION_INVALID", "不支持的申请操作");
+    }
+
+    const rows = await readMany("app_user_registration_requests", {
+        filter: { id: { _eq: requestId } } as JsonObject,
+        limit: 1,
+        fields: ["id", "request_status"],
+    });
+    const target = rows[0];
+    if (!target) {
+        throw notFound("REGISTRATION_NOT_FOUND", "申请不存在");
+    }
+    if (String(target.request_status || "").trim() !== "pending") {
+        throw conflict(
+            "REGISTRATION_STATUS_CONFLICT",
+            "申请状态冲突，请刷新后重试",
+        );
+    }
+
+    const updated = await updateOne(
+        "app_user_registration_requests",
+        requestId,
+        {
+            request_status: "cancelled",
+            reviewed_by: null,
+            reviewed_at: new Date().toISOString(),
+            registration_password: null,
+            reject_reason: null,
+        },
+    );
+
+    return ok({ item: updated });
+}
+
 export async function handlePublicRegistrationRequests(
     context: APIContext,
     segments: string[],
@@ -267,108 +371,14 @@ export async function handlePublicRegistrationRequests(
         if (context.request.method !== "POST") {
             return fail("方法不允许", 405);
         }
-
-        assertRegisterEnabled(context);
-        const body = await parseJsonBody(context.request);
-        const email = parseRegistrationEmail(body.email);
-        const username = normalizeRequestedUsername(
-            toStringValue(body.username).trim(),
-        );
-        const displayName = validateDisplayName(
-            toStringValue(body.display_name).trim(),
-        );
-        const registrationPassword = parseRegistrationPassword(body.password);
-        const registrationReason = parseRegistrationReason(
-            body.registration_reason,
-        );
-        const avatarFileRaw = toStringValue(body.avatar_file).trim();
-        const avatarFile = avatarFileRaw ? parseRouteId(avatarFileRaw) : null;
-
-        await assertNoPendingRegistrationConflict(email, username);
-        await Promise.all([
-            assertRegistrationEmailAvailable(email),
-            assertRegistrationUsernameAvailable(username),
-        ]);
-
-        const created = await createOne("app_user_registration_requests", {
-            status: "published",
-            email,
-            username,
-            display_name: displayName,
-            registration_password: registrationPassword,
-            avatar_file: avatarFile,
-            registration_reason: registrationReason,
-            request_status: "pending",
-            reviewed_by: null,
-            reviewed_at: null,
-            reject_reason: null,
-            approved_user_id: null,
-        });
-
-        if (created?.id) {
-            setRegistrationRequestCookie(context, created.id);
-        }
-
-        return ok({
-            item: created,
-        });
+        return handleRegistrationCreate(context);
     }
 
     if (segments.length === 3) {
         if (context.request.method !== "PATCH") {
             return fail("方法不允许", 405);
         }
-        assertRegisterEnabled(context);
-
-        const requestId = parseRouteId(segments[2]);
-        if (!requestId) {
-            return fail("缺少申请 ID", 400);
-        }
-        const cookieRequestId = normalizeRegistrationRequestId(
-            context.cookies.get(REGISTRATION_REQUEST_COOKIE_NAME)?.value,
-        );
-        if (!cookieRequestId || cookieRequestId !== requestId) {
-            throw forbidden(
-                "REGISTRATION_REQUEST_FORBIDDEN",
-                "无法操作当前申请，请刷新后重试",
-            );
-        }
-
-        const body = await parseJsonBody(context.request);
-        const action = String(body.action || "").trim();
-        if (action !== "cancel") {
-            throw badRequest("REGISTRATION_ACTION_INVALID", "不支持的申请操作");
-        }
-
-        const rows = await readMany("app_user_registration_requests", {
-            filter: { id: { _eq: requestId } } as JsonObject,
-            limit: 1,
-            fields: ["id", "request_status"],
-        });
-        const target = rows[0];
-        if (!target) {
-            throw notFound("REGISTRATION_NOT_FOUND", "申请不存在");
-        }
-        if (String(target.request_status || "").trim() !== "pending") {
-            throw conflict(
-                "REGISTRATION_STATUS_CONFLICT",
-                "申请状态冲突，请刷新后重试",
-            );
-        }
-
-        const updated = await updateOne(
-            "app_user_registration_requests",
-            requestId,
-            {
-                request_status: "cancelled",
-                reviewed_by: null,
-                reviewed_at: new Date().toISOString(),
-                registration_password: null,
-                reject_reason: null,
-            },
-        );
-
-        return ok({ item: updated });
+        return handleRegistrationCancel(context, segments);
     }
 
     return fail("未找到接口", 404);

@@ -17,6 +17,90 @@ type BangumiFilterRuntimeWindow = Window &
         __bangumiFilterCleanup?: () => void;
     };
 
+function getBangumiItems(): HTMLElement[] {
+    return Array.from(
+        document.querySelectorAll<HTMLElement>(".bangumi-list-item"),
+    );
+}
+
+function parseItemTags(item: HTMLElement): string[] {
+    try {
+        const parsed = JSON.parse(item.dataset.tags || "[]") as unknown;
+        return Array.isArray(parsed) ? parsed.map((tag) => String(tag)) : [];
+    } catch {
+        return [];
+    }
+}
+
+function getSelectedTags(filter: FilterState): string[] {
+    return normalizeTagList(filter.tags);
+}
+
+function hasActiveFilters(filter: FilterState): boolean {
+    return getSelectedTags(filter).length > 0 || filter.category !== null;
+}
+
+function getMatchingItems(filter: FilterState): Set<HTMLElement> {
+    const allItems = getBangumiItems();
+    const selectedTags = getSelectedTags(filter);
+    const hasTagFilter = selectedTags.length > 0;
+    const hasCategoryFilter = filter.category !== null;
+
+    if (!hasTagFilter && !hasCategoryFilter) {
+        return new Set(allItems);
+    }
+
+    const matched = new Set<HTMLElement>();
+    for (const item of allItems) {
+        const tagMatched =
+            !hasTagFilter ||
+            (() => {
+                const itemTags = parseItemTags(item);
+                return selectedTags.every((tag) => itemTags.includes(tag));
+            })();
+        const categoryMatched =
+            !hasCategoryFilter || item.dataset.category === filter.category;
+
+        if (tagMatched && categoryMatched) {
+            matched.add(item);
+        }
+    }
+    return matched;
+}
+
+function resolveCategoryDisplay(category: string): string {
+    const selector = `.bangumi-filter-btn[data-filter="category"][data-value="${CSS.escape(category)}"]`;
+    const button = document.querySelector<HTMLElement>(selector);
+    if (!button) {
+        return category;
+    }
+
+    const label =
+        button.querySelector<HTMLElement>("span span")?.textContent ||
+        button.textContent;
+    return String(label || category).trim();
+}
+
+function readUrlFilterState(): FilterState {
+    const params = new URLSearchParams(window.location.search);
+    const tagParams = params
+        .getAll("tag")
+        .flatMap((value) => value.split(","))
+        .map((value) => value.trim())
+        .filter(Boolean);
+    const category = params.get("category");
+
+    const filter: FilterState = { tags: [], category: null };
+
+    if (tagParams.length > 0) {
+        filter.tags = normalizeTagList(tagParams);
+    }
+    if (category) {
+        filter.category = category;
+    }
+    return filter;
+}
+
 export function initBangumiFilter(): void {
     const rw = window as BangumiFilterRuntimeWindow;
     rw.__bangumiFilterCleanup?.();
@@ -33,12 +117,6 @@ export function initBangumiFilter(): void {
         category: null,
     };
 
-    function getBangumiItems(): HTMLElement[] {
-        return Array.from(
-            document.querySelectorAll<HTMLElement>(".bangumi-list-item"),
-        );
-    }
-
     function getNoResults() {
         return document.getElementById("bangumi-no-results");
     }
@@ -49,53 +127,6 @@ export function initBangumiFilter(): void {
             filterLabel: document.getElementById("bangumi-filter-status-label"),
             filterClearBtn: document.getElementById("bangumi-filter-clear-btn"),
         };
-    }
-
-    function getSelectedTags(filter: FilterState): string[] {
-        return normalizeTagList(filter.tags);
-    }
-
-    function hasActiveFilters(filter: FilterState): boolean {
-        return getSelectedTags(filter).length > 0 || filter.category !== null;
-    }
-
-    function parseItemTags(item: HTMLElement): string[] {
-        try {
-            const parsed = JSON.parse(item.dataset.tags || "[]") as unknown;
-            return Array.isArray(parsed)
-                ? parsed.map((tag) => String(tag))
-                : [];
-        } catch {
-            return [];
-        }
-    }
-
-    function getMatchingItems(filter: FilterState): Set<HTMLElement> {
-        const allItems = getBangumiItems();
-        const selectedTags = getSelectedTags(filter);
-        const hasTagFilter = selectedTags.length > 0;
-        const hasCategoryFilter = filter.category !== null;
-
-        if (!hasTagFilter && !hasCategoryFilter) {
-            return new Set(allItems);
-        }
-
-        const matched = new Set<HTMLElement>();
-        for (const item of allItems) {
-            const tagMatched =
-                !hasTagFilter ||
-                (() => {
-                    const itemTags = parseItemTags(item);
-                    return selectedTags.every((tag) => itemTags.includes(tag));
-                })();
-            const categoryMatched =
-                !hasCategoryFilter || item.dataset.category === filter.category;
-
-            if (tagMatched && categoryMatched) {
-                matched.add(item);
-            }
-        }
-        return matched;
     }
 
     function render() {
@@ -111,19 +142,6 @@ export function initBangumiFilter(): void {
             "hidden",
             !hasActiveFilters(currentFilter) || matching.size > 0,
         );
-    }
-
-    function resolveCategoryDisplay(category: string): string {
-        const selector = `.bangumi-filter-btn[data-filter="category"][data-value="${CSS.escape(category)}"]`;
-        const button = document.querySelector<HTMLElement>(selector);
-        if (!button) {
-            return category;
-        }
-
-        const label =
-            button.querySelector<HTMLElement>("span span")?.textContent ||
-            button.textContent;
-        return String(label || category).trim();
     }
 
     function updateFilterStatus(filter: FilterState) {
@@ -247,20 +265,7 @@ export function initBangumiFilter(): void {
     };
 
     // 从 URL 读取初始筛选参数。
-    const params = new URLSearchParams(window.location.search);
-    const tagParams = params
-        .getAll("tag")
-        .flatMap((value) => value.split(","))
-        .map((value) => value.trim())
-        .filter(Boolean);
-    const category = params.get("category");
-
-    if (tagParams.length > 0) {
-        currentFilter.tags = normalizeTagList(tagParams);
-    }
-    if (category) {
-        currentFilter.category = category;
-    }
+    currentFilter = readUrlFilterState();
 
     if (hasActiveFilters(currentFilter)) {
         applyFilter(currentFilter);

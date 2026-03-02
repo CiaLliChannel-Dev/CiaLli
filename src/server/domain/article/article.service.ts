@@ -61,6 +61,56 @@ export async function createArticle(
 
 // ── 更新 ──
 
+function buildArticleUpdatePayload(input: UpdateArticleInput): JsonObject {
+    const payload: JsonObject = {};
+    if (input.title !== undefined) payload.title = input.title;
+    if (input.slug !== undefined) payload.slug = input.slug;
+    if (input.summary !== undefined) payload.summary = input.summary;
+    if (input.body_markdown !== undefined)
+        payload.body_markdown = input.body_markdown;
+    if (input.cover_url !== undefined) payload.cover_url = input.cover_url;
+    if (input.tags !== undefined) payload.tags = input.tags;
+    if (input.category !== undefined) payload.category = input.category;
+    if (input.allow_comments !== undefined)
+        payload.allow_comments = input.allow_comments;
+    if (input.is_public !== undefined) payload.is_public = input.is_public;
+    if (input.status !== undefined) payload.status = input.status;
+    if (input.published_at !== undefined)
+        payload.published_at = input.published_at;
+    return payload;
+}
+
+function applyArticleCoverFileToPayload(
+    payload: JsonObject,
+    input: UpdateArticleInput,
+    rawBody: JsonObject,
+    prevCoverFile: string | null,
+): { payload: JsonObject; nextCoverFile: string | null } {
+    if (!Object.hasOwn(rawBody, "cover_file")) {
+        return { payload, nextCoverFile: prevCoverFile };
+    }
+    const nextCoverFile = normalizeDirectusFileId(input.cover_file);
+    return {
+        payload: { ...payload, cover_file: input.cover_file ?? null },
+        nextCoverFile,
+    };
+}
+
+async function cleanupOldCoverIfNeeded(
+    rawBody: JsonObject | undefined,
+    prevCoverFile: string | null,
+    nextCoverFile: string | null,
+): Promise<void> {
+    if (
+        rawBody &&
+        Object.hasOwn(rawBody, "cover_file") &&
+        prevCoverFile &&
+        prevCoverFile !== nextCoverFile
+    ) {
+        await cleanupOrphanDirectusFiles([prevCoverFile]);
+    }
+}
+
 export async function updateArticle(
     articleId: string,
     input: UpdateArticleInput,
@@ -87,42 +137,18 @@ export async function updateArticle(
         }
     }
 
-    const payload: JsonObject = {};
     const prevCoverFile = normalizeDirectusFileId(article.cover_file);
-    let nextCoverFile = prevCoverFile;
+    let payload = buildArticleUpdatePayload(input);
 
-    if (input.title !== undefined) payload.title = input.title;
-    if (input.slug !== undefined) payload.slug = input.slug;
-    if (input.summary !== undefined) payload.summary = input.summary;
-    if (input.body_markdown !== undefined)
-        payload.body_markdown = input.body_markdown;
-    if (input.cover_url !== undefined) payload.cover_url = input.cover_url;
-    if (input.tags !== undefined) payload.tags = input.tags;
-    if (input.category !== undefined) payload.category = input.category;
-    if (input.allow_comments !== undefined)
-        payload.allow_comments = input.allow_comments;
-    if (input.is_public !== undefined) payload.is_public = input.is_public;
-    if (input.status !== undefined) payload.status = input.status;
-    if (input.published_at !== undefined)
-        payload.published_at = input.published_at;
-
-    // 文件字段需要检测原始 body 是否包含该键
-    if (rawBody && Object.hasOwn(rawBody, "cover_file")) {
-        nextCoverFile = normalizeDirectusFileId(input.cover_file);
-        payload.cover_file = input.cover_file ?? null;
-    }
+    const coverResult = rawBody
+        ? applyArticleCoverFileToPayload(payload, input, rawBody, prevCoverFile)
+        : { payload, nextCoverFile: prevCoverFile };
+    payload = coverResult.payload;
+    const nextCoverFile = coverResult.nextCoverFile;
 
     const updated = await articleRepo.update(articleId, payload);
 
-    // 清理旧封面文件
-    if (
-        rawBody &&
-        Object.hasOwn(rawBody, "cover_file") &&
-        prevCoverFile &&
-        prevCoverFile !== nextCoverFile
-    ) {
-        await cleanupOrphanDirectusFiles([prevCoverFile]);
-    }
+    await cleanupOldCoverIfNeeded(rawBody, prevCoverFile, nextCoverFile);
 
     return updated;
 }

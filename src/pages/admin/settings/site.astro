@@ -2,6 +2,8 @@
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import AdminLayout from "@layouts/AdminLayout.astro";
+import SiteSiteSection from "@/components/admin/settings/SiteSiteSection.astro";
+import SiteHomeSection from "@/components/admin/settings/SiteHomeSection.astro";
 
 export const prerender = false;
 ---
@@ -24,204 +26,23 @@ export const prerender = false;
           {i18n(I18nKey.adminSiteSettingsTitle)}
         </h1>
         <p class="text-base text-70">
-          {i18n(I18nKey.siteSettingsPageIntro)}
+          {i18n(I18nKey.adminSiteSettingsPageIntro)}
         </p>
       </section>
 
       <div id="ss-authenticated" class="space-y-4">
         <!-- ===== Section 1: 站点信息 ===== -->
-        <section class="card-base p-8 rounded-(--radius-large) space-y-4">
-          <h2 class="text-2xl font-semibold text-90">
-            {i18n(I18nKey.siteSettingsSectionSite)}
-          </h2>
-          <form id="ss-site-form" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <label class="space-y-1.5">
-              <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsSiteTitle)}
-              </span>
-              <input
-                id="ss-title"
-                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75 placeholder:text-50"
-                placeholder="My Blog"
-              />
-            </label>
-            <label class="space-y-1.5">
-              <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsSiteSubtitle)}
-              </span>
-              <input
-                id="ss-subtitle"
-                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75 placeholder:text-50"
-                placeholder="A place for stories"
-              />
-            </label>
-            <label class="space-y-1.5">
-              <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsSiteLanguage)}
-              </span>
-              <select
-                id="ss-language"
-                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75"
-              >
-                <option value="zh_CN">
-                  {i18n(I18nKey.siteSettingsLanguageZhCN)}
-                </option>
-                <option value="zh_TW">
-                  {i18n(I18nKey.siteSettingsLanguageZhTW)}
-                </option>
-                <option value="en"
-                  >{i18n(I18nKey.siteSettingsLanguageEn)}</option
-                >
-                <option value="ja"
-                  >{i18n(I18nKey.siteSettingsLanguageJa)}</option
-                >
-              </select>
-            </label>
-            <label class="space-y-1.5">
-              <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsSiteKeywords)}
-              </span>
-              <input
-                id="ss-keywords"
-                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75 placeholder:text-50"
-                placeholder="blog, tech, life"
-              />
-            </label>
-            <label class="space-y-1.5">
-              <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsSiteStartDate)}
-              </span>
-              <input
-                id="ss-start-date"
-                type="date"
-                onkeydown="return false"
-                inputmode="none"
-                class="date-picker-input w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75"
-              />
-            </label>
-            <label class="space-y-1.5">
-              <span class="text-sm text-60"
-                >{i18n(I18nKey.siteSettingsProfileNameLabel)}</span
-              >
-              <input
-                id="ss-profile-name"
-                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75 placeholder:text-50"
-                placeholder={i18n(I18nKey.siteSettingsProfileNamePlaceholder)}
-              />
-            </label>
-            <hr class="border-(--line-divider) col-span-2" />
-            <h3 class="text-lg font-medium text-75 col-span-2">
-              {i18n(I18nKey.siteSettingsFaviconTitle)}
-            </h3>
-            <div class="col-span-2 space-y-2">
-              <div class="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  id="ss-favicon-upload-btn"
-                  class="px-4 h-9 rounded-lg text-sm font-medium cursor-pointer bg-(--primary) text-white hover:opacity-90 transition flex items-center gap-1.5"
-                  ><svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="w-4 h-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    ><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"
-                    ></path><polyline points="17 8 12 3 7 8"></polyline><line
-                      x1="12"
-                      y1="3"
-                      x2="12"
-                      y2="15"></line></svg
-                  >{i18n(I18nKey.commonUploadImage)}</button
-                >
-                <button
-                  type="button"
-                  id="ss-favicon-add-btn"
-                  class="px-3 h-9 rounded-lg text-sm font-medium cursor-pointer border border-(--line-divider) text-75 hover:border-(--primary) hover:text-(--primary) transition"
-                  >{i18n(I18nKey.siteSettingsAddItem)}</button
-                >
-                <span class="text-xs text-50"
-                  >{i18n(I18nKey.siteSettingsFaviconHint)}</span
-                >
-              </div>
-              <div id="ss-favicon-list" class="space-y-2"></div>
-            </div>
-            <hr class="border-(--line-divider) col-span-2" />
-            <h3 class="text-lg font-medium text-75 col-span-2">
-              {i18n(I18nKey.siteSettingsUmamiTitle)}
-            </h3>
-            <label
-              class="flex items-center gap-3 text-75 cursor-pointer select-none col-span-2"
-            >
-              <input
-                type="checkbox"
-                id="ss-umami-enabled"
-                class="toggle-checkbox"
-              />
-              <span class="toggle-track"><span class="toggle-knob"></span></span
-              >
-              {i18n(I18nKey.siteSettingsUmamiEnable)}
-            </label>
-            <label class="space-y-1.5">
-              <span class="text-sm text-60">Umami Base URL</span>
-              <input
-                id="ss-umami-url"
-                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75 placeholder:text-50"
-                placeholder="https://umami.example.com"
-              />
-            </label>
-            <label class="space-y-1.5 col-span-2">
-              <span class="text-sm text-60">Umami Scripts</span>
-              <textarea
-                id="ss-umami-scripts"
-                class="w-full min-h-24 rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75 font-mono text-xs placeholder:text-50"
-                placeholder="<script ...></script>"></textarea>
-            </label>
-            <hr class="border-(--line-divider) col-span-2" />
-            <h3 class="text-lg font-medium text-75 col-span-2">
-              {i18n(I18nKey.siteSettingsAnalyticsTitle)}
-            </h3>
-            <label class="space-y-1.5">
-              <span class="text-sm text-60">Google Tag Manager ID</span>
-              <input
-                id="ss-gtm-id"
-                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75 placeholder:text-50"
-                placeholder="GTM-XXXXXXX"
-              />
-            </label>
-            <label class="space-y-1.5">
-              <span class="text-sm text-60">Microsoft Clarity ID</span>
-              <input
-                id="ss-clarity-id"
-                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75 placeholder:text-50"
-                placeholder="abcd1234ef"
-              />
-            </label>
-            <p class="col-span-2 text-xs text-50">
-              {i18n(I18nKey.siteSettingsAnalyticsHint)}
-            </p>
-            <div class="col-span-2 flex items-center gap-2 pt-2">
-              <button
-                type="submit"
-                class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
-                >{i18n(I18nKey.siteSettingsSaveSite)}</button
-              >
-              <span id="ss-site-msg" class="text-sm text-60"></span>
-            </div>
-          </form>
-        </section>
+        <SiteSiteSection />
 
         <!-- ===== Section 2: 导航栏 ===== -->
         <section class="card-base p-8 rounded-(--radius-large) space-y-4">
           <h2 class="text-2xl font-semibold text-90">
-            {i18n(I18nKey.siteSettingsSectionNav)}
+            {i18n(I18nKey.adminSiteSettingsSectionNav)}
           </h2>
           <form id="ss-nav-form" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <label class="space-y-1.5">
               <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsNavMode)}
+                {i18n(I18nKey.adminSiteSettingsNavMode)}
               </span>
               <select
                 id="ss-navbar-mode"
@@ -229,13 +50,13 @@ export const prerender = false;
               >
                 <option value="logo">Logo</option>
                 <option value="text-icon">
-                  {i18n(I18nKey.siteSettingsNavTextIcon)}
+                  {i18n(I18nKey.adminSiteSettingsNavTextIcon)}
                 </option>
               </select>
             </label>
             <label class="space-y-1.5">
               <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsNavTitleText)}
+                {i18n(I18nKey.adminSiteSettingsNavTitleText)}
               </span>
               <input
                 id="ss-navbar-text"
@@ -245,7 +66,7 @@ export const prerender = false;
             </label>
             <label class="space-y-1.5">
               <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsNavIconLabel)}
+                {i18n(I18nKey.adminSiteSettingsNavIconLabel)}
               </span>
               <input
                 id="ss-navbar-icon"
@@ -255,7 +76,7 @@ export const prerender = false;
             </label>
             <label class="space-y-1.5">
               <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsNavLogoLabel)}
+                {i18n(I18nKey.adminSiteSettingsNavLogoLabel)}
               </span>
               <input
                 id="ss-navbar-logo"
@@ -265,7 +86,7 @@ export const prerender = false;
             </label>
             <label class="space-y-1.5">
               <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsNavBannerTransparency)}
+                {i18n(I18nKey.adminSiteSettingsNavBannerTransparency)}
               </span>
               <select
                 id="ss-navbar-transparent-mode"
@@ -278,7 +99,7 @@ export const prerender = false;
             </label>
             <div class="col-span-2 space-y-1.5">
               <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsNavLinks)}
+                {i18n(I18nKey.adminSiteSettingsNavLinks)}
               </span>
               <div id="ss-nav-links-list" class="space-y-2"></div>
             </div>
@@ -286,7 +107,7 @@ export const prerender = false;
               <button
                 type="submit"
                 class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
-                >{i18n(I18nKey.siteSettingsSaveNav)}</button
+                >{i18n(I18nKey.adminSiteSettingsSaveNav)}</button
               >
               <span id="ss-nav-msg" class="text-sm text-60"></span>
             </div>
@@ -294,241 +115,12 @@ export const prerender = false;
         </section>
 
         <!-- ===== Section 3: 首页设置 ===== -->
-        <section class="card-base p-8 rounded-(--radius-large) space-y-4">
-          <h2 class="text-2xl font-semibold text-90">
-            {i18n(I18nKey.siteSettingsSectionHome)}
-          </h2>
-          <form id="ss-home-form" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <h3 class="text-lg font-medium text-75 col-span-2">
-              {i18n(I18nKey.siteSettingsCarouselWallpaper)}
-            </h3>
-            <label class="space-y-1.5">
-              <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsWallpaperMode)}
-              </span>
-              <select
-                id="ss-wallpaper-mode"
-                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75"
-              >
-                <option value="banner">banner</option>
-                <option value="none">none</option>
-              </select>
-            </label>
-            <label class="space-y-1.5">
-              <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsBannerAlignment)}
-              </span>
-              <select
-                id="ss-banner-position"
-                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75"
-              >
-                <option value="top">top</option>
-                <option value="center">center</option>
-                <option value="bottom">bottom</option>
-              </select>
-            </label>
-            <label
-              class="flex items-center gap-3 text-75 cursor-pointer select-none col-span-2"
-            >
-              <input
-                type="checkbox"
-                id="ss-banner-carousel-enable"
-                class="toggle-checkbox"
-              />
-              <span class="toggle-track"><span class="toggle-knob"></span></span
-              >
-              {i18n(I18nKey.siteSettingsEnableWallpaperCarousel)}
-            </label>
-            <label class="space-y-1.5">
-              <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsCarouselIntervalSeconds)}
-              </span>
-              <input
-                id="ss-banner-carousel-interval"
-                type="number"
-                min="1"
-                max="120"
-                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75"
-                placeholder="5"
-              />
-            </label>
-            <hr class="border-(--line-divider) col-span-2" />
-            <h3 class="text-lg font-medium text-75 col-span-2">
-              {i18n(I18nKey.siteSettingsImageSourceAndCopy)}
-            </h3>
-            <label
-              class="flex items-center gap-3 text-75 cursor-pointer select-none col-span-2"
-            >
-              <input
-                type="checkbox"
-                id="ss-banner-image-api-enable"
-                class="toggle-checkbox"
-              />
-              <span class="toggle-track"><span class="toggle-knob"></span></span
-              >
-              {i18n(I18nKey.siteSettingsEnableBannerApi)}
-            </label>
-            <label class="space-y-1.5 col-span-2">
-              <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsBannerApiUrl)}
-              </span>
-              <input
-                id="ss-banner-image-api-url"
-                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75 placeholder:text-50"
-                placeholder="https://example.com/api/banner"
-              />
-            </label>
-            <label
-              class="flex items-center gap-3 text-75 cursor-pointer select-none col-span-2"
-            >
-              <input
-                type="checkbox"
-                id="ss-banner-home-text-enable"
-                class="toggle-checkbox"
-              />
-              <span class="toggle-track"><span class="toggle-knob"></span></span
-              >
-              {i18n(I18nKey.siteSettingsShowBannerCopy)}
-            </label>
-            <label class="space-y-1.5">
-              <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsHomeTitle)}
-              </span>
-              <input
-                id="ss-banner-home-text-title"
-                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75 placeholder:text-50"
-                placeholder={i18n(I18nKey.siteSettingsHomeTitlePlaceholder)}
-              />
-            </label>
-            <label class="space-y-1.5">
-              <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsHomeSubtitleLines)}
-              </span>
-              <textarea
-                id="ss-banner-home-text-subtitle"
-                class="w-full min-h-24 rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75 placeholder:text-50"
-                placeholder={i18n(I18nKey.siteSettingsHomeSubtitlePlaceholder)}
-              ></textarea>
-            </label>
-            <label
-              class="flex items-center gap-3 text-75 cursor-pointer select-none col-span-2"
-            >
-              <input
-                type="checkbox"
-                id="ss-banner-home-typewriter-enable"
-                class="toggle-checkbox"
-              />
-              <span class="toggle-track"><span class="toggle-knob"></span></span
-              >
-              {i18n(I18nKey.siteSettingsEnableTypewriter)}
-            </label>
-            <label class="space-y-1.5">
-              <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsTypeSpeedMs)}
-              </span>
-              <input
-                id="ss-banner-home-typewriter-speed"
-                type="number"
-                min="10"
-                max="500"
-                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75"
-              />
-            </label>
-            <label class="space-y-1.5">
-              <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsDeleteSpeedMs)}
-              </span>
-              <input
-                id="ss-banner-home-typewriter-delete-speed"
-                type="number"
-                min="10"
-                max="500"
-                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75"
-              />
-            </label>
-            <label class="space-y-1.5">
-              <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsPauseTimeMs)}
-              </span>
-              <input
-                id="ss-banner-home-typewriter-pause-time"
-                type="number"
-                min="100"
-                max="10000"
-                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75"
-              />
-            </label>
-            <label
-              class="flex items-center gap-3 text-75 cursor-pointer select-none"
-            >
-              <input
-                type="checkbox"
-                id="ss-banner-waves-enable"
-                class="toggle-checkbox"
-              />
-              <span class="toggle-track"><span class="toggle-knob"></span></span
-              >
-              {i18n(I18nKey.siteSettingsEnableWaveEffect)}
-            </label>
-            <label
-              class="flex items-center gap-3 text-75 cursor-pointer select-none"
-            >
-              <input
-                type="checkbox"
-                id="ss-banner-waves-performance"
-                class="toggle-checkbox"
-              />
-              <span class="toggle-track"><span class="toggle-knob"></span></span
-              >
-              {i18n(I18nKey.siteSettingsOptimizeWavePerformance)}
-            </label>
-            <div class="col-span-2 space-y-2">
-              <h4 class="text-base font-medium text-75">
-                {i18n(I18nKey.siteSettingsDesktopWallpaper)}
-              </h4>
-              <div class="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  id="ss-banner-desktop-upload-btn"
-                  class="px-4 h-9 rounded-lg text-sm font-medium cursor-pointer bg-(--primary) text-white hover:opacity-90 transition flex items-center gap-1.5"
-                  ><svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    class="w-4 h-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    stroke-width="2"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    ><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"
-                    ></path><polyline points="17 8 12 3 7 8"></polyline><line
-                      x1="12"
-                      y1="3"
-                      x2="12"
-                      y2="15"></line></svg
-                  >{i18n(I18nKey.commonUploadImage)}</button
-                >
-                <span class="text-xs text-50">
-                  {i18n(I18nKey.meSettingsDragSort)}
-                </span>
-              </div>
-              <div id="ss-banner-desktop-list" class="space-y-2"></div>
-            </div>
-            <div class="col-span-2 flex items-center gap-2 pt-2">
-              <button
-                type="submit"
-                class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
-                >{i18n(I18nKey.siteSettingsSaveHome)}</button
-              >
-              <span id="ss-home-msg" class="text-sm text-60"></span>
-            </div>
-          </form>
-        </section>
+        <SiteHomeSection />
 
         <!-- ===== Section 4: 文章设置 ===== -->
         <section class="card-base p-8 rounded-(--radius-large) space-y-4">
           <h2 class="text-2xl font-semibold text-90">
-            {i18n(I18nKey.siteSettingsSectionArticle)}
+            {i18n(I18nKey.adminSiteSettingsSectionArticle)}
           </h2>
           <form
             id="ss-feature-form"
@@ -544,7 +136,7 @@ export const prerender = false;
               />
               <span class="toggle-track"><span class="toggle-knob"></span></span
               >
-              {i18n(I18nKey.siteSettingsEnableArticleToc)}
+              {i18n(I18nKey.adminSiteSettingsEnableArticleToc)}
             </label>
             <label
               class="flex items-center gap-3 text-75 cursor-pointer select-none"
@@ -552,11 +144,11 @@ export const prerender = false;
               <input type="checkbox" id="ss-toc-jp" class="toggle-checkbox" />
               <span class="toggle-track"><span class="toggle-knob"></span></span
               >
-              {i18n(I18nKey.siteSettingsUseJapaneseTocBadge)}
+              {i18n(I18nKey.adminSiteSettingsUseJapaneseTocBadge)}
             </label>
             <label class="space-y-1.5">
               <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsTocMode)}
+                {i18n(I18nKey.adminSiteSettingsTocMode)}
               </span>
               <select
                 id="ss-toc-mode"
@@ -568,7 +160,7 @@ export const prerender = false;
             </label>
             <label class="space-y-1.5">
               <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsTocDepth)}
+                {i18n(I18nKey.adminSiteSettingsTocDepth)}
               </span>
               <select
                 id="ss-toc-depth"
@@ -581,7 +173,7 @@ export const prerender = false;
             </label>
             <hr class="border-(--line-divider) col-span-2" />
             <h3 class="text-lg font-medium text-75 col-span-2">
-              {i18n(I18nKey.siteSettingsArticleLicenseInfo)}
+              {i18n(I18nKey.adminSiteSettingsArticleLicenseInfo)}
             </h3>
             <label
               class="flex items-center gap-3 text-75 cursor-pointer select-none col-span-2"
@@ -593,11 +185,11 @@ export const prerender = false;
               />
               <span class="toggle-track"><span class="toggle-knob"></span></span
               >
-              {i18n(I18nKey.siteSettingsEnableLicenseBlock)}
+              {i18n(I18nKey.adminSiteSettingsEnableLicenseBlock)}
             </label>
             <label class="space-y-1.5">
               <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsLicenseName)}
+                {i18n(I18nKey.adminSiteSettingsLicenseName)}
               </span>
               <input
                 id="ss-license-name"
@@ -607,7 +199,7 @@ export const prerender = false;
             </label>
             <label class="space-y-1.5">
               <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsLicenseUrl)}
+                {i18n(I18nKey.adminSiteSettingsLicenseUrl)}
               </span>
               <input
                 id="ss-license-url"
@@ -619,7 +211,7 @@ export const prerender = false;
               <button
                 type="submit"
                 class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
-                >{i18n(I18nKey.siteSettingsSaveArticle)}</button
+                >{i18n(I18nKey.adminSiteSettingsSaveArticle)}</button
               >
               <span id="ss-feature-msg" class="text-sm text-60"></span>
             </div>
@@ -629,14 +221,14 @@ export const prerender = false;
         <!-- ===== Section 5: 其它设置 ===== -->
         <section class="card-base p-8 rounded-(--radius-large) space-y-4">
           <h2 class="text-2xl font-semibold text-90">
-            {i18n(I18nKey.siteSettingsSectionOther)}
+            {i18n(I18nKey.adminSiteSettingsSectionOther)}
           </h2>
           <form
             id="ss-other-form"
             class="grid grid-cols-1 lg:grid-cols-2 gap-4"
           >
             <h3 class="text-lg font-medium text-75 col-span-2">
-              {i18n(I18nKey.musicPlayer)}
+              {i18n(I18nKey.coreMusicPlayer)}
             </h3>
             <label
               class="flex items-center gap-3 text-75 cursor-pointer select-none col-span-2"
@@ -648,7 +240,7 @@ export const prerender = false;
               />
               <span class="toggle-track"><span class="toggle-knob"></span></span
               >
-              {i18n(I18nKey.siteSettingsEnableMusicPlayer)}
+              {i18n(I18nKey.adminSiteSettingsEnableMusicPlayer)}
             </label>
             <label class="space-y-1.5">
               <span class="text-sm text-60">Meting API</span>
@@ -660,7 +252,7 @@ export const prerender = false;
             </label>
             <label class="space-y-1.5">
               <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsPlaylistId)}
+                {i18n(I18nKey.adminSiteSettingsPlaylistId)}
               </span>
               <input
                 id="ss-music-id"
@@ -669,7 +261,7 @@ export const prerender = false;
             </label>
             <label class="space-y-1.5">
               <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsMusicServer)}
+                {i18n(I18nKey.adminSiteSettingsMusicServer)}
               </span>
               <input
                 id="ss-music-server"
@@ -679,7 +271,7 @@ export const prerender = false;
             </label>
             <label class="space-y-1.5">
               <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsMusicType)}
+                {i18n(I18nKey.adminSiteSettingsMusicType)}
               </span>
               <input
                 id="ss-music-type"
@@ -689,7 +281,7 @@ export const prerender = false;
             </label>
             <label class="space-y-1.5">
               <span class="text-sm text-60">
-                {i18n(I18nKey.siteSettingsMarqueeSpeed)}
+                {i18n(I18nKey.adminSiteSettingsMarqueeSpeed)}
               </span>
               <input
                 id="ss-music-marquee"
@@ -702,7 +294,7 @@ export const prerender = false;
             </label>
             <hr class="border-(--line-divider) col-span-2" />
             <h3 class="text-lg font-medium text-75 col-span-2">
-              {i18n(I18nKey.siteSettingsSakuraEffect)}
+              {i18n(I18nKey.adminSiteSettingsSakuraEffect)}
             </h3>
             <label
               class="flex items-center gap-3 text-75 cursor-pointer select-none"
@@ -714,13 +306,13 @@ export const prerender = false;
               />
               <span class="toggle-track"><span class="toggle-knob"></span></span
               >
-              {i18n(I18nKey.siteSettingsEnableSakura)}
+              {i18n(I18nKey.adminSiteSettingsEnableSakura)}
             </label>
             <div class="col-span-2 flex items-center gap-2 pt-2">
               <button
                 type="submit"
                 class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
-                >{i18n(I18nKey.siteSettingsSaveOther)}</button
+                >{i18n(I18nKey.adminSiteSettingsSaveOther)}</button
               >
               <span id="ss-other-msg" class="text-sm text-60"></span>
             </div>
@@ -776,11 +368,11 @@ export const prerender = false;
     >
       <div class="flex items-center gap-2">
         <h3 id="ss-image-crop-title" class="text-lg font-semibold text-90">
-          {i18n(I18nKey.commonCropImage)}
+          {i18n(I18nKey.interactionCommonCropImage)}
         </h3>
       </div>
       <p id="ss-image-crop-help" class="text-sm text-60">
-        {i18n(I18nKey.siteSettingsCropHelpDefault)}
+        {i18n(I18nKey.adminSiteSettingsCropHelpDefault)}
       </p>
       <div
         id="ss-image-crop-viewport"
@@ -791,13 +383,13 @@ export const prerender = false;
           id="ss-image-crop-image"
           src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw=="
           class="absolute left-0 top-0 max-w-none pointer-events-none hidden"
-          alt={i18n(I18nKey.commonCropPreviewAlt)}
+          alt={i18n(I18nKey.interactionCommonCropPreviewAlt)}
         />
         <div
           id="ss-image-crop-empty"
           class="absolute inset-0 grid place-items-center text-sm text-60 pointer-events-none"
         >
-          {i18n(I18nKey.commonSelectImageFirst)}
+          {i18n(I18nKey.interactionCommonSelectImageFirst)}
         </div>
         <div
           class="absolute inset-0 pointer-events-none rounded-2xl ring-2 ring-white/80"
@@ -806,7 +398,7 @@ export const prerender = false;
       </div>
       <div class="space-y-1">
         <label for="ss-image-crop-zoom" class="text-sm text-60">
-          {i18n(I18nKey.commonZoom)}
+          {i18n(I18nKey.interactionCommonZoom)}
         </label>
         <input
           id="ss-image-crop-zoom"
@@ -844,21 +436,21 @@ export const prerender = false;
               y1="3"
               x2="12"
               y2="15"></line></svg
-          >{i18n(I18nKey.commonChooseFile)}</button
+          >{i18n(I18nKey.interactionCommonChooseFile)}</button
         >
         <button
           type="button"
           id="ss-image-crop-apply-btn"
           class="px-4 py-2.5 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
         >
-          {i18n(I18nKey.commonApplyCrop)}
+          {i18n(I18nKey.interactionCommonApplyCrop)}
         </button>
         <button
           type="button"
           id="ss-image-crop-cancel-btn"
           class="ml-auto px-4 py-2.5 rounded-lg border border-(--line-divider) text-sm text-75"
         >
-          {i18n(I18nKey.commonCancel)}
+          {i18n(I18nKey.interactionCommonCancel)}
         </button>
       </div>
       <span id="ss-image-crop-msg" class="text-sm text-red-500"></span>

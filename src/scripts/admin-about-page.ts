@@ -1,584 +1,173 @@
+/* eslint-disable max-lines -- 文件行数较长，按页面驱动与模块边界保留当前结构 */
 import I18nKey from "@/i18n/i18nKey";
-import { setupCodeCopyDelegation } from "@/scripts/code-copy";
-import { refreshGithubCards } from "@/scripts/github-card-runtime";
-import { t } from "@/scripts/i18n-runtime";
 import { MarkdownImagePasteUploader } from "@/scripts/markdown-image-paste";
-import {
-    MarkdownPreviewClient,
-    normalizeMarkdownPreviewHtml,
-} from "@/scripts/markdown-preview-client";
+import { MarkdownPreviewClient } from "@/scripts/markdown-preview-client";
 import { runWithTask } from "@/scripts/progress-overlay-manager";
 import { getApiErrorMessage, requestApi as api } from "@/scripts/http-client";
-
-type EditorMode = "edit" | "preview";
-type ToolbarAction =
-    | "bold"
-    | "italic"
-    | "underline"
-    | "strike"
-    | "quote"
-    | "inline-code"
-    | "code-block";
-
-type RuntimeWindow = Window &
-    typeof globalThis & {
-        renderMermaidDiagrams?: () => Promise<void>;
-    };
-
-const TOOLBAR_ACTIONS = new Set<ToolbarAction>([
-    "bold",
-    "italic",
-    "underline",
-    "strike",
-    "quote",
-    "inline-code",
-    "code-block",
-]);
+import {
+    type EditorMode,
+    type RuntimeWindow,
+    type PreviewState,
+    isToolbarAction,
+    toRecord,
+    toStringValue,
+    applyToolbarAction,
+    makeSetMsg,
+    makeSetError,
+    makeRefreshMarkdownRuntime,
+    updateModeButtonStyle,
+    handlePreviewResult,
+    makeRenderPreview,
+} from "@/scripts/admin-about-page-helpers";
+import { t } from "@/scripts/i18n-runtime";
 
 const DATA_BOUND = "data-admin-about-bound";
 
-function toRecord(value: unknown): Record<string, unknown> | null {
-    if (!value || typeof value !== "object" || Array.isArray(value)) {
-        return null;
-    }
-    return value as Record<string, unknown>;
+type AboutPageElements = {
+    formEl: HTMLFormElement;
+    titleEl: HTMLInputElement;
+    summaryEl: HTMLTextAreaElement;
+    bodyEl: HTMLTextAreaElement;
+    modeEditEl: HTMLButtonElement;
+    modePreviewEl: HTMLButtonElement;
+    editorPanelEl: HTMLElement;
+    toolbarEl: HTMLElement;
+    saveMsgEl: HTMLElement;
+    saveErrorEl: HTMLElement;
+    saveBtnEl: HTMLButtonElement;
+    previewPanelEl: HTMLElement;
+    previewLoadingEl: HTMLElement;
+    previewErrorEl: HTMLElement;
+    previewEmptyEl: HTMLElement;
+    previewContentEl: HTMLElement;
+};
+
+type AboutPageContext = {
+    els: AboutPageElements;
+    state: PreviewState;
+    previewClient: MarkdownPreviewClient;
+    setMsg: (message: string) => void;
+    setError: (message: string) => void;
+    renderPreview: () => void;
+    requestPreview: (
+        mode: "fast" | "full",
+        generation: number,
+        force?: boolean,
+    ) => Promise<void>;
+    fillForm: (data: Record<string, unknown> | null) => void;
+};
+
+function hasRequiredEditorElements(els: {
+    titleEl: HTMLElement | null;
+    summaryEl: HTMLElement | null;
+    bodyEl: HTMLElement | null;
+    modeEditEl: HTMLElement | null;
+    modePreviewEl: HTMLElement | null;
+    editorPanelEl: HTMLElement | null;
+    toolbarEl: HTMLElement | null;
+    saveMsgEl: HTMLElement | null;
+    saveErrorEl: HTMLElement | null;
+    saveBtnEl: HTMLElement | null;
+}): boolean {
+    return Boolean(
+        els.titleEl &&
+        els.summaryEl &&
+        els.bodyEl &&
+        els.modeEditEl &&
+        els.modePreviewEl &&
+        els.editorPanelEl &&
+        els.toolbarEl &&
+        els.saveMsgEl &&
+        els.saveErrorEl &&
+        els.saveBtnEl,
+    );
 }
 
-function toStringValue(value: unknown): string {
-    if (typeof value === "string") {
-        return value.trim();
-    }
-    return "";
+function hasRequiredPreviewElements(els: {
+    previewPanelEl: HTMLElement | null;
+    previewLoadingEl: HTMLElement | null;
+    previewErrorEl: HTMLElement | null;
+    previewEmptyEl: HTMLElement | null;
+    previewContentEl: HTMLElement | null;
+}): boolean {
+    return Boolean(
+        els.previewPanelEl &&
+        els.previewLoadingEl &&
+        els.previewErrorEl &&
+        els.previewEmptyEl &&
+        els.previewContentEl,
+    );
 }
 
-function isToolbarAction(value: string): value is ToolbarAction {
-    return TOOLBAR_ACTIONS.has(value as ToolbarAction);
-}
-
-export function initAdminAboutPage(): void {
-    const normalizedPath = window.location.pathname.replace(/\/+$/, "") || "/";
-    if (normalizedPath !== "/admin/settings/about") {
-        return;
-    }
-
+function queryAboutPageElements(): AboutPageElements | null {
     const formEl = document.getElementById(
         "about-form",
     ) as HTMLFormElement | null;
     if (!formEl || formEl.hasAttribute(DATA_BOUND)) {
-        return;
+        return null;
     }
-    formEl.setAttribute(DATA_BOUND, "1");
-
-    const titleEl = document.getElementById(
-        "about-title",
-    ) as HTMLInputElement | null;
-    const summaryEl = document.getElementById(
-        "about-summary",
-    ) as HTMLTextAreaElement | null;
-    const bodyEl = document.getElementById(
-        "about-body-markdown",
-    ) as HTMLTextAreaElement | null;
-    const modeEditEl = document.getElementById(
-        "about-mode-edit",
-    ) as HTMLButtonElement | null;
-    const modePreviewEl = document.getElementById(
-        "about-mode-preview",
-    ) as HTMLButtonElement | null;
-    const editorPanelEl = document.getElementById("about-editor-panel");
-    const toolbarEl = document.getElementById("about-toolbar");
-    const saveMsgEl = document.getElementById("about-save-msg");
-    const saveErrorEl = document.getElementById("about-save-error");
-    const saveBtnEl = document.getElementById(
-        "about-save",
-    ) as HTMLButtonElement | null;
-
-    const previewPanelEl = document.getElementById("about-preview-panel");
-    const previewLoadingEl = document.getElementById("about-preview-loading");
-    const previewErrorEl = document.getElementById("about-preview-error");
-    const previewEmptyEl = document.getElementById("about-preview-empty");
-    const previewContentEl = document.getElementById("about-preview-content");
-
-    if (
-        !titleEl ||
-        !summaryEl ||
-        !bodyEl ||
-        !modeEditEl ||
-        !modePreviewEl ||
-        !editorPanelEl ||
-        !toolbarEl ||
-        !saveMsgEl ||
-        !saveErrorEl ||
-        !saveBtnEl ||
-        !previewPanelEl ||
-        !previewLoadingEl ||
-        !previewErrorEl ||
-        !previewEmptyEl ||
-        !previewContentEl
-    ) {
-        return;
+    const els = {
+        titleEl: document.getElementById(
+            "about-title",
+        ) as HTMLInputElement | null,
+        summaryEl: document.getElementById(
+            "about-summary",
+        ) as HTMLTextAreaElement | null,
+        bodyEl: document.getElementById(
+            "about-body-markdown",
+        ) as HTMLTextAreaElement | null,
+        modeEditEl: document.getElementById(
+            "about-mode-edit",
+        ) as HTMLButtonElement | null,
+        modePreviewEl: document.getElementById(
+            "about-mode-preview",
+        ) as HTMLButtonElement | null,
+        editorPanelEl: document.getElementById("about-editor-panel"),
+        toolbarEl: document.getElementById("about-toolbar"),
+        saveMsgEl: document.getElementById("about-save-msg"),
+        saveErrorEl: document.getElementById("about-save-error"),
+        saveBtnEl: document.getElementById(
+            "about-save",
+        ) as HTMLButtonElement | null,
+        previewPanelEl: document.getElementById("about-preview-panel"),
+        previewLoadingEl: document.getElementById("about-preview-loading"),
+        previewErrorEl: document.getElementById("about-preview-error"),
+        previewEmptyEl: document.getElementById("about-preview-empty"),
+        previewContentEl: document.getElementById("about-preview-content"),
+    };
+    if (!hasRequiredEditorElements(els) || !hasRequiredPreviewElements(els)) {
+        return null;
     }
+    return { formEl, ...els } as AboutPageElements;
+}
 
-    const runtimeWindow = window as RuntimeWindow;
-    const previewClient = new MarkdownPreviewClient("about");
-
-    let currentMode: EditorMode = "edit";
-    let previewLoading = false;
-    let previewError = "";
-    let previewHtml = "";
-    let previewSource = "";
-    let previewDirty = false;
-    let previewGeneration = 0;
-    let previewFastTimer: number | null = null;
-    let previewFullTimer: number | null = null;
-    let renderedPreviewHtml = "";
-
-    const setMsg = (message: string): void => {
-        saveMsgEl.textContent = message;
-    };
-
-    const setError = (message: string): void => {
-        if (!message) {
-            saveErrorEl.textContent = "";
-            saveErrorEl.classList.add("hidden");
-            return;
-        }
-        saveErrorEl.textContent = message;
-        saveErrorEl.classList.remove("hidden");
-    };
-
-    const refreshMarkdownRuntime = async (): Promise<void> => {
-        setupCodeCopyDelegation();
-        try {
-            await refreshGithubCards();
-        } catch (error) {
-            console.warn("[admin-about] refresh github cards failed:", error);
-        }
-        if (typeof runtimeWindow.renderMermaidDiagrams === "function") {
-            void runtimeWindow.renderMermaidDiagrams().catch((error) => {
-                console.warn("[admin-about] refresh mermaid failed:", error);
-            });
-        }
-    };
-
-    const updateModeButtonStyle = (
-        button: HTMLButtonElement,
-        active: boolean,
-    ): void => {
-        button.setAttribute("aria-pressed", active ? "true" : "false");
-        button.classList.toggle("text-90", active);
-        button.classList.toggle("text-60", !active);
-        button.classList.toggle("bg-(--btn-plain-bg-hover)", active);
-        button.classList.toggle("border-(--primary)", active);
-    };
-
-    const renderPreview = (): void => {
-        previewLoadingEl.classList.toggle("hidden", !previewLoading);
-
-        if (previewError) {
-            previewErrorEl.textContent = previewError;
-            previewErrorEl.classList.remove("hidden");
-        } else {
-            previewErrorEl.textContent = "";
-            previewErrorEl.classList.add("hidden");
-        }
-
-        if (previewHtml) {
-            if (renderedPreviewHtml !== previewHtml) {
-                previewContentEl.innerHTML = previewHtml;
-                renderedPreviewHtml = previewHtml;
-                void refreshMarkdownRuntime();
-            }
-            previewContentEl.classList.remove("hidden");
-            previewEmptyEl.classList.add("hidden");
-            return;
-        }
-
-        previewContentEl.innerHTML = "";
-        renderedPreviewHtml = "";
-        previewContentEl.classList.add("hidden");
-        previewEmptyEl.classList.remove("hidden");
-    };
-
-    const setEditorMode = (mode: EditorMode): void => {
-        currentMode = mode;
-        editorPanelEl.classList.toggle("hidden", mode !== "edit");
-        previewPanelEl.classList.toggle("hidden", mode !== "preview");
-        updateModeButtonStyle(modeEditEl, mode === "edit");
-        updateModeButtonStyle(modePreviewEl, mode === "preview");
-        if (mode === "preview") {
-            schedulePreview();
-        }
-    };
-
-    const markPreviewDirty = (): void => {
-        previewDirty = true;
-        previewGeneration += 1;
-    };
-
-    const imagePasteUploader = new MarkdownImagePasteUploader({
-        textarea: bodyEl,
-        fileNamePrefix: "about",
-        autoUpload: false,
-        onContentChange: () => {
-            markPreviewDirty();
-            schedulePreview();
-        },
-        onError: (message) => {
-            setMsg("");
-            setError(message);
-        },
-    });
-
-    const replaceSelection = (
-        textarea: HTMLTextAreaElement,
-        replacement: string,
-        selectionStartOffset: number,
-        selectionEndOffset: number,
-    ): void => {
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const source = textarea.value;
-        const before = source.slice(0, start);
-        const after = source.slice(end);
-        textarea.value = `${before}${replacement}${after}`;
-        const nextStart = before.length + selectionStartOffset;
-        const nextEnd = before.length + selectionEndOffset;
-        textarea.focus();
-        textarea.setSelectionRange(nextStart, nextEnd);
-        markPreviewDirty();
-    };
-
-    const applyWrapAction = (
-        textarea: HTMLTextAreaElement,
-        prefix: string,
-        suffix: string,
-        placeholder: string,
-    ): void => {
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const selected = textarea.value.slice(start, end);
-        const content = selected || placeholder;
-        const replacement = `${prefix}${content}${suffix}`;
-        replaceSelection(
-            textarea,
-            replacement,
-            prefix.length,
-            prefix.length + content.length,
-        );
-    };
-
-    const applyQuoteAction = (textarea: HTMLTextAreaElement): void => {
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const selected = textarea.value.slice(start, end);
-        const source = selected || t(I18nKey.adminMarkdownQuotePlaceholder);
-        const quoted = source
-            .replaceAll("\r\n", "\n")
-            .split("\n")
-            .map((line) => (line.startsWith("> ") ? line : `> ${line}`))
-            .join("\n");
-        replaceSelection(textarea, quoted, 0, quoted.length);
-    };
-
-    const applyCodeBlockAction = (textarea: HTMLTextAreaElement): void => {
-        const start = textarea.selectionStart;
-        const end = textarea.selectionEnd;
-        const source = textarea.value;
-        const selected =
-            source.slice(start, end) || t(I18nKey.adminMarkdownCodePlaceholder);
-        const language = "text";
-        const block = `\`\`\`${language}\n${selected}\n\`\`\``;
-        const needsLeadingBreak = start > 0 && source[start - 1] !== "\n";
-        const needsTrailingBreak = end < source.length && source[end] !== "\n";
-        const replacement = `${needsLeadingBreak ? "\n" : ""}${block}${needsTrailingBreak ? "\n" : ""}`;
-        const contentStartOffset = (needsLeadingBreak ? 1 : 0) + 8;
-        const contentEndOffset = contentStartOffset + selected.length;
-        replaceSelection(
-            textarea,
-            replacement,
-            contentStartOffset,
-            contentEndOffset,
-        );
-    };
-
-    const applyToolbarAction = (action: ToolbarAction): void => {
-        if (action === "bold") {
-            applyWrapAction(
-                bodyEl,
-                "**",
-                "**",
-                t(I18nKey.adminMarkdownBoldPlaceholder),
-            );
-            return;
-        }
-        if (action === "italic") {
-            applyWrapAction(
-                bodyEl,
-                "*",
-                "*",
-                t(I18nKey.adminMarkdownItalicPlaceholder),
-            );
-            return;
-        }
-        if (action === "underline") {
-            applyWrapAction(
-                bodyEl,
-                "<u>",
-                "</u>",
-                t(I18nKey.adminMarkdownUnderlinePlaceholder),
-            );
-            return;
-        }
-        if (action === "strike") {
-            applyWrapAction(
-                bodyEl,
-                "~~",
-                "~~",
-                t(I18nKey.adminMarkdownStrikePlaceholder),
-            );
-            return;
-        }
-        if (action === "quote") {
-            applyQuoteAction(bodyEl);
-            return;
-        }
-        if (action === "inline-code") {
-            applyWrapAction(
-                bodyEl,
-                "`",
-                "`",
-                t(I18nKey.adminMarkdownCodePlaceholder),
-            );
-            return;
-        }
-        applyCodeBlockAction(bodyEl);
-    };
-
-    const requestPreview = async (
-        mode: "fast" | "full",
-        generation: number,
-        force = false,
-    ): Promise<void> => {
-        if (generation !== previewGeneration) {
-            return;
-        }
-        const source = String(bodyEl.value || "");
-        const markdown = source.trim();
-        if (
-            !force &&
-            mode === "fast" &&
-            !previewDirty &&
-            source === previewSource
-        ) {
-            return;
-        }
-
-        if (!markdown) {
-            previewSource = source;
-            previewHtml = "";
-            previewError = "";
-            previewLoading = false;
-            previewDirty = false;
-            renderPreview();
-            return;
-        }
-
-        previewLoading = true;
-        previewError = "";
-        if (mode === "fast") {
-            const incrementalHtml = previewClient.getIncrementalPreview(source);
-            if (incrementalHtml) {
-                previewHtml = incrementalHtml;
-            }
-        }
-        renderPreview();
-
-        try {
-            const result = await previewClient.preview(markdown, {
-                force,
-                mode,
-            });
-            if (generation !== previewGeneration) {
-                return;
-            }
-            if (result.aborted) {
-                return;
-            }
-            if (result.error) {
-                previewHtml = "";
-                previewError = result.error;
-                previewDirty = true;
-                return;
-            }
-            previewSource = source;
-            previewHtml = normalizeMarkdownPreviewHtml(result.html);
-            previewError = "";
-            if (mode === "full") {
-                previewDirty = false;
-            }
-        } catch (error) {
-            console.error("[admin-about] preview failed:", error);
-            if (generation !== previewGeneration) {
-                return;
-            }
-            previewHtml = "";
-            previewError = t(I18nKey.adminMarkdownPreviewFailedRetry);
-            previewDirty = true;
-        } finally {
-            if (generation === previewGeneration) {
-                previewLoading = false;
-                renderPreview();
-            }
-        }
-    };
-
-    const schedulePreview = (): void => {
-        if (currentMode !== "preview") {
-            return;
-        }
-        if (!previewDirty) {
-            return;
-        }
-        if (previewFastTimer !== null) {
-            window.clearTimeout(previewFastTimer);
-        }
-        if (previewFullTimer !== null) {
-            window.clearTimeout(previewFullTimer);
-        }
-        const generation = previewGeneration;
-        previewFastTimer = window.setTimeout(() => {
-            previewFastTimer = null;
-            void requestPreview("fast", generation);
-        }, previewClient.getFastDebounceDelay());
-        previewFullTimer = window.setTimeout(() => {
-            previewFullTimer = null;
-            void requestPreview("full", generation);
-        }, previewClient.getFullDebounceDelay());
-    };
-
-    const fillForm = (about: Record<string, unknown> | null): void => {
-        titleEl.value = toStringValue(about?.title);
-        summaryEl.value = toStringValue(about?.summary);
-        bodyEl.value = toStringValue(about?.body_markdown);
-        previewHtml = "";
-        previewError = "";
-        previewLoading = false;
-        previewDirty = true;
-        previewSource = bodyEl.value;
-        previewGeneration += 1;
-        previewClient.resetIncrementalState();
-        if (previewFastTimer !== null) {
-            window.clearTimeout(previewFastTimer);
-            previewFastTimer = null;
-        }
-        if (previewFullTimer !== null) {
-            window.clearTimeout(previewFullTimer);
-            previewFullTimer = null;
-        }
-        renderPreview();
-    };
-
-    const loadAbout = async (): Promise<void> => {
-        setError("");
-        setMsg(t(I18nKey.commonLoading));
-        try {
-            const { response, data } = await api(
-                "/api/v1/admin/settings/about",
-            );
-            if (!response.ok || !data?.ok) {
-                setMsg("");
-                setError(
-                    getApiErrorMessage(data, t(I18nKey.adminAboutLoadFailed)),
-                );
-                return;
-            }
-            const about = toRecord(data.about);
-            fillForm(about);
-            setMsg(t(I18nKey.commonLoaded));
-            window.setTimeout(() => {
-                if (saveMsgEl.textContent === t(I18nKey.commonLoaded)) {
-                    setMsg("");
-                }
-            }, 1200);
-        } catch (error) {
-            console.error("[admin-about] load failed:", error);
-            setMsg("");
-            setError(t(I18nKey.adminAboutLoadFailedRetry));
-        }
-    };
-
-    const saveAbout = async (): Promise<void> => {
-        setError("");
-        setMsg(t(I18nKey.commonSaving));
-        saveBtnEl.disabled = true;
-        await runWithTask(
-            {
-                title: t(I18nKey.adminAboutSavingTitle),
-                mode: "indeterminate",
-                text: imagePasteUploader.hasPendingUploads()
-                    ? t(I18nKey.commonImageUploading)
-                    : t(I18nKey.commonSaving),
-            },
-            async ({ update }) => {
-                try {
-                    const uploadsReady =
-                        await imagePasteUploader.flushPendingUploads();
-                    if (!uploadsReady) {
-                        setMsg("");
-                        setError(t(I18nKey.commonImageUploadFailedRetry));
-                        return;
-                    }
-
-                    const bodyMarkdown = String(bodyEl.value || "").trim();
-                    if (!bodyMarkdown) {
-                        setError(t(I18nKey.adminAboutBodyRequired));
-                        return;
-                    }
-
-                    update({ text: t(I18nKey.adminAboutSavingText) });
-                    const payload = {
-                        title: String(titleEl.value || "").trim(),
-                        summary: String(summaryEl.value || "").trim(),
-                        body_markdown: bodyMarkdown,
-                    };
-                    const { response, data } = await api(
-                        "/api/v1/admin/settings/about",
-                        {
-                            method: "PATCH",
-                            body: JSON.stringify(payload),
-                        },
-                    );
-                    if (!response.ok || !data?.ok) {
-                        setMsg("");
-                        setError(
-                            getApiErrorMessage(
-                                data,
-                                t(I18nKey.commonSaveFailed),
-                            ),
-                        );
-                        return;
-                    }
-                    update({ text: t(I18nKey.commonSaveCompleted) });
-                    fillForm(toRecord(data.about));
-                    setMsg(t(I18nKey.commonSaveSuccess));
-                } catch (error) {
-                    console.error("[admin-about] save failed:", error);
-                    setMsg("");
-                    setError(t(I18nKey.commonSaveFailedRetry));
-                } finally {
-                    saveBtnEl.disabled = false;
-                }
-            },
-        );
-    };
-
+function setupModeHandlers(
+    modeEditEl: HTMLButtonElement,
+    modePreviewEl: HTMLButtonElement,
+    setEditorMode: (mode: EditorMode) => void,
+): void {
     modeEditEl.addEventListener("click", () => {
         setEditorMode("edit");
     });
     modePreviewEl.addEventListener("click", () => {
         setEditorMode("preview");
     });
+}
 
+type RequestPreviewFn = (
+    mode: "fast" | "full",
+    generation: number,
+    force?: boolean,
+) => Promise<void>;
+
+function setupBodyHandlers(
+    bodyEl: HTMLTextAreaElement,
+    imagePasteUploader: MarkdownImagePasteUploader,
+    markPreviewDirty: () => void,
+    schedulePreview: () => void,
+    state: PreviewState,
+    requestPreview: RequestPreviewFn,
+): void {
     bodyEl.addEventListener("input", () => {
         markPreviewDirty();
         schedulePreview();
@@ -587,21 +176,27 @@ export function initAdminAboutPage(): void {
         imagePasteUploader.handlePaste(event);
     });
     bodyEl.addEventListener("blur", () => {
-        if (!previewDirty) {
+        if (!state.dirty) {
             return;
         }
-        if (previewFastTimer !== null) {
-            window.clearTimeout(previewFastTimer);
-            previewFastTimer = null;
+        if (state.fastTimer !== null) {
+            window.clearTimeout(state.fastTimer);
+            state.fastTimer = null;
         }
-        if (previewFullTimer !== null) {
-            window.clearTimeout(previewFullTimer);
-            previewFullTimer = null;
+        if (state.fullTimer !== null) {
+            window.clearTimeout(state.fullTimer);
+            state.fullTimer = null;
         }
-        const generation = previewGeneration;
-        void requestPreview("full", generation, true);
+        void requestPreview("full", state.generation, true);
     });
+}
 
+function setupToolbarHandler(
+    toolbarEl: HTMLElement,
+    bodyEl: HTMLTextAreaElement,
+    markPreviewDirty: () => void,
+    schedulePreview: () => void,
+): void {
     toolbarEl.addEventListener("click", (event: Event) => {
         const target = event.target as HTMLElement | null;
         if (!target) {
@@ -615,19 +210,329 @@ export function initAdminAboutPage(): void {
         if (!isToolbarAction(action)) {
             return;
         }
-        applyToolbarAction(action);
+        applyToolbarAction(action, bodyEl, markPreviewDirty);
         schedulePreview();
     });
+}
 
-    formEl.addEventListener("submit", (event: Event) => {
-        event.preventDefault();
-        void saveAbout();
+async function requestPreviewImpl(
+    mode: "fast" | "full",
+    generation: number,
+    force: boolean,
+    ctx: Omit<AboutPageContext, "requestPreview" | "fillForm">,
+): Promise<void> {
+    const { state, els, previewClient, renderPreview } = ctx;
+    if (generation !== state.generation) {
+        return;
+    }
+    const source = String(els.bodyEl.value || "");
+    const markdown = source.trim();
+    if (!force && mode === "fast" && !state.dirty && source === state.source) {
+        return;
+    }
+    if (!markdown) {
+        state.source = source;
+        state.html = "";
+        state.error = "";
+        state.loading = false;
+        state.dirty = false;
+        renderPreview();
+        return;
+    }
+    state.loading = true;
+    state.error = "";
+    if (mode === "fast") {
+        const incrementalHtml = previewClient.getIncrementalPreview(source);
+        if (incrementalHtml) {
+            state.html = incrementalHtml;
+        }
+    }
+    renderPreview();
+    try {
+        const result = await previewClient.preview(markdown, { force, mode });
+        if (generation !== state.generation) {
+            return;
+        }
+        await handlePreviewResult(result, source, mode, state);
+    } catch (error) {
+        console.error("[admin-about] preview failed:", error);
+        if (generation !== state.generation) {
+            return;
+        }
+        state.html = "";
+        state.error = t(I18nKey.adminMarkdownPreviewFailedRetry);
+        state.dirty = true;
+    } finally {
+        if (generation === state.generation) {
+            state.loading = false;
+            renderPreview();
+        }
+    }
+}
+
+function fillFormImpl(
+    about: Record<string, unknown> | null,
+    ctx: Omit<AboutPageContext, "requestPreview" | "fillForm">,
+): void {
+    const { els, state, previewClient, renderPreview } = ctx;
+    els.titleEl.value = toStringValue(about?.title);
+    els.summaryEl.value = toStringValue(about?.summary);
+    els.bodyEl.value = toStringValue(about?.body_markdown);
+    state.html = "";
+    state.error = "";
+    state.loading = false;
+    state.dirty = true;
+    state.source = els.bodyEl.value;
+    state.generation += 1;
+    previewClient.resetIncrementalState();
+    if (state.fastTimer !== null) {
+        window.clearTimeout(state.fastTimer);
+        state.fastTimer = null;
+    }
+    if (state.fullTimer !== null) {
+        window.clearTimeout(state.fullTimer);
+        state.fullTimer = null;
+    }
+    renderPreview();
+}
+
+async function loadAboutImpl(ctx: AboutPageContext): Promise<void> {
+    const { setMsg, setError, fillForm, els } = ctx;
+    setError("");
+    setMsg(t(I18nKey.interactionCommonLoading));
+    try {
+        const { response, data } = await api("/api/v1/admin/settings/about");
+        if (!response.ok || !data?.ok) {
+            setMsg("");
+            setError(getApiErrorMessage(data, t(I18nKey.adminAboutLoadFailed)));
+            return;
+        }
+        fillForm(toRecord(data.about));
+        setMsg(t(I18nKey.interactionCommonLoaded));
+        window.setTimeout(() => {
+            if (
+                els.saveMsgEl.textContent === t(I18nKey.interactionCommonLoaded)
+            ) {
+                setMsg("");
+            }
+        }, 1200);
+    } catch (error) {
+        console.error("[admin-about] load failed:", error);
+        setMsg("");
+        setError(t(I18nKey.adminAboutLoadFailedRetry));
+    }
+}
+
+async function saveAboutImpl(
+    ctx: AboutPageContext,
+    imagePasteUploader: MarkdownImagePasteUploader,
+): Promise<void> {
+    const { setMsg, setError, fillForm, els } = ctx;
+    setError("");
+    setMsg(t(I18nKey.interactionCommonSaving));
+    els.saveBtnEl.disabled = true;
+    await runWithTask(
+        {
+            title: t(I18nKey.adminAboutSavingTitle),
+            mode: "indeterminate",
+            text: imagePasteUploader.hasPendingUploads()
+                ? t(I18nKey.interactionCommonImageUploading)
+                : t(I18nKey.interactionCommonSaving),
+        },
+        async ({ update }) => {
+            try {
+                const uploadsReady =
+                    await imagePasteUploader.flushPendingUploads();
+                if (!uploadsReady) {
+                    setMsg("");
+                    setError(
+                        t(I18nKey.interactionCommonImageUploadFailedRetry),
+                    );
+                    return;
+                }
+                const bodyMarkdown = String(els.bodyEl.value || "").trim();
+                if (!bodyMarkdown) {
+                    setError(t(I18nKey.adminAboutBodyRequired));
+                    return;
+                }
+                update({ text: t(I18nKey.adminAboutSavingText) });
+                const payload = {
+                    title: String(els.titleEl.value || "").trim(),
+                    summary: String(els.summaryEl.value || "").trim(),
+                    body_markdown: bodyMarkdown,
+                };
+                const { response, data } = await api(
+                    "/api/v1/admin/settings/about",
+                    { method: "PATCH", body: JSON.stringify(payload) },
+                );
+                if (!response.ok || !data?.ok) {
+                    setMsg("");
+                    setError(
+                        getApiErrorMessage(
+                            data,
+                            t(I18nKey.interactionCommonSaveFailed),
+                        ),
+                    );
+                    return;
+                }
+                update({ text: t(I18nKey.interactionCommonSaveCompleted) });
+                fillForm(toRecord(data.about));
+                setMsg(t(I18nKey.interactionCommonSaveSuccess));
+            } catch (error) {
+                console.error("[admin-about] save failed:", error);
+                setMsg("");
+                setError(t(I18nKey.interactionCommonSaveFailedRetry));
+            } finally {
+                els.saveBtnEl.disabled = false;
+            }
+        },
+    );
+}
+
+export function initAdminAboutPage(): void {
+    const normalizedPath = window.location.pathname.replace(/\/+$/, "") || "/";
+    if (normalizedPath !== "/admin/settings/about") {
+        return;
+    }
+
+    const elements = queryAboutPageElements();
+    if (!elements) {
+        return;
+    }
+
+    elements.formEl.setAttribute(DATA_BOUND, "1");
+
+    const runtimeWindow = window as RuntimeWindow;
+    const previewClient = new MarkdownPreviewClient("about");
+    let currentMode: EditorMode = "edit";
+
+    const state: PreviewState = {
+        loading: false,
+        error: "",
+        html: "",
+        source: "",
+        dirty: false,
+        generation: 0,
+        fastTimer: null,
+        fullTimer: null,
+        renderedHtml: "",
+    };
+
+    const setMsg = makeSetMsg(elements.saveMsgEl);
+    const setError = makeSetError(elements.saveErrorEl);
+    const refreshMarkdownRuntime = makeRefreshMarkdownRuntime(
+        runtimeWindow,
+        "[admin-about]",
+    );
+    const renderPreview = makeRenderPreview(
+        {
+            previewLoadingEl: elements.previewLoadingEl,
+            previewErrorEl: elements.previewErrorEl,
+            previewContentEl: elements.previewContentEl,
+            previewEmptyEl: elements.previewEmptyEl,
+        },
+        state,
+        refreshMarkdownRuntime,
+    );
+
+    const baseCtx = {
+        els: elements,
+        state,
+        previewClient,
+        setMsg,
+        setError,
+        renderPreview,
+    };
+
+    const requestPreview: RequestPreviewFn = (
+        mode,
+        generation,
+        force = false,
+    ) => requestPreviewImpl(mode, generation, force, baseCtx);
+
+    const fillForm = (data: Record<string, unknown> | null): void =>
+        fillFormImpl(data, baseCtx);
+
+    const ctx: AboutPageContext = { ...baseCtx, requestPreview, fillForm };
+
+    const markPreviewDirty = (): void => {
+        state.dirty = true;
+        state.generation += 1;
+    };
+
+    const schedulePreview = (): void => {
+        if (currentMode !== "preview" || !state.dirty) {
+            return;
+        }
+        if (state.fastTimer !== null) {
+            window.clearTimeout(state.fastTimer);
+        }
+        if (state.fullTimer !== null) {
+            window.clearTimeout(state.fullTimer);
+        }
+        const generation = state.generation;
+        state.fastTimer = window.setTimeout(() => {
+            state.fastTimer = null;
+            void requestPreview("fast", generation);
+        }, previewClient.getFastDebounceDelay());
+        state.fullTimer = window.setTimeout(() => {
+            state.fullTimer = null;
+            void requestPreview("full", generation);
+        }, previewClient.getFullDebounceDelay());
+    };
+
+    const setEditorMode = (mode: EditorMode): void => {
+        currentMode = mode;
+        elements.editorPanelEl.classList.toggle("hidden", mode !== "edit");
+        elements.previewPanelEl.classList.toggle("hidden", mode !== "preview");
+        updateModeButtonStyle(elements.modeEditEl, mode === "edit");
+        updateModeButtonStyle(elements.modePreviewEl, mode === "preview");
+        if (mode === "preview") {
+            schedulePreview();
+        }
+    };
+
+    const imagePasteUploader = new MarkdownImagePasteUploader({
+        textarea: elements.bodyEl,
+        fileNamePrefix: "about",
+        autoUpload: false,
+        onContentChange: () => {
+            markPreviewDirty();
+            schedulePreview();
+        },
+        onError: (message) => {
+            setMsg("");
+            setError(message);
+        },
     });
 
+    setupModeHandlers(
+        elements.modeEditEl,
+        elements.modePreviewEl,
+        setEditorMode,
+    );
+    setupBodyHandlers(
+        elements.bodyEl,
+        imagePasteUploader,
+        markPreviewDirty,
+        schedulePreview,
+        state,
+        requestPreview,
+    );
+    setupToolbarHandler(
+        elements.toolbarEl,
+        elements.bodyEl,
+        markPreviewDirty,
+        schedulePreview,
+    );
+    elements.formEl.addEventListener("submit", (event: Event) => {
+        event.preventDefault();
+        void saveAboutImpl(ctx, imagePasteUploader);
+    });
     window.addEventListener("beforeunload", () => {
         imagePasteUploader.dispose();
     });
 
     setEditorMode("edit");
-    void loadAbout();
+    void loadAboutImpl(ctx);
 }

@@ -220,6 +220,35 @@ export class MarkdownImagePasteUploader {
         this.activeUploads.set(localUrl, promise);
     }
 
+    private resolveRemoteUrl(fileId: string): string {
+        return (
+            this.buildAssetUrl?.(fileId) ||
+            `/api/v1/public/assets/${encodeURIComponent(fileId)}`
+        );
+    }
+
+    private applyUploadSuccess(localUrl: string, fileId: string): void {
+        const remoteUrl = this.resolveRemoteUrl(fileId);
+        this.textarea.value = this.textarea.value
+            .split(localUrl)
+            .join(remoteUrl);
+        this.onContentChange?.();
+    }
+
+    private applyUploadFailure(
+        localUrl: string,
+        markdown: string,
+        message: string,
+    ): void {
+        this.textarea.value = this.textarea.value
+            .split(markdown)
+            .join("")
+            .split(localUrl)
+            .join("");
+        this.onContentChange?.();
+        this.onError?.(message);
+    }
+
     private async uploadImage(params: PendingPasteImage): Promise<void> {
         const { localUrl, markdown, file, sequence } = params;
         const ext = getImageFileExt(file);
@@ -262,26 +291,14 @@ export class MarkdownImagePasteUploader {
                 throw new Error("图片上传失败：未返回文件 ID");
             }
 
-            const remoteUrl =
-                this.buildAssetUrl?.(fileId) ||
-                `/api/v1/public/assets/${encodeURIComponent(fileId)}`;
-            this.textarea.value = this.textarea.value
-                .split(localUrl)
-                .join(remoteUrl);
-            this.onContentChange?.();
+            this.applyUploadSuccess(localUrl, fileId);
         } catch (error) {
             console.error("[markdown-image-paste] upload failed:", error);
             const message =
                 error instanceof Error
                     ? error.message
                     : "图片上传失败，请稍后重试";
-            this.textarea.value = this.textarea.value
-                .split(markdown)
-                .join("")
-                .split(localUrl)
-                .join("");
-            this.onContentChange?.();
-            this.onError?.(message);
+            this.applyUploadFailure(localUrl, markdown, message);
         } finally {
             this.pendingImages.delete(localUrl);
             URL.revokeObjectURL(localUrl);

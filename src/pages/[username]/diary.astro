@@ -64,17 +64,17 @@ const items = result.status === "ok" ? result.data.items : [];
 ---
 
 <MainGridLayout
-  title={i18n(I18nKey.diary)}
-  description={i18n(I18nKey.diaryPublicSubtitle)}
+  title={i18n(I18nKey.contentDiary)}
+  description={i18n(I18nKey.contentDiaryPublicSubtitle)}
 >
   {
     result.status === "not_found" || result.status === "permission_denied" ? (
       <ContentNotVisible
         mode="not_found"
-        title={i18n(I18nKey.userNotFoundTitle)}
-        description={i18n(I18nKey.userNotFoundDescription)}
+        title={i18n(I18nKey.contentUserNotFoundTitle)}
+        description={i18n(I18nKey.contentUserNotFoundDescription)}
         backHref="/"
-        backLabel={i18n(I18nKey.userBackToHome)}
+        backLabel={i18n(I18nKey.contentUserBackToHome)}
       />
     ) : (
       <div
@@ -89,10 +89,10 @@ const items = result.status === "ok" ? result.data.items : [];
 					before:w-1 before:h-8 before:rounded-md before:bg-(--primary)
 					before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
               >
-                {i18n(I18nKey.diary)}
+                {i18n(I18nKey.contentDiary)}
               </h1>
               <p class="text-base text-70">
-                {i18n(I18nKey.diaryPublicSubtitle)}
+                {i18n(I18nKey.contentDiaryPublicSubtitle)}
               </p>
             </div>
             {isOwner && (
@@ -115,14 +115,14 @@ const items = result.status === "ok" ? result.data.items : [];
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
-                {i18n(I18nKey.diaryWriteNew)}
+                {i18n(I18nKey.contentDiaryWriteNew)}
               </a>
             )}
           </section>
 
           {items.length === 0 ? (
             <div class="card-base p-8 rounded-(--radius-large) text-70">
-              {i18n(I18nKey.diaryNoPublic)}
+              {i18n(I18nKey.contentDiaryNoPublic)}
             </div>
           ) : (
             <div class="space-y-4">

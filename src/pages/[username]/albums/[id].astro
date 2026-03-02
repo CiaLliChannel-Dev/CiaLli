@@ -4,12 +4,6 @@ import MainGridLayout from "@layouts/MainGridLayout.astro";
 import AlbumDetailEditor from "@components/album/AlbumDetailEditor.svelte";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
-import { buildPublicAssetUrl } from "@/server/directus-auth";
-import {
-  ALBUM_MASONRY_WIDTH,
-  ALBUM_GRID_WIDTH,
-  ALBUM_GRID_HEIGHT,
-} from "@/constants/image";
 import {
   loadProfileForViewer,
   loadUserAlbumDetail,
@@ -17,6 +11,12 @@ import {
 } from "@/server/api/v1/public-data";
 import type { ContentLoadResult } from "@/server/api/v1/public-data";
 import { getSessionUser } from "@/server/auth/session";
+import {
+  resolvePhotoUrl,
+  resolvePhotoPreviewUrl,
+  formatAlbumDate,
+  buildGoogleMapsSearchUrl,
+} from "@/utils/album-page-utils";
 
 export const prerender = false;
 
@@ -86,76 +86,39 @@ if (!username || !id) {
 
 const album = result.status === "ok" ? result.data : null;
 
-function photoUrl(
-  photo: {
-    file_id: string | null;
-    image_url: string | null;
-  },
-  layout: "grid" | "masonry",
-): string | null {
-  if (photo.image_url) {
-    return photo.image_url;
-  }
-  if (photo.file_id) {
-    if (layout === "masonry") {
-      return buildPublicAssetUrl(photo.file_id, {
-        width: ALBUM_MASONRY_WIDTH,
-      });
-    }
-    return buildPublicAssetUrl(photo.file_id, {
-      width: ALBUM_GRID_WIDTH,
-      height: ALBUM_GRID_HEIGHT,
-      fit: "cover",
-    });
-  }
-  return null;
-}
-
-function photoPreviewUrl(photo: {
-  file_id: string | null;
-  image_url: string | null;
-}): string | null {
-  if (photo.image_url) {
-    return photo.image_url;
-  }
-  if (photo.file_id) {
-    return buildPublicAssetUrl(photo.file_id, {
-      width: ALBUM_MASONRY_WIDTH,
-    });
-  }
-  return null;
-}
-
-function buildGoogleMapsSearchUrl(value: string | null | undefined): string {
-  const query = String(value || "").trim();
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-}
-
-function formatAlbumDate(value: string | null | undefined): string {
-  const raw = String(value || "").trim();
-  if (!raw) {
-    return "";
-  }
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) {
-    return raw;
-  }
-  return `${parsed.getFullYear()}/${String(parsed.getMonth() + 1).padStart(2, "0")}/${String(parsed.getDate()).padStart(2, "0")}`;
-}
+const enrichedPhotos = album
+  ? album.photos.map((photo) => {
+      const thumbSrc = resolvePhotoUrl(photo, album.layout);
+      const previewSrc = resolvePhotoPreviewUrl(photo) ?? thumbSrc;
+      const hasCaption = Boolean(photo.title || photo.description);
+      return {
+        ...photo,
+        thumbSrc,
+        previewSrc,
+        hasMedia: Boolean(thumbSrc && previewSrc),
+        showOverlay: hasCaption && album.layout === "grid",
+        showCaption: hasCaption && album.layout !== "grid",
+        isMasonry: album.layout === "masonry",
+        captionText: [photo.title, photo.description]
+          .filter(Boolean)
+          .join("\n"),
+      };
+    })
+  : [];
 ---
 
 <MainGridLayout
-  title={album?.title || i18n(I18nKey.albumNotFoundTitle)}
+  title={album?.title || i18n(I18nKey.contentAlbumNotFoundTitle)}
   description={album?.description || ""}
 >
   {
     !album ? (
       <ContentNotVisible
         mode="not_found"
-        title={i18n(I18nKey.albumNotFoundTitle)}
-        description={i18n(I18nKey.albumNotFoundDescription)}
+        title={i18n(I18nKey.contentAlbumNotFoundTitle)}
+        description={i18n(I18nKey.contentAlbumNotFoundDescription)}
         backHref={`/${username}/albums`}
-        backLabel={i18n(I18nKey.albumBackToList)}
+        backLabel={i18n(I18nKey.contentAlbumBackToList)}
       />
     ) : isOwner ? (
       <AlbumDetailEditor
@@ -197,7 +160,7 @@ function formatAlbumDate(value: string | null | undefined): string {
             href={`/${username}/albums`}
             class="text-sm text-(--primary) hover:underline"
           >
-            {i18n(I18nKey.albumBackToList)}
+            {i18n(I18nKey.contentAlbumBackToList)}
           </a>
           <h1 class="text-3xl font-bold">{album.title}</h1>
           <div class="text-xs text-60 flex flex-wrap items-center gap-2">
@@ -251,9 +214,9 @@ function formatAlbumDate(value: string | null | undefined): string {
           {album.description && <p class="text-75">{album.description}</p>}
         </section>
 
-        {album.photos.length === 0 ? (
+        {enrichedPhotos.length === 0 ? (
           <div class="card-base p-8 rounded-(--radius-large) text-70">
-            {i18n(I18nKey.albumNoPhotosToShow)}
+            {i18n(I18nKey.contentAlbumNoPhotosToShow)}
           </div>
         ) : (
           <div
@@ -264,64 +227,54 @@ function formatAlbumDate(value: string | null | undefined): string {
                 : "grid grid-cols-2 lg:grid-cols-4",
             ]}
           >
-            {album.photos.map((photo) => {
-              const thumbSrc = photoUrl(photo, album.layout);
-              const previewSrc = photoPreviewUrl(photo) || thumbSrc;
-              const captionText = [photo.title, photo.description]
-                .filter(Boolean)
-                .join("\n");
-
-              return (
-                <figure
-                  class:list={[
-                    "album-photo-item rounded-xl overflow-hidden border border-(--line-divider) bg-(--card-bg) relative",
-                    album.layout === "masonry" ? "mb-3 break-inside-avoid" : "",
-                  ]}
-                >
-                  {thumbSrc && previewSrc && (
-                    <a
-                      href={previewSrc}
-                      data-fancybox="album-photo-preview"
-                      data-caption={captionText || undefined}
-                      class="block relative"
-                    >
-                      <img
-                        src={thumbSrc}
-                        alt={photo.title || "album photo"}
-                        class="w-full h-auto object-cover"
-                        loading="lazy"
-                      />
-                      {(photo.title || photo.description) &&
-                        album.layout === "grid" && (
-                          <div class="absolute inset-x-0 bottom-0 p-3 space-y-1 text-white bg-linear-to-t from-black/70 via-black/35 to-transparent">
-                            {photo.title && (
-                              <div class="text-sm font-medium line-clamp-1">
-                                {photo.title}
-                              </div>
-                            )}
-                            {photo.description && (
-                              <div class="text-xs text-white/85 line-clamp-2">
-                                {photo.description}
-                              </div>
-                            )}
+            {enrichedPhotos.map((photo) => (
+              <figure
+                class:list={[
+                  "album-photo-item rounded-xl overflow-hidden border border-(--line-divider) bg-(--card-bg) relative",
+                  photo.isMasonry ? "mb-3 break-inside-avoid" : "",
+                ]}
+              >
+                {photo.hasMedia && (
+                  <a
+                    href={photo.previewSrc ?? ""}
+                    data-fancybox="album-photo-preview"
+                    data-caption={photo.captionText || undefined}
+                    class="block relative"
+                  >
+                    <img
+                      src={photo.thumbSrc ?? ""}
+                      alt={photo.title || "album photo"}
+                      class="w-full h-auto object-cover"
+                      loading="lazy"
+                    />
+                    {photo.showOverlay && (
+                      <div class="absolute inset-x-0 bottom-0 p-3 space-y-1 text-white bg-linear-to-t from-black/70 via-black/35 to-transparent">
+                        {photo.title && (
+                          <div class="text-sm font-medium line-clamp-1">
+                            {photo.title}
                           </div>
                         )}
-                    </a>
-                  )}
-                  {(photo.title || photo.description) &&
-                    album.layout !== "grid" && (
-                      <figcaption class="p-3 space-y-1 text-90">
-                        {photo.title && (
-                          <div class="text-sm font-medium">{photo.title}</div>
-                        )}
                         {photo.description && (
-                          <div class="text-xs text-60">{photo.description}</div>
+                          <div class="text-xs text-white/85 line-clamp-2">
+                            {photo.description}
+                          </div>
                         )}
-                      </figcaption>
+                      </div>
                     )}
-                </figure>
-              );
-            })}
+                  </a>
+                )}
+                {photo.showCaption && (
+                  <figcaption class="p-3 space-y-1 text-90">
+                    {photo.title && (
+                      <div class="text-sm font-medium">{photo.title}</div>
+                    )}
+                    {photo.description && (
+                      <div class="text-xs text-60">{photo.description}</div>
+                    )}
+                  </figcaption>
+                )}
+              </figure>
+            ))}
           </div>
         )}
       </>

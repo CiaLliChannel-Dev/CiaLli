@@ -136,6 +136,67 @@ function createCandidate(input: CandidateInput): HomeFeedCandidate {
     };
 }
 
+function buildAuthorCooldownCandidates(): HomeFeedCandidate[] {
+    return [
+        createCandidate({
+            id: "article-a1",
+            type: "article",
+            authorId: "author-a",
+            hoursAgo: 1,
+            likes72h: 40,
+            comments72h: 20,
+        }),
+        createCandidate({
+            id: "article-a2",
+            type: "article",
+            authorId: "author-a",
+            hoursAgo: 2,
+            likes72h: 36,
+            comments72h: 18,
+        }),
+        createCandidate({
+            id: "article-b1",
+            type: "article",
+            authorId: "author-b",
+            hoursAgo: 3,
+            likes72h: 35,
+            comments72h: 16,
+        }),
+        createCandidate({
+            id: "article-c1",
+            type: "article",
+            authorId: "author-c",
+            hoursAgo: 4,
+            likes72h: 34,
+            comments72h: 14,
+        }),
+        createCandidate({
+            id: "diary-d1",
+            type: "diary",
+            authorId: "author-d",
+            hoursAgo: 2,
+            likes72h: 26,
+            comments72h: 12,
+        }),
+        createCandidate({
+            id: "diary-e1",
+            type: "diary",
+            authorId: "author-e",
+            hoursAgo: 5,
+            likes72h: 24,
+            comments72h: 10,
+        }),
+        createCandidate({
+            id: "diary-f1",
+            type: "diary",
+            authorId: "author-f",
+            hoursAgo: 6,
+            likes72h: 22,
+            comments72h: 9,
+        }),
+    ];
+}
+
 describe("home feed recommendation", () => {
     it("在互动相同条件下，新内容应排在旧内容之前", () => {
         const candidates = [
@@ -230,64 +291,7 @@ describe("home feed recommendation", () => {
     });
 
     it("候选允许时，同作者冷却应生效（最近 2 条不重复）", () => {
-        const candidates = [
-            createCandidate({
-                id: "article-a1",
-                type: "article",
-                authorId: "author-a",
-                hoursAgo: 1,
-                likes72h: 40,
-                comments72h: 20,
-            }),
-            createCandidate({
-                id: "article-a2",
-                type: "article",
-                authorId: "author-a",
-                hoursAgo: 2,
-                likes72h: 36,
-                comments72h: 18,
-            }),
-            createCandidate({
-                id: "article-b1",
-                type: "article",
-                authorId: "author-b",
-                hoursAgo: 3,
-                likes72h: 35,
-                comments72h: 16,
-            }),
-            createCandidate({
-                id: "article-c1",
-                type: "article",
-                authorId: "author-c",
-                hoursAgo: 4,
-                likes72h: 34,
-                comments72h: 14,
-            }),
-            createCandidate({
-                id: "diary-d1",
-                type: "diary",
-                authorId: "author-d",
-                hoursAgo: 2,
-                likes72h: 26,
-                comments72h: 12,
-            }),
-            createCandidate({
-                id: "diary-e1",
-                type: "diary",
-                authorId: "author-e",
-                hoursAgo: 5,
-                likes72h: 24,
-                comments72h: 10,
-            }),
-            createCandidate({
-                id: "diary-f1",
-                type: "diary",
-                authorId: "author-f",
-                hoursAgo: 6,
-                likes72h: 22,
-                comments72h: 9,
-            }),
-        ];
+        const candidates = buildAuthorCooldownCandidates();
 
         const ranked = scoreHomeFeedCandidates(candidates, {
             now: BASE_NOW,

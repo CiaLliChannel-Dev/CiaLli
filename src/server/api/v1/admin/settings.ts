@@ -199,6 +199,42 @@ async function readAboutArticleRow(): Promise<AboutArticleData | null> {
     };
 }
 
+// ── 辅助：从 Directus 记录映射 AboutArticleData ──
+
+function mapRowToAboutArticleData(row: JsonObject): AboutArticleData {
+    return {
+        id: String(row.id),
+        title: String(row.title || "").trim() || ABOUT_FALLBACK_TITLE,
+        summary: String(row.summary || "").trim(),
+        body_markdown: String(row.body_markdown || ""),
+        updated_at:
+            (row.date_updated as string | null) ||
+            (row.date_created as string | null) ||
+            null,
+    };
+}
+
+// ── 辅助：构建 about 文章字段 ──
+
+function buildAboutArticleFields(
+    input: {
+        title?: string | null;
+        summary?: string | null;
+        body_markdown: string;
+    },
+    existing: AboutArticleData | null,
+): { title: string; summary: string | null } {
+    const title =
+        String(input.title || "").trim() ||
+        existing?.title ||
+        ABOUT_FALLBACK_TITLE;
+    const summaryStr =
+        input.summary !== undefined
+            ? String(input.summary || "").trim()
+            : existing?.summary || "";
+    return { title, summary: summaryStr || null };
+}
+
 async function upsertAboutArticle(
     adminUserId: string,
     input: {
@@ -208,19 +244,12 @@ async function upsertAboutArticle(
     },
 ): Promise<AboutArticleData> {
     const existing = await readAboutArticleRow();
-    const title =
-        String(input.title || "").trim() ||
-        existing?.title ||
-        ABOUT_FALLBACK_TITLE;
-    const summary =
-        input.summary !== undefined
-            ? String(input.summary || "").trim()
-            : existing?.summary || "";
+    const { title, summary } = buildAboutArticleFields(input, existing);
     const payload = {
         status: "published" as const,
         title,
         slug: ABOUT_ARTICLE_SLUG,
-        summary: summary || null,
+        summary,
         body_markdown: input.body_markdown,
         allow_comments: false,
         is_public: true,
@@ -236,24 +265,232 @@ async function upsertAboutArticle(
             category: null,
             published_at: nowIso(),
         });
-        return {
-            id: String(created.id),
-            title: String(created.title || "").trim() || ABOUT_FALLBACK_TITLE,
-            summary: String(created.summary || "").trim(),
-            body_markdown: String(created.body_markdown || ""),
-            updated_at: created.date_updated || created.date_created || null,
-        };
+        return mapRowToAboutArticleData(created);
     }
 
     const updated = await updateOne("app_articles", existing.id, payload);
-    return {
-        id: String(updated.id),
-        title: String(updated.title || "").trim() || ABOUT_FALLBACK_TITLE,
-        summary: String(updated.summary || "").trim(),
-        body_markdown: String(updated.body_markdown || ""),
-        updated_at: updated.date_updated || updated.date_created || null,
-    };
+    return mapRowToAboutArticleData(updated);
 }
+
+// ── 辅助：渲染预览响应 ──
+
+function buildMarkdownPreviewResponse(
+    bodyMarkdown: string,
+    bodyHtml: string,
+    renderDuration: number,
+    renderMode: string,
+): Response {
+    return ok(
+        {
+            body_markdown: bodyMarkdown,
+            body_html: bodyHtml,
+        },
+        {
+            headers:
+                process.env.NODE_ENV === "production"
+                    ? undefined
+                    : {
+                          "Server-Timing": `md-render;dur=${renderDuration.toFixed(2)};desc="${renderMode}"`,
+                      },
+        },
+    );
+}
+
+// ── 路由处理：/admin/settings/site ──
+
+async function handleAdminSiteGet(): Promise<Response> {
+    const [resolved, rowMeta] = await Promise.all([
+        getResolvedSiteSettings(),
+        readSiteSettingsRowMeta(),
+    ]);
+    return ok({
+        settings: resolved.settings,
+        updated_at: rowMeta?.updatedAt || null,
+    });
+}
+
+async function handleAdminSitePatch(context: APIContext): Promise<Response> {
+    const body = await parseJsonBody(context.request);
+    const patch = body as Partial<EditableSiteSettings>;
+    const current = await getResolvedSiteSettings();
+    const settings = resolveSiteSettingsPayload(patch, current.settings);
+    const prevFileIds = collectSettingsFileIds(current.settings);
+    const nextFileIds = collectSettingsFileIds(settings);
+    const removedFileIds = [...prevFileIds].filter(
+        (fileId) => !nextFileIds.has(fileId),
+    );
+    const { updatedAt } = await upsertSiteSettings(settings);
+    invalidateSiteSettingsCache();
+    await cleanupOrphanDirectusFiles(removedFileIds);
+    return ok({
+        settings,
+        updated_at: updatedAt,
+    });
+}
+
+async function handleAdminSite(context: APIContext): Promise<Response> {
+    if (context.request.method === "GET") {
+        return handleAdminSiteGet();
+    }
+    if (context.request.method === "PATCH") {
+        return handleAdminSitePatch(context);
+    }
+    return fail("方法不允许", 405);
+}
+
+// ── 路由处理：/admin/settings/bulletin/preview ──
+
+async function handleAdminBulletinPreview(
+    context: APIContext,
+): Promise<Response> {
+    if (context.request.method !== "POST") {
+        return fail("方法不允许", 405);
+    }
+    const body = await parseJsonBody(context.request);
+    const input = validateBody(AdminBulletinPreviewSchema, body);
+    const renderStart = performance.now();
+    const bodyHtml = await renderSettingsMarkdown(
+        input.body_markdown,
+        "bulletin",
+        input.render_mode,
+    );
+    const renderDuration = performance.now() - renderStart;
+    return buildMarkdownPreviewResponse(
+        input.body_markdown,
+        bodyHtml,
+        renderDuration,
+        input.render_mode,
+    );
+}
+
+// ── 路由处理：/admin/settings/bulletin ──
+
+async function handleAdminBulletinGet(): Promise<Response> {
+    const [resolved, rowMeta] = await Promise.all([
+        getResolvedSiteSettings(),
+        readSiteSettingsRowMeta(),
+    ]);
+    return ok({
+        announcement: resolved.settings.announcement,
+        updated_at: rowMeta?.updatedAt || null,
+    });
+}
+
+async function handleAdminBulletinPatch(
+    context: APIContext,
+): Promise<Response> {
+    const body = await parseJsonBody(context.request);
+    const input = validateBody(AdminBulletinUpdateSchema, body);
+    const current = await getResolvedSiteSettings();
+    const announcementPatch: EditableSiteSettings["announcement"] = {
+        ...current.settings.announcement,
+        ...(input.title !== undefined
+            ? { title: String(input.title ?? "") }
+            : {}),
+        ...(input.summary !== undefined
+            ? { summary: String(input.summary ?? "") }
+            : {}),
+        ...(input.body_markdown !== undefined
+            ? { body_markdown: input.body_markdown }
+            : {}),
+        ...(input.closable !== undefined ? { closable: input.closable } : {}),
+    };
+    const settings = resolveSiteSettingsPayload(
+        { announcement: announcementPatch },
+        current.settings,
+    );
+    const { updatedAt } = await upsertSiteSettings(settings);
+    invalidateSiteSettingsCache();
+    return ok({
+        announcement: settings.announcement,
+        updated_at: updatedAt,
+    });
+}
+
+async function handleAdminBulletin(context: APIContext): Promise<Response> {
+    if (context.request.method === "GET") {
+        return handleAdminBulletinGet();
+    }
+    if (context.request.method === "PATCH") {
+        return handleAdminBulletinPatch(context);
+    }
+    return fail("方法不允许", 405);
+}
+
+// ── 路由处理：/admin/settings/about/preview ──
+
+async function handleAdminAboutPreview(context: APIContext): Promise<Response> {
+    if (context.request.method !== "POST") {
+        return fail("方法不允许", 405);
+    }
+    const body = await parseJsonBody(context.request);
+    const input = validateBody(AdminAboutPreviewSchema, body);
+    const renderStart = performance.now();
+    const bodyHtml = await renderSettingsMarkdown(
+        input.body_markdown,
+        "about",
+        input.render_mode,
+    );
+    const renderDuration = performance.now() - renderStart;
+    return buildMarkdownPreviewResponse(
+        input.body_markdown,
+        bodyHtml,
+        renderDuration,
+        input.render_mode,
+    );
+}
+
+// ── 路由处理：/admin/settings/about ──
+
+async function handleAdminAboutGet(): Promise<Response> {
+    const about = await readAboutArticleRow();
+    return ok({
+        about: about || {
+            id: null,
+            title: ABOUT_FALLBACK_TITLE,
+            summary: "",
+            body_markdown: "",
+            updated_at: null,
+        },
+        updated_at: about?.updated_at || null,
+    });
+}
+
+async function handleAdminAboutPatch(
+    context: APIContext,
+    adminUserId: string,
+): Promise<Response> {
+    const body = await parseJsonBody(context.request);
+    const input = validateBody(AdminAboutUpdateSchema, body);
+    const about = await upsertAboutArticle(adminUserId, {
+        title: input.title,
+        summary: input.summary,
+        body_markdown: input.body_markdown,
+    });
+    void cacheManager.invalidateByDomain("article-list");
+    void cacheManager.invalidateByDomain("article-public");
+    void cacheManager.invalidate("article-detail", ABOUT_ARTICLE_SLUG);
+    void cacheManager.invalidate("article-detail", about.id);
+    return ok({
+        about,
+        updated_at: about.updated_at,
+    });
+}
+
+async function handleAdminAbout(
+    context: APIContext,
+    adminUserId: string,
+): Promise<Response> {
+    if (context.request.method === "GET") {
+        return handleAdminAboutGet();
+    }
+    if (context.request.method === "PATCH") {
+        return handleAdminAboutPatch(context, adminUserId);
+    }
+    return fail("方法不允许", 405);
+}
+
+// ── 主入口 ──
 
 export async function handleAdminSettings(
     context: APIContext,
@@ -269,40 +506,7 @@ export async function handleAdminSettings(
     }
 
     if (segments[1] === "site" && segments.length === 2) {
-        if (context.request.method === "GET") {
-            const [resolved, rowMeta] = await Promise.all([
-                getResolvedSiteSettings(),
-                readSiteSettingsRowMeta(),
-            ]);
-            return ok({
-                settings: resolved.settings,
-                updated_at: rowMeta?.updatedAt || null,
-            });
-        }
-
-        if (context.request.method === "PATCH") {
-            const body = await parseJsonBody(context.request);
-            const patch = body as Partial<EditableSiteSettings>;
-            const current = await getResolvedSiteSettings();
-            const settings = resolveSiteSettingsPayload(
-                patch,
-                current.settings,
-            );
-            const prevFileIds = collectSettingsFileIds(current.settings);
-            const nextFileIds = collectSettingsFileIds(settings);
-            const removedFileIds = [...prevFileIds].filter(
-                (fileId) => !nextFileIds.has(fileId),
-            );
-            const { updatedAt } = await upsertSiteSettings(settings);
-            invalidateSiteSettingsCache();
-            await cleanupOrphanDirectusFiles(removedFileIds);
-            return ok({
-                settings,
-                updated_at: updatedAt,
-            });
-        }
-
-        return fail("方法不允许", 405);
+        return handleAdminSite(context);
     }
 
     if (
@@ -310,78 +514,11 @@ export async function handleAdminSettings(
         segments.length === 3 &&
         segments[2] === "preview"
     ) {
-        if (context.request.method !== "POST") {
-            return fail("方法不允许", 405);
-        }
-        const body = await parseJsonBody(context.request);
-        const input = validateBody(AdminBulletinPreviewSchema, body);
-        const renderStart = performance.now();
-        const bodyHtml = await renderSettingsMarkdown(
-            input.body_markdown,
-            "bulletin",
-            input.render_mode,
-        );
-        const renderDuration = performance.now() - renderStart;
-        return ok(
-            {
-                body_markdown: input.body_markdown,
-                body_html: bodyHtml,
-            },
-            {
-                headers:
-                    process.env.NODE_ENV === "production"
-                        ? undefined
-                        : {
-                              "Server-Timing": `md-render;dur=${renderDuration.toFixed(2)};desc="${input.render_mode}"`,
-                          },
-            },
-        );
+        return handleAdminBulletinPreview(context);
     }
 
     if (segments[1] === "bulletin" && segments.length === 2) {
-        if (context.request.method === "GET") {
-            const [resolved, rowMeta] = await Promise.all([
-                getResolvedSiteSettings(),
-                readSiteSettingsRowMeta(),
-            ]);
-            return ok({
-                announcement: resolved.settings.announcement,
-                updated_at: rowMeta?.updatedAt || null,
-            });
-        }
-
-        if (context.request.method === "PATCH") {
-            const body = await parseJsonBody(context.request);
-            const input = validateBody(AdminBulletinUpdateSchema, body);
-            const current = await getResolvedSiteSettings();
-            const announcementPatch: EditableSiteSettings["announcement"] = {
-                ...current.settings.announcement,
-                ...(input.title !== undefined
-                    ? { title: String(input.title ?? "") }
-                    : {}),
-                ...(input.summary !== undefined
-                    ? { summary: String(input.summary ?? "") }
-                    : {}),
-                ...(input.body_markdown !== undefined
-                    ? { body_markdown: input.body_markdown }
-                    : {}),
-                ...(input.closable !== undefined
-                    ? { closable: input.closable }
-                    : {}),
-            };
-            const settings = resolveSiteSettingsPayload(
-                { announcement: announcementPatch },
-                current.settings,
-            );
-            const { updatedAt } = await upsertSiteSettings(settings);
-            invalidateSiteSettingsCache();
-            return ok({
-                announcement: settings.announcement,
-                updated_at: updatedAt,
-            });
-        }
-
-        return fail("方法不允许", 405);
+        return handleAdminBulletin(context);
     }
 
     if (
@@ -389,68 +526,11 @@ export async function handleAdminSettings(
         segments.length === 3 &&
         segments[2] === "preview"
     ) {
-        if (context.request.method !== "POST") {
-            return fail("方法不允许", 405);
-        }
-        const body = await parseJsonBody(context.request);
-        const input = validateBody(AdminAboutPreviewSchema, body);
-        const renderStart = performance.now();
-        const bodyHtml = await renderSettingsMarkdown(
-            input.body_markdown,
-            "about",
-            input.render_mode,
-        );
-        const renderDuration = performance.now() - renderStart;
-        return ok(
-            {
-                body_markdown: input.body_markdown,
-                body_html: bodyHtml,
-            },
-            {
-                headers:
-                    process.env.NODE_ENV === "production"
-                        ? undefined
-                        : {
-                              "Server-Timing": `md-render;dur=${renderDuration.toFixed(2)};desc="${input.render_mode}"`,
-                          },
-            },
-        );
+        return handleAdminAboutPreview(context);
     }
 
     if (segments[1] === "about" && segments.length === 2) {
-        if (context.request.method === "GET") {
-            const about = await readAboutArticleRow();
-            return ok({
-                about: about || {
-                    id: null,
-                    title: ABOUT_FALLBACK_TITLE,
-                    summary: "",
-                    body_markdown: "",
-                    updated_at: null,
-                },
-                updated_at: about?.updated_at || null,
-            });
-        }
-
-        if (context.request.method === "PATCH") {
-            const body = await parseJsonBody(context.request);
-            const input = validateBody(AdminAboutUpdateSchema, body);
-            const about = await upsertAboutArticle(required.access.user.id, {
-                title: input.title,
-                summary: input.summary,
-                body_markdown: input.body_markdown,
-            });
-            void cacheManager.invalidateByDomain("article-list");
-            void cacheManager.invalidateByDomain("article-public");
-            void cacheManager.invalidate("article-detail", ABOUT_ARTICLE_SLUG);
-            void cacheManager.invalidate("article-detail", about.id);
-            return ok({
-                about,
-                updated_at: about.updated_at,
-            });
-        }
-
-        return fail("方法不允许", 405);
+        return handleAdminAbout(context, required.access.user.id);
     }
 
     return fail("未找到接口", 404);

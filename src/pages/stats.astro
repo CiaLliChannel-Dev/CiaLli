@@ -13,7 +13,7 @@ import { getRunningDays } from "@utils/running-days";
 
 export const prerender = false;
 
-const title = i18n(I18nKey.siteStats);
+const title = i18n(I18nKey.coreSiteStats);
 const resolvedSiteSettings =
   Astro.locals.siteSettings ?? (await getResolvedSiteSettings());
 
@@ -53,22 +53,22 @@ function formatNumber(num: number): string {
 const stats = [
   {
     icon: "material-symbols:article-outline",
-    label: i18n(I18nKey.siteStatsPostCount),
+    label: i18n(I18nKey.coreSiteStatsPostCount),
     value: posts.length,
   },
   {
     icon: "material-symbols:folder-outline",
-    label: i18n(I18nKey.siteStatsCategoryCount),
+    label: i18n(I18nKey.coreSiteStatsCategoryCount),
     value: categories.length,
   },
   {
     icon: "material-symbols:label-outline",
-    label: i18n(I18nKey.siteStatsTagCount),
+    label: i18n(I18nKey.coreSiteStatsTagCount),
     value: tags.length,
   },
   {
     icon: "material-symbols:text-ad-outline-rounded",
-    label: i18n(I18nKey.siteStatsTotalWords),
+    label: i18n(I18nKey.coreSiteStatsTotalWords),
     value: totalWords,
     formatted: true,
   },
@@ -107,14 +107,16 @@ const stats = [
               </div>
               <div class="hero-body">
                 <span class="hero-label"
-                  >{i18n(I18nKey.siteStatsRunningDays)}</span
+                  >{i18n(I18nKey.coreSiteStatsRunningDays)}</span
                 >
                 <div class="hero-metric">
                   <span class="hero-value" data-stat-id="running-days"
                     >{runningDays}</span
                   >
                   <span class="hero-unit"
-                    >{i18n(I18nKey.siteStatsDays).replace("{days}", "")}</span
+                    >{
+                      i18n(I18nKey.coreSiteStatsDays).replace("{days}", "")
+                    }</span
                   >
                 </div>
               </div>

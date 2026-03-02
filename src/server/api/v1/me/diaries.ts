@@ -17,6 +17,7 @@ import {
     CreateDiaryImageSchema,
     CreateDiarySchema,
     DiaryPreviewSchema,
+    type UpdateDiaryImageInput,
     UpdateDiaryImageSchema,
     UpdateDiarySchema,
 } from "@/server/api/schemas";
@@ -111,84 +112,183 @@ async function resolveOwnedDiary(
     };
 }
 
+// ── handleMeDiaries 辅助函数 ──────────────────────────────────────────────────
+
+async function handleDiaryPreview(
+    context: APIContext,
+    access: AppAccess,
+): Promise<Response> {
+    if (context.request.method !== "POST") {
+        return fail("方法不允许", 405);
+    }
+    assertCan(access, "can_manage_diaries");
+    const body = await parseJsonBody(context.request);
+    const input = validateBody(DiaryPreviewSchema, body);
+    const renderStart = performance.now();
+    const bodyHtml = await renderMeMarkdownPreview(
+        input.content,
+        input.render_mode,
+    );
+    const renderDuration = performance.now() - renderStart;
+    return ok(
+        {
+            content: input.content,
+            body_html: bodyHtml,
+        },
+        {
+            headers:
+                process.env.NODE_ENV === "production"
+                    ? undefined
+                    : {
+                          "Server-Timing": `md-render;dur=${renderDuration.toFixed(2)};desc="${input.render_mode}"`,
+                      },
+        },
+    );
+}
+
+async function handleDiaryListGet(
+    context: APIContext,
+    access: AppAccess,
+): Promise<Response> {
+    const { page, limit, offset } = parsePagination(context.url);
+    const rows = await readMany("app_diaries", {
+        filter: {
+            author_id: { _eq: access.user.id },
+        } as JsonObject,
+        fields: [...DIARY_FIELDS],
+        sort: ["-date_created"],
+        limit,
+        offset,
+    });
+    return ok({
+        items: rows,
+        page,
+        limit,
+        total: rows.length,
+    });
+}
+
+async function handleDiaryCreate(
+    context: APIContext,
+    access: AppAccess,
+): Promise<Response> {
+    assertCan(access, "can_manage_diaries");
+    const body = await parseJsonBody(context.request);
+    const input = validateBody(CreateDiarySchema, body);
+
+    const diaryPayload = {
+        status: "published" as const,
+        author_id: access.user.id,
+        content: input.content,
+        allow_comments: input.allow_comments,
+        praviate: input.praviate,
+    };
+
+    const created = await createWithShortId(
+        "app_diaries",
+        diaryPayload,
+        (collection, payload) =>
+            createOne(collection, payload, {
+                fields: [...DIARY_FIELDS],
+            }),
+    );
+    void cacheManager.invalidateByDomain("diary-list");
+    void cacheManager.invalidateByDomain("home-feed");
+    return ok({ item: created });
+}
+
+async function handleDiaryGet(
+    diaryId: string,
+    target: OwnedDiaryRecord,
+): Promise<Response> {
+    const images = await readMany("app_diary_images", {
+        filter: {
+            diary_id: { _eq: diaryId },
+        } as JsonObject,
+        sort: ["sort", "-date_created"],
+        limit: 100,
+    });
+    return ok({ item: target, images });
+}
+
+async function handleDiaryPatch(
+    context: APIContext,
+    diaryId: string,
+): Promise<Response> {
+    const body = await parseJsonBody(context.request);
+    const input = validateBody(UpdateDiarySchema, body);
+    const payload: JsonObject = {};
+    if (input.content !== undefined) {
+        payload.content = input.content;
+    }
+    if (input.allow_comments !== undefined) {
+        payload.allow_comments = input.allow_comments;
+    }
+    if (input.praviate !== undefined) {
+        payload.praviate = input.praviate;
+    }
+    payload.status = "published";
+    const updated = await updateOne("app_diaries", diaryId, payload, {
+        fields: [...DIARY_FIELDS],
+    });
+    void cacheManager.invalidateByDomain("diary-list");
+    void cacheManager.invalidateByDomain("home-feed");
+    invalidateDiaryDetailCache(diaryId, updated.short_id);
+    return ok({ item: updated });
+}
+
+async function handleDiaryDelete(
+    diaryId: string,
+    target: OwnedDiaryRecord,
+): Promise<Response> {
+    const fileIds = await collectDiaryFileIds(diaryId);
+    await deleteOne("app_diaries", diaryId);
+    await cleanupOrphanDirectusFiles(fileIds);
+    void cacheManager.invalidateByDomain("diary-list");
+    void cacheManager.invalidateByDomain("home-feed");
+    invalidateDiaryDetailCache(diaryId, target.short_id);
+    return ok({ id: diaryId });
+}
+
+async function handleSingleDiary(
+    context: APIContext,
+    access: AppAccess,
+    identifier: string,
+): Promise<Response> {
+    const target = await resolveOwnedDiary(identifier, access.user.id);
+    if (!target) {
+        return fail("日记不存在", 404);
+    }
+    assertOwnerOrAdmin(access, target.author_id);
+    const diaryId = String(target.id);
+
+    if (context.request.method === "GET") {
+        return handleDiaryGet(diaryId, target);
+    }
+    if (context.request.method === "PATCH") {
+        return handleDiaryPatch(context, diaryId);
+    }
+    if (context.request.method === "DELETE") {
+        return handleDiaryDelete(diaryId, target);
+    }
+    return fail("未找到接口", 404);
+}
+
 export async function handleMeDiaries(
     context: APIContext,
     access: AppAccess,
     segments: string[],
 ): Promise<Response> {
     if (segments.length === 2 && segments[1] === "preview") {
-        if (context.request.method !== "POST") {
-            return fail("方法不允许", 405);
-        }
-        assertCan(access, "can_manage_diaries");
-        const body = await parseJsonBody(context.request);
-        const input = validateBody(DiaryPreviewSchema, body);
-        const renderStart = performance.now();
-        const bodyHtml = await renderMeMarkdownPreview(
-            input.content,
-            input.render_mode,
-        );
-        const renderDuration = performance.now() - renderStart;
-        return ok(
-            {
-                content: input.content,
-                body_html: bodyHtml,
-            },
-            {
-                headers:
-                    process.env.NODE_ENV === "production"
-                        ? undefined
-                        : {
-                              "Server-Timing": `md-render;dur=${renderDuration.toFixed(2)};desc="${input.render_mode}"`,
-                          },
-            },
-        );
+        return handleDiaryPreview(context, access);
     }
 
     if (segments.length === 1) {
         if (context.request.method === "GET") {
-            const { page, limit, offset } = parsePagination(context.url);
-            const rows = await readMany("app_diaries", {
-                filter: {
-                    author_id: { _eq: access.user.id },
-                } as JsonObject,
-                fields: [...DIARY_FIELDS],
-                sort: ["-date_created"],
-                limit,
-                offset,
-            });
-            return ok({
-                items: rows,
-                page,
-                limit,
-                total: rows.length,
-            });
+            return handleDiaryListGet(context, access);
         }
-
         if (context.request.method === "POST") {
-            assertCan(access, "can_manage_diaries");
-            const body = await parseJsonBody(context.request);
-            const input = validateBody(CreateDiarySchema, body);
-
-            const diaryPayload = {
-                status: "published" as const,
-                author_id: access.user.id,
-                content: input.content,
-                allow_comments: input.allow_comments,
-                praviate: input.praviate,
-            };
-
-            const created = await createWithShortId(
-                "app_diaries",
-                diaryPayload,
-                (collection, payload) =>
-                    createOne(collection, payload, {
-                        fields: [...DIARY_FIELDS],
-                    }),
-            );
-            void cacheManager.invalidateByDomain("diary-list");
-            void cacheManager.invalidateByDomain("home-feed");
-            return ok({ item: created });
+            return handleDiaryCreate(context, access);
         }
     }
 
@@ -197,58 +297,170 @@ export async function handleMeDiaries(
         if (!identifier) {
             return fail("缺少日记 ID", 400);
         }
-        const target = await resolveOwnedDiary(identifier, access.user.id);
-        if (!target) {
-            return fail("日记不存在", 404);
-        }
-        assertOwnerOrAdmin(access, target.author_id);
-        const diaryId = String(target.id);
-
-        if (context.request.method === "GET") {
-            const images = await readMany("app_diary_images", {
-                filter: {
-                    diary_id: { _eq: diaryId },
-                } as JsonObject,
-                sort: ["sort", "-date_created"],
-                limit: 100,
-            });
-            return ok({ item: target, images });
-        }
-
-        if (context.request.method === "PATCH") {
-            const body = await parseJsonBody(context.request);
-            const input = validateBody(UpdateDiarySchema, body);
-            const payload: JsonObject = {};
-            if (input.content !== undefined) {
-                payload.content = input.content;
-            }
-            if (input.allow_comments !== undefined) {
-                payload.allow_comments = input.allow_comments;
-            }
-            if (input.praviate !== undefined) {
-                payload.praviate = input.praviate;
-            }
-            payload.status = "published";
-            const updated = await updateOne("app_diaries", diaryId, payload, {
-                fields: [...DIARY_FIELDS],
-            });
-            void cacheManager.invalidateByDomain("diary-list");
-            void cacheManager.invalidateByDomain("home-feed");
-            invalidateDiaryDetailCache(diaryId, updated.short_id);
-            return ok({ item: updated });
-        }
-
-        if (context.request.method === "DELETE") {
-            const fileIds = await collectDiaryFileIds(diaryId);
-            await deleteOne("app_diaries", diaryId);
-            await cleanupOrphanDirectusFiles(fileIds);
-            void cacheManager.invalidateByDomain("diary-list");
-            void cacheManager.invalidateByDomain("home-feed");
-            invalidateDiaryDetailCache(diaryId, target.short_id);
-            return ok({ id: diaryId });
-        }
+        return handleSingleDiary(context, access, identifier);
     }
 
+    return fail("未找到接口", 404);
+}
+
+// ── handleMeDiaryImages 辅助函数 ──────────────────────────────────────────────
+
+async function handleDiaryImageCreate(
+    context: APIContext,
+    access: AppAccess,
+    segments: string[],
+): Promise<Response> {
+    assertCan(access, "can_manage_diaries");
+    const diaryIdentifier = parseRouteId(segments[1]);
+    if (!diaryIdentifier) {
+        return fail("缺少日记 ID", 400);
+    }
+    const diary = await resolveOwnedDiary(diaryIdentifier, access.user.id);
+    if (!diary) {
+        return fail("日记不存在", 404);
+    }
+    assertOwnerOrAdmin(access, diary.author_id);
+    const diaryId = String(diary.id);
+    const body = await parseJsonBody(context.request);
+    const input = validateBody(CreateDiaryImageSchema, body);
+    const created = await createOne("app_diary_images", {
+        status: input.is_public ? "published" : "archived",
+        diary_id: diaryId,
+        file_id: input.file_id ?? null,
+        image_url: input.image_url ?? null,
+        caption: input.caption ?? null,
+        sort: input.sort ?? null,
+        is_public: input.is_public,
+        show_on_profile: input.show_on_profile,
+    });
+    if (created.file_id) {
+        await bindFileOwnerToUser(
+            created.file_id,
+            access.user.id,
+            buildDiaryFileTitle(diary.short_id, created.sort),
+        );
+    }
+    void cacheManager.invalidateByDomain("home-feed");
+    invalidateDiaryDetailCache(diaryId, diary.short_id);
+    return ok({ item: created });
+}
+
+async function buildDiaryImagePatchPayload(context: APIContext): Promise<{
+    payload: JsonObject;
+    input: UpdateDiaryImageInput;
+    body: JsonObject;
+    prevFileId: string | null;
+    nextFileId: string | null;
+}> {
+    const body = await parseJsonBody(context.request);
+    const input = validateBody(UpdateDiaryImageSchema, body);
+    const payload: JsonObject = {};
+    const prevFileId = normalizeDirectusFileId((body as JsonObject).file_id);
+    let nextFileId = prevFileId;
+    if (hasOwn(body as JsonObject, "file_id")) {
+        nextFileId = normalizeDirectusFileId(input.file_id);
+        payload.file_id = input.file_id ?? null;
+    }
+    if (input.image_url !== undefined) {
+        payload.image_url = input.image_url;
+    }
+    if (input.caption !== undefined) {
+        payload.caption = input.caption;
+    }
+    if (input.sort !== undefined) {
+        payload.sort = input.sort;
+    }
+    if (input.is_public !== undefined) {
+        payload.is_public = input.is_public;
+    }
+    if (input.show_on_profile !== undefined) {
+        payload.show_on_profile = input.show_on_profile;
+    }
+    if (input.status !== undefined) {
+        payload.status = input.status;
+    }
+    return { payload, input, body: body as JsonObject, prevFileId, nextFileId };
+}
+
+async function handleDiaryImagePatch(
+    context: APIContext,
+    access: AppAccess,
+    imageId: string,
+    image: JsonObject,
+    diary: JsonObject,
+): Promise<Response> {
+    const { payload, body, prevFileId, nextFileId } =
+        await buildDiaryImagePatchPayload(context);
+    const updated = await updateOne("app_diary_images", imageId, payload);
+    if (hasOwn(body, "file_id") && nextFileId) {
+        await bindFileOwnerToUser(
+            nextFileId,
+            access.user.id,
+            buildDiaryFileTitle(diary.short_id, updated.sort),
+        );
+    }
+    if (hasOwn(body, "file_id") && prevFileId && prevFileId !== nextFileId) {
+        await cleanupOrphanDirectusFiles([prevFileId]);
+    }
+    void cacheManager.invalidateByDomain("home-feed");
+    invalidateDiaryDetailCache(
+        String(image.diary_id ?? ""),
+        typeof diary.short_id === "string" ? diary.short_id : null,
+    );
+    return ok({ item: updated });
+}
+
+async function handleDiaryImageDelete(
+    imageId: string,
+    image: JsonObject,
+    diary: JsonObject,
+): Promise<Response> {
+    const fileId = normalizeDirectusFileId(image.file_id);
+    await deleteOne("app_diary_images", imageId);
+    if (fileId) {
+        await cleanupOrphanDirectusFiles([fileId]);
+    }
+    void cacheManager.invalidateByDomain("home-feed");
+    invalidateDiaryDetailCache(
+        String(image.diary_id ?? ""),
+        typeof diary.short_id === "string" ? diary.short_id : null,
+    );
+    return ok({ id: imageId });
+}
+
+async function handleSingleDiaryImage(
+    context: APIContext,
+    access: AppAccess,
+    imageId: string,
+): Promise<Response> {
+    const image = await readOneById("app_diary_images", imageId);
+    if (!image) {
+        return fail("图片不存在", 404);
+    }
+    const diary = await readOneById("app_diaries", image.diary_id, {
+        fields: [...DIARY_FIELDS],
+    });
+    if (!diary) {
+        return fail("日记不存在", 404);
+    }
+    assertOwnerOrAdmin(access, diary.author_id);
+
+    if (context.request.method === "PATCH") {
+        return handleDiaryImagePatch(
+            context,
+            access,
+            imageId,
+            image as JsonObject,
+            diary as JsonObject,
+        );
+    }
+    if (context.request.method === "DELETE") {
+        return handleDiaryImageDelete(
+            imageId,
+            image as JsonObject,
+            diary as JsonObject,
+        );
+    }
     return fail("未找到接口", 404);
 }
 
@@ -258,39 +470,7 @@ export async function handleMeDiaryImages(
     segments: string[],
 ): Promise<Response> {
     if (segments.length === 3 && context.request.method === "POST") {
-        assertCan(access, "can_manage_diaries");
-        const diaryIdentifier = parseRouteId(segments[1]);
-        if (!diaryIdentifier) {
-            return fail("缺少日记 ID", 400);
-        }
-        const diary = await resolveOwnedDiary(diaryIdentifier, access.user.id);
-        if (!diary) {
-            return fail("日记不存在", 404);
-        }
-        assertOwnerOrAdmin(access, diary.author_id);
-        const diaryId = String(diary.id);
-        const body = await parseJsonBody(context.request);
-        const input = validateBody(CreateDiaryImageSchema, body);
-        const created = await createOne("app_diary_images", {
-            status: input.is_public ? "published" : "archived",
-            diary_id: diaryId,
-            file_id: input.file_id ?? null,
-            image_url: input.image_url ?? null,
-            caption: input.caption ?? null,
-            sort: input.sort ?? null,
-            is_public: input.is_public,
-            show_on_profile: input.show_on_profile,
-        });
-        if (created.file_id) {
-            await bindFileOwnerToUser(
-                created.file_id,
-                access.user.id,
-                buildDiaryFileTitle(diary.short_id, created.sort),
-            );
-        }
-        void cacheManager.invalidateByDomain("home-feed");
-        invalidateDiaryDetailCache(diaryId, diary.short_id);
-        return ok({ item: created });
+        return handleDiaryImageCreate(context, access, segments);
     }
 
     if (segments.length === 4) {
@@ -298,80 +478,7 @@ export async function handleMeDiaryImages(
         if (!imageId) {
             return fail("缺少图片 ID", 400);
         }
-        const image = await readOneById("app_diary_images", imageId);
-        if (!image) {
-            return fail("图片不存在", 404);
-        }
-        const diary = await readOneById("app_diaries", image.diary_id, {
-            fields: [...DIARY_FIELDS],
-        });
-        if (!diary) {
-            return fail("日记不存在", 404);
-        }
-        assertOwnerOrAdmin(access, diary.author_id);
-
-        if (context.request.method === "PATCH") {
-            const body = await parseJsonBody(context.request);
-            const input = validateBody(UpdateDiaryImageSchema, body);
-            const payload: JsonObject = {};
-            const prevFileId = normalizeDirectusFileId(image.file_id);
-            let nextFileId = prevFileId;
-            if (hasOwn(body as JsonObject, "file_id")) {
-                nextFileId = normalizeDirectusFileId(input.file_id);
-                payload.file_id = input.file_id ?? null;
-            }
-            if (input.image_url !== undefined) {
-                payload.image_url = input.image_url;
-            }
-            if (input.caption !== undefined) {
-                payload.caption = input.caption;
-            }
-            if (input.sort !== undefined) {
-                payload.sort = input.sort;
-            }
-            if (input.is_public !== undefined) {
-                payload.is_public = input.is_public;
-            }
-            if (input.show_on_profile !== undefined) {
-                payload.show_on_profile = input.show_on_profile;
-            }
-            if (input.status !== undefined) {
-                payload.status = input.status;
-            }
-            const updated = await updateOne(
-                "app_diary_images",
-                imageId,
-                payload,
-            );
-            if (hasOwn(body as JsonObject, "file_id") && nextFileId) {
-                await bindFileOwnerToUser(
-                    nextFileId,
-                    access.user.id,
-                    buildDiaryFileTitle(diary.short_id, updated.sort),
-                );
-            }
-            if (
-                hasOwn(body as JsonObject, "file_id") &&
-                prevFileId &&
-                prevFileId !== nextFileId
-            ) {
-                await cleanupOrphanDirectusFiles([prevFileId]);
-            }
-            void cacheManager.invalidateByDomain("home-feed");
-            invalidateDiaryDetailCache(image.diary_id, diary.short_id);
-            return ok({ item: updated });
-        }
-
-        if (context.request.method === "DELETE") {
-            const fileId = normalizeDirectusFileId(image.file_id);
-            await deleteOne("app_diary_images", imageId);
-            if (fileId) {
-                await cleanupOrphanDirectusFiles([fileId]);
-            }
-            void cacheManager.invalidateByDomain("home-feed");
-            invalidateDiaryDetailCache(image.diary_id, diary.short_id);
-            return ok({ id: imageId });
-        }
+        return handleSingleDiaryImage(context, access, imageId);
     }
 
     return fail("未找到接口", 404);

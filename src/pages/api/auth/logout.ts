@@ -56,7 +56,7 @@ export async function POST(context: APIContext): Promise<Response> {
     const origin = request.headers.get("origin");
     if (origin && origin !== url.origin) {
         return json(
-            { ok: false, message: i18n(I18nKey.apiIllegalOrigin) },
+            { ok: false, message: i18n(I18nKey.interactionApiIllegalOrigin) },
             { status: 403 },
         );
     }

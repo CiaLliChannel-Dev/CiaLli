@@ -46,7 +46,7 @@ const postUrl = sourceLink || decodeURIComponent(Astro.url.toString());
     </div>
     <div>
       <div class="transition text-black/30 dark:text-white/30 text-sm">
-        {i18n(I18nKey.publishedAt)}
+        {i18n(I18nKey.articleEditoredAt)}
       </div>
       <div class="transition text-black/75 dark:text-white/75 line-clamp-2">
         {formatDateToYYYYMMDD(pubDate)}
@@ -54,7 +54,7 @@ const postUrl = sourceLink || decodeURIComponent(Astro.url.toString());
     </div>
     <div>
       <div class="transition text-black/30 dark:text-white/30 text-sm">
-        {i18n(I18nKey.license)}
+        {i18n(I18nKey.contentLicense)}
       </div>
       <a
         href={licenseName ? licenseUrl || undefined : licenseConf.url}

@@ -183,6 +183,175 @@ function ensurePendingRegistrationStatus(
     }
 }
 
+// ── handleAdminRegistrationRequests 辅助函数 ──────────────────────────────────
+
+async function handleRegistrationRequestsGet(
+    context: APIContext,
+): Promise<Response> {
+    const { page, limit, offset } = parsePagination(context.url);
+    const statusRaw = String(
+        context.url.searchParams.get("status") || "",
+    ).trim();
+
+    let statusFilter: RegistrationRequestStatus | null = null;
+    if (statusRaw && statusRaw !== "all") {
+        const normalized = normalizeRegistrationRequestStatus(
+            statusRaw,
+            "pending",
+        );
+        if (normalized !== statusRaw) {
+            throw badRequest("REGISTRATION_STATUS_INVALID", "申请状态参数无效");
+        }
+        statusFilter = normalized;
+    }
+
+    const filter = statusFilter
+        ? ({ request_status: { _eq: statusFilter } } as JsonObject)
+        : undefined;
+    const [items, total] = await Promise.all([
+        readMany("app_user_registration_requests", {
+            filter,
+            sort: ["-date_created"],
+            limit,
+            offset,
+            fields: [
+                "id",
+                "email",
+                "username",
+                "display_name",
+                "avatar_file",
+                "registration_reason",
+                "request_status",
+                "reviewed_by",
+                "reviewed_at",
+                "reject_reason",
+                "approved_user_id",
+                "status",
+                "sort",
+                "user_created",
+                "date_created",
+                "user_updated",
+                "date_updated",
+            ],
+        }),
+        countItems("app_user_registration_requests", filter),
+    ]);
+
+    return ok({ items, page, limit, total });
+}
+
+async function handleRegistrationApprove(
+    target: AppUserRegistrationRequest,
+    reviewedBy: string,
+    reviewedAt: string,
+): Promise<Response> {
+    const password = String(target.registration_password || "");
+    if (!password) {
+        throw badRequest(
+            "REGISTRATION_PASSWORD_MISSING",
+            "申请缺少密码，请让用户重新提交申请",
+        );
+    }
+
+    const created = await createManagedUser({
+        email: parseNormalizedEmail(target.email),
+        password,
+        requestedUsername: normalizeRequestedUsername(target.username),
+        displayName: validateDisplayName(target.display_name),
+        avatarFile: target.avatar_file,
+        appRole: "member",
+    });
+    const registrationAvatarFileId = normalizeDirectusFileId(
+        target.avatar_file,
+    );
+    if (registrationAvatarFileId) {
+        await updateDirectusFileMetadata(registrationAvatarFileId, {
+            uploaded_by: created.user.id,
+        });
+    }
+
+    const updated = await updateOne(
+        "app_user_registration_requests",
+        target.id,
+        {
+            request_status: "approved",
+            reviewed_by: reviewedBy,
+            reviewed_at: reviewedAt,
+            approved_user_id: created.user.id,
+            registration_password: null,
+            reject_reason: null,
+        },
+    );
+    return ok({
+        item: updated,
+        user: created.user,
+        profile: created.profile,
+        permissions: created.permissions,
+    });
+}
+
+async function handleRegistrationRejectOrCancel(
+    action: string,
+    target: AppUserRegistrationRequest,
+    reviewedBy: string,
+    reviewedAt: string,
+    body: JsonObject,
+): Promise<Response> {
+    const reason =
+        action === "reject"
+            ? parseOptionalRegistrationReason(body.reason)
+            : null;
+    const updated = await updateOne(
+        "app_user_registration_requests",
+        target.id,
+        {
+            request_status: action === "reject" ? "rejected" : "cancelled",
+            reviewed_by: reviewedBy,
+            reviewed_at: reviewedAt,
+            registration_password: null,
+            reject_reason: action === "reject" ? reason : null,
+        },
+    );
+    return ok({ item: updated });
+}
+
+async function handleRegistrationRequestPatch(
+    context: APIContext,
+    reviewedBy: string,
+    segments: string[],
+): Promise<Response> {
+    const requestId = parseRouteId(segments[1]);
+    if (!requestId) {
+        return fail("缺少申请 ID", 400);
+    }
+    const body = await parseJsonBody(context.request);
+    const action = parseBodyTextField(body, "action");
+    const target = await readRegistrationRequestById(requestId);
+    if (!target) {
+        throw notFound("REGISTRATION_NOT_FOUND", "申请不存在");
+    }
+    ensurePendingRegistrationStatus(
+        normalizeRegistrationRequestStatus(target.request_status, "pending"),
+    );
+
+    const reviewedAt = new Date().toISOString();
+
+    if (action === "approve") {
+        return handleRegistrationApprove(target, reviewedBy, reviewedAt);
+    }
+    if (action === "reject" || action === "cancel") {
+        return handleRegistrationRejectOrCancel(
+            action,
+            target,
+            reviewedBy,
+            reviewedAt,
+            body as JsonObject,
+        );
+    }
+
+    throw badRequest("REGISTRATION_ACTION_INVALID", "不支持的申请操作");
+}
+
 export async function handleAdminRegistrationRequests(
     context: APIContext,
     segments: string[],
@@ -193,154 +362,15 @@ export async function handleAdminRegistrationRequests(
     }
 
     if (segments.length === 1 && context.request.method === "GET") {
-        const { page, limit, offset } = parsePagination(context.url);
-        const statusRaw = String(
-            context.url.searchParams.get("status") || "",
-        ).trim();
-
-        let statusFilter: RegistrationRequestStatus | null = null;
-        if (statusRaw && statusRaw !== "all") {
-            const normalized = normalizeRegistrationRequestStatus(
-                statusRaw,
-                "pending",
-            );
-            if (normalized !== statusRaw) {
-                throw badRequest(
-                    "REGISTRATION_STATUS_INVALID",
-                    "申请状态参数无效",
-                );
-            }
-            statusFilter = normalized;
-        }
-
-        const filter = statusFilter
-            ? ({ request_status: { _eq: statusFilter } } as JsonObject)
-            : undefined;
-        const [items, total] = await Promise.all([
-            readMany("app_user_registration_requests", {
-                filter,
-                sort: ["-date_created"],
-                limit,
-                offset,
-                fields: [
-                    "id",
-                    "email",
-                    "username",
-                    "display_name",
-                    "avatar_file",
-                    "registration_reason",
-                    "request_status",
-                    "reviewed_by",
-                    "reviewed_at",
-                    "reject_reason",
-                    "approved_user_id",
-                    "status",
-                    "sort",
-                    "user_created",
-                    "date_created",
-                    "user_updated",
-                    "date_updated",
-                ],
-            }),
-            countItems("app_user_registration_requests", filter),
-        ]);
-
-        return ok({
-            items,
-            page,
-            limit,
-            total,
-        });
+        return handleRegistrationRequestsGet(context);
     }
 
     if (segments.length === 2 && context.request.method === "PATCH") {
-        const requestId = parseRouteId(segments[1]);
-        if (!requestId) {
-            return fail("缺少申请 ID", 400);
-        }
-        const body = await parseJsonBody(context.request);
-        const action = parseBodyTextField(body, "action");
-        const target = await readRegistrationRequestById(requestId);
-        if (!target) {
-            throw notFound("REGISTRATION_NOT_FOUND", "申请不存在");
-        }
-        ensurePendingRegistrationStatus(
-            normalizeRegistrationRequestStatus(
-                target.request_status,
-                "pending",
-            ),
+        return handleRegistrationRequestPatch(
+            context,
+            required.access.user.id,
+            segments,
         );
-
-        const reviewedBy = required.access.user.id;
-        const reviewedAt = new Date().toISOString();
-
-        if (action === "approve") {
-            const password = String(target.registration_password || "");
-            if (!password) {
-                throw badRequest(
-                    "REGISTRATION_PASSWORD_MISSING",
-                    "申请缺少密码，请让用户重新提交申请",
-                );
-            }
-
-            const created = await createManagedUser({
-                email: parseNormalizedEmail(target.email),
-                password,
-                requestedUsername: normalizeRequestedUsername(target.username),
-                displayName: validateDisplayName(target.display_name),
-                avatarFile: target.avatar_file,
-                appRole: "member",
-            });
-            const registrationAvatarFileId = normalizeDirectusFileId(
-                target.avatar_file,
-            );
-            if (registrationAvatarFileId) {
-                await updateDirectusFileMetadata(registrationAvatarFileId, {
-                    uploaded_by: created.user.id,
-                });
-            }
-
-            const updated = await updateOne(
-                "app_user_registration_requests",
-                target.id,
-                {
-                    request_status: "approved",
-                    reviewed_by: reviewedBy,
-                    reviewed_at: reviewedAt,
-                    approved_user_id: created.user.id,
-                    registration_password: null,
-                    reject_reason: null,
-                },
-            );
-            return ok({
-                item: updated,
-                user: created.user,
-                profile: created.profile,
-                permissions: created.permissions,
-            });
-        }
-
-        if (action === "reject" || action === "cancel") {
-            const reason =
-                action === "reject"
-                    ? parseOptionalRegistrationReason(body.reason)
-                    : null;
-            const updated = await updateOne(
-                "app_user_registration_requests",
-                target.id,
-                {
-                    request_status:
-                        action === "reject" ? "rejected" : "cancelled",
-                    reviewed_by: reviewedBy,
-                    reviewed_at: reviewedAt,
-                    registration_password: null,
-                    reject_reason: action === "reject" ? reason : null,
-                },
-            );
-            return ok({ item: updated });
-        }
-
-        throw badRequest("REGISTRATION_ACTION_INVALID", "不支持的申请操作");
     }
 
     return fail("未找到接口", 404);

@@ -177,17 +177,17 @@ const diaryMetaText = formatDiaryMetaDate(diary?.date_created);
 ---
 
 <MainGridLayout
-  title={i18n(I18nKey.diaryDetailTitle)}
+  title={i18n(I18nKey.contentDiaryDetailTitle)}
   description={diary?.content || ""}
 >
   {
     !diary ? (
       <ContentNotVisible
         mode="not_found"
-        title={i18n(I18nKey.diaryNotFoundTitle)}
-        description={i18n(I18nKey.diaryNotFoundDescription)}
+        title={i18n(I18nKey.contentDiaryNotFoundTitle)}
+        description={i18n(I18nKey.contentDiaryNotFoundDescription)}
         backHref={`/${username}/diary`}
-        backLabel={i18n(I18nKey.diaryBackToList)}
+        backLabel={i18n(I18nKey.contentDiaryBackToList)}
       />
     ) : (
       <>
@@ -203,11 +203,11 @@ const diaryMetaText = formatDiaryMetaDate(diary?.date_created);
                   href={`/${username}/diary`}
                   class="inline-block text-sm text-(--primary) hover:underline mb-4"
                 >
-                  {i18n(I18nKey.diaryBackToList)}
+                  {i18n(I18nKey.contentDiaryBackToList)}
                 </a>
                 <header class="mb-4 space-y-2">
                   <h1 class="text-3xl font-bold text-90">
-                    {i18n(I18nKey.diaryDetailTitle)}
+                    {i18n(I18nKey.contentDiaryDetailTitle)}
                   </h1>
                   <div class="text-sm text-60 flex flex-wrap items-center gap-3">
                     {diary.date_created && diaryMetaText && (
@@ -332,7 +332,7 @@ const diaryMetaText = formatDiaryMetaDate(diary?.date_created);
               dockToBackTop={true}
               editHref={`/${username}/diary/${encodeURIComponent(diary.short_id || diary.id)}/edit`}
               deleteEndpoint={`/api/v1/me/diaries/${encodeURIComponent(diary.id)}`}
-              deleteConfirmMessage={i18n(I18nKey.diaryDeleteConfirm)}
+              deleteConfirmMessage={i18n(I18nKey.contentDiaryDeleteConfirm)}
               deleteSuccessHref={`/${username}/diary`}
             />
 

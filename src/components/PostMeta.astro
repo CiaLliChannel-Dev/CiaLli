@@ -87,7 +87,7 @@ const shouldLoadPageViews = !isHome && umamiEnabled && Boolean(id);
         class="link-lg transition text-50 text-sm font-medium
 							 hover:text-(--primary) dark:hover:text-(--primary) whitespace-nowrap"
       >
-        {category || i18n(I18nKey.uncategorized)}
+        {category || i18n(I18nKey.contentUncategorized)}
       </a>
     </div>
   </div>
@@ -98,7 +98,9 @@ const shouldLoadPageViews = !isHome && umamiEnabled && Boolean(id);
       <div class="flex items-center">
         <span class="text-50 text-sm font-medium">
           {words}{" "}
-          {words > 1 ? i18n(I18nKey.wordsCount) : i18n(I18nKey.wordCount)}
+          {words > 1
+            ? i18n(I18nKey.contentWordsCount)
+            : i18n(I18nKey.contentWordCount)}
         </span>
       </div>
     )
@@ -133,7 +135,7 @@ const shouldLoadPageViews = !isHome && umamiEnabled && Boolean(id);
             ))}
           {!(tags && tags.length > 0) && (
             <div class="transition text-50 text-sm font-medium">
-              {i18n(I18nKey.noTags)}
+              {i18n(I18nKey.contentNoTags)}
             </div>
           )}
         </div>

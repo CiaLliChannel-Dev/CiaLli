@@ -102,145 +102,163 @@ async function shouldClearRegistrationCookieOnLogin(
     }
 }
 
-export async function POST(context: APIContext): Promise<Response> {
-    const { request, cookies, url } = context;
-
-    const origin = request.headers.get("origin");
-    if (origin && origin !== url.origin) {
-        return json(
-            { ok: false, message: i18n(I18nKey.apiIllegalOrigin) },
-            { status: 403 },
-        );
-    }
-
-    const csrfDenied = assertCsrfToken(context);
-    if (csrfDenied) return csrfDenied;
-
-    const ip = resolveTrustedClientIp(request.headers);
-    let ipRate: Awaited<ReturnType<typeof applyRateLimit>>;
+async function applyRateLimitOrError(
+    key: string,
+): Promise<
+    | { ok: true; result: Awaited<ReturnType<typeof applyRateLimit>> }
+    | { ok: false; response: Response }
+> {
     try {
-        ipRate = await applyRateLimit(ip, "auth");
+        const result = await applyRateLimit(key, "auth");
+        return { ok: true, result };
     } catch (error) {
         if (
             error instanceof AppError &&
             error.message.includes("限流服务未配置")
         ) {
-            return json(
-                {
-                    ok: false,
-                    message: i18n(I18nKey.apiRateLimitServiceMissing),
-                },
-                { status: 500 },
-            );
+            return {
+                ok: false,
+                response: json(
+                    {
+                        ok: false,
+                        message: i18n(
+                            I18nKey.interactionApiRateLimitServiceMissing,
+                        ),
+                    },
+                    { status: 500 },
+                ),
+            };
         }
         console.error("[api/auth/login] rate limit failed:", error);
-        return json(
-            { ok: false, message: i18n(I18nKey.apiRateLimitCheckFailed) },
-            { status: 500 },
-        );
+        return {
+            ok: false,
+            response: json(
+                {
+                    ok: false,
+                    message: i18n(I18nKey.interactionApiRateLimitCheckFailed),
+                },
+                { status: 500 },
+            ),
+        };
     }
-    if (!ipRate.ok) {
-        return rateLimitResponse(ipRate);
-    }
+}
 
+function setLoginCookies(
+    context: APIContext,
+    tokens: { refreshToken: string; accessToken: string; expiresMs?: number },
+    remember: boolean,
+): void {
+    const { cookies, url } = context;
+    const sessionOnly = !remember;
+    cookies.set(
+        DIRECTUS_REFRESH_COOKIE_NAME,
+        tokens.refreshToken,
+        getCookieOptions({ requestUrl: url, sessionOnly }),
+    );
+    cookies.set(
+        DIRECTUS_ACCESS_COOKIE_NAME,
+        tokens.accessToken,
+        getCookieOptions({
+            requestUrl: url,
+            maxAge: resolveAccessTokenMaxAgeSeconds(tokens.expiresMs),
+            sessionOnly,
+        }),
+    );
+    cookies.set(
+        REMEMBER_COOKIE_NAME,
+        remember ? "1" : "0",
+        getRememberCookieOptions({ requestUrl: url, remember }),
+    );
+}
+
+async function fetchPublicUserInfo(
+    accessToken: string,
+    fallback: PublicUserInfo,
+): Promise<PublicUserInfo> {
+    try {
+        const me = await directusGetMe({ accessToken });
+        const picked = pickPublicUserInfo(me);
+        return {
+            id: picked.id || fallback.id,
+            email: picked.email || fallback.email,
+            name: picked.name || fallback.name,
+            avatarUrl: picked.avatarUrl || fallback.avatarUrl,
+        };
+    } catch {
+        // 若 /users/me 失败，不影响登录态写入，前台可再调用 /api/auth/me
+        return fallback;
+    }
+}
+
+function buildLoginErrorResponse(error: unknown): Response {
+    const status =
+        error instanceof DirectusAuthError && error.directusStatus === 401
+            ? 401
+            : 500;
+    return json(
+        {
+            ok: false,
+            message:
+                status === 401
+                    ? i18n(I18nKey.interactionApiAuthInvalidCredentials)
+                    : i18n(I18nKey.interactionApiAuthLoginFailed),
+        },
+        { status },
+    );
+}
+
+type LoginCredentials = {
+    email: string;
+    password: string;
+    remember: boolean;
+};
+
+async function parseLoginBody(
+    request: Request,
+): Promise<LoginCredentials | Response> {
     let body: JsonValue;
     try {
         body = (await request.json()) as JsonValue;
     } catch {
         return json(
-            { ok: false, message: i18n(I18nKey.apiInvalidJsonBody) },
+            { ok: false, message: i18n(I18nKey.interactionApiInvalidJsonBody) },
             { status: 400 },
         );
     }
-
     const bodyObject: JsonObject = isJsonObject(body) ? body : {};
     const email = (getJsonString(bodyObject, "email") ?? "").trim();
     const password = getJsonString(bodyObject, "password") ?? "";
     const remember = bodyObject.remember !== false;
-
     if (!email || !password) {
         return json(
-            { ok: false, message: i18n(I18nKey.apiAuthEmailPasswordRequired) },
+            {
+                ok: false,
+                message: i18n(I18nKey.interactionApiAuthEmailPasswordRequired),
+            },
             { status: 400 },
         );
     }
+    return { email, password, remember };
+}
 
-    // 登录限流采用 IP + 账号双维度，避免通过伪造来源 IP 绕过限制。
-    let emailRate: Awaited<ReturnType<typeof applyRateLimit>>;
-    try {
-        emailRate = await applyRateLimit(
-            normalizeRateLimitEmailKey(email),
-            "auth",
-        );
-    } catch (error) {
-        if (
-            error instanceof AppError &&
-            error.message.includes("限流服务未配置")
-        ) {
-            return json(
-                {
-                    ok: false,
-                    message: i18n(I18nKey.apiRateLimitServiceMissing),
-                },
-                { status: 500 },
-            );
-        }
-        console.error("[api/auth/login] account rate limit failed:", error);
-        return json(
-            { ok: false, message: i18n(I18nKey.apiRateLimitCheckFailed) },
-            { status: 500 },
-        );
-    }
-    if (!emailRate.ok) {
-        return rateLimitResponse(emailRate);
-    }
-
-    const sessionOnly = !remember;
-
+async function executeLogin(
+    context: APIContext,
+    credentials: LoginCredentials,
+    rateLimitRemaining: number,
+): Promise<Response> {
+    const { email, password, remember } = credentials;
     try {
         const tokens = await directusLogin({ email, password });
-        cookies.set(
-            DIRECTUS_REFRESH_COOKIE_NAME,
-            tokens.refreshToken,
-            getCookieOptions({
-                requestUrl: url,
-                sessionOnly,
-            }),
-        );
-        cookies.set(
-            DIRECTUS_ACCESS_COOKIE_NAME,
-            tokens.accessToken,
-            getCookieOptions({
-                requestUrl: url,
-                maxAge: resolveAccessTokenMaxAgeSeconds(tokens.expiresMs),
-                sessionOnly,
-            }),
-        );
-        cookies.set(
-            REMEMBER_COOKIE_NAME,
-            remember ? "1" : "0",
-            getRememberCookieOptions({ requestUrl: url, remember }),
-        );
+        setLoginCookies(context, tokens, remember);
         // 登录成功后轮换 CSRF token，避免沿用登录前 token。
         rotateCsrfCookie(context);
 
-        let user: PublicUserInfo = {
-            id: "",
-            email,
-            name: email,
-        };
-        try {
-            const me = await directusGetMe({ accessToken: tokens.accessToken });
-            const picked = pickPublicUserInfo(me);
-            user = {
-                id: picked.id || user.id,
-                email: picked.email || user.email,
-                name: picked.name || user.name,
-                avatarUrl: picked.avatarUrl || user.avatarUrl,
-            };
-        } catch {
-            // 若 /users/me 失败，不影响登录态写入，前台可再调用 /api/auth/me
-        }
+        const fallbackUser: PublicUserInfo = { id: "", email, name: email };
+        const user = await fetchPublicUserInfo(
+            tokens.accessToken,
+            fallbackUser,
+        );
+
         if (await shouldClearRegistrationCookieOnLogin(context, user.id)) {
             clearRegistrationRequestCookie(context);
         }
@@ -249,26 +267,49 @@ export async function POST(context: APIContext): Promise<Response> {
             { ok: true, user },
             {
                 headers: {
-                    "X-RateLimit-Remaining": String(
-                        Math.min(ipRate.remaining, emailRate.remaining),
-                    ),
+                    "X-RateLimit-Remaining": String(rateLimitRemaining),
                 },
             },
         );
     } catch (error) {
-        const status =
-            error instanceof DirectusAuthError && error.directusStatus === 401
-                ? 401
-                : 500;
+        return buildLoginErrorResponse(error);
+    }
+}
+
+export async function POST(context: APIContext): Promise<Response> {
+    const { request, url } = context;
+
+    const origin = request.headers.get("origin");
+    if (origin && origin !== url.origin) {
         return json(
-            {
-                ok: false,
-                message:
-                    status === 401
-                        ? i18n(I18nKey.apiAuthInvalidCredentials)
-                        : i18n(I18nKey.apiAuthLoginFailed),
-            },
-            { status },
+            { ok: false, message: i18n(I18nKey.interactionApiIllegalOrigin) },
+            { status: 403 },
         );
     }
+
+    const csrfDenied = assertCsrfToken(context);
+    if (csrfDenied) return csrfDenied;
+
+    const ip = resolveTrustedClientIp(request.headers);
+    const ipRateResult = await applyRateLimitOrError(ip);
+    if (!ipRateResult.ok) return ipRateResult.response;
+    const ipRate = ipRateResult.result;
+    if (!ipRate.ok) return rateLimitResponse(ipRate);
+
+    const parsed = await parseLoginBody(request);
+    if (parsed instanceof Response) return parsed;
+
+    // 登录限流采用 IP + 账号双维度，避免通过伪造来源 IP 绕过限制。
+    const emailRateResult = await applyRateLimitOrError(
+        normalizeRateLimitEmailKey(parsed.email),
+    );
+    if (!emailRateResult.ok) return emailRateResult.response;
+    const emailRate = emailRateResult.result;
+    if (!emailRate.ok) return rateLimitResponse(emailRate);
+
+    return executeLogin(
+        context,
+        parsed,
+        Math.min(ipRate.remaining, emailRate.remaining),
+    );
 }

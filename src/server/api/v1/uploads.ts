@@ -59,89 +59,141 @@ function resolvePurpose(raw: FormDataEntryValue | null): UploadPurpose {
     return "general";
 }
 
+type OwnerResolution = { ownerUserId: string | null } | { response: Response };
+
+async function resolveOwner(
+    context: APIContext,
+    purpose: UploadPurpose,
+): Promise<OwnerResolution> {
+    if (purpose !== "registration-avatar") {
+        const required = await requireAccess(context);
+        if ("response" in required) {
+            return required;
+        }
+        const access = required.access;
+        assertCan(access, "can_upload_files");
+        return { ownerUserId: access.user.id };
+    }
+
+    const ip = getClientIp(context.request.headers);
+    const rateResult = await applyRateLimit(ip, "upload");
+    if (!rateResult.ok) {
+        return { response: rateLimitResponse(rateResult) };
+    }
+    const sessionUser = await getSessionUser(context);
+    return { ownerUserId: sessionUser?.id || null };
+}
+
+type IcoConversionResult =
+    | { buffer: Buffer; fileName: string; mime: string }
+    | { response: Response };
+
+async function convertToIco(
+    inputBuffer: Buffer,
+    originalName: string,
+    maxSize: number,
+    label: string,
+): Promise<IcoConversionResult> {
+    try {
+        const converted = Buffer.from(await convertBufferToIco(inputBuffer));
+        const baseName = originalName.replace(/\.[^/.]+$/u, "") || "favicon";
+        if (converted.length > maxSize) {
+            return { response: fail(`站点图标过大，最大允许 ${label}`, 413) };
+        }
+        return {
+            buffer: converted,
+            fileName: `${baseName}.ico`,
+            mime: "image/x-icon",
+        };
+    } catch (error) {
+        console.error("[uploads] favicon ico conversion failed", error);
+        return { response: fail("站点图标转换失败", 400) };
+    }
+}
+
+type BufferProcessResult =
+    | { buffer: Buffer; fileName: string; mime: string }
+    | { response: Response };
+
+async function processUploadBuffer(
+    initialBuffer: Buffer,
+    file: File,
+    purpose: UploadPurpose,
+    targetFormat: string,
+): Promise<BufferProcessResult> {
+    const maxSize = UPLOAD_LIMITS[purpose];
+    const label = UPLOAD_LIMIT_LABELS[purpose];
+
+    const magic = validateFileMagicBytes(initialBuffer, purpose);
+    if (!magic.valid) {
+        return {
+            response: fail("不支持的文件类型", 400, "UNSUPPORTED_FILE_TYPE"),
+        };
+    }
+
+    const dims = await validateImageDimensions(initialBuffer, purpose);
+    if (!dims.valid) {
+        return {
+            response: fail(
+                dims.message || "图片尺寸过大",
+                400,
+                "IMAGE_TOO_LARGE",
+            ),
+        };
+    }
+
+    const sanitized = Buffer.from(
+        await sanitizeImage(initialBuffer, magic.detectedMime),
+    );
+
+    if (targetFormat === "ico") {
+        return convertToIco(sanitized, file.name, maxSize, label);
+    }
+
+    return { buffer: sanitized, fileName: file.name, mime: file.type };
+}
+
 export async function handleUploads(context: APIContext): Promise<Response> {
     if (context.request.method !== "POST") {
         return fail("方法不允许", 405);
     }
 
-    // 1. formData 解析 + purpose 解析
     const formData = await context.request.formData();
     const purpose = resolvePurpose(formData.get("purpose"));
-    let ownerUserId: string | null;
 
-    // 2. ACL 校验
-    if (purpose !== "registration-avatar") {
-        const required = await requireAccess(context);
-        if ("response" in required) {
-            return required.response;
-        }
-        const access = required.access;
-        assertCan(access, "can_upload_files");
-        ownerUserId = access.user.id;
-    } else {
-        const ip = getClientIp(context.request.headers);
-        const rateResult = await applyRateLimit(ip, "upload");
-        if (!rateResult.ok) {
-            return rateLimitResponse(rateResult);
-        }
-        const sessionUser = await getSessionUser(context);
-        ownerUserId = sessionUser?.id || null;
+    const ownerResolution = await resolveOwner(context, purpose);
+    if ("response" in ownerResolution) {
+        return ownerResolution.response;
     }
+    const { ownerUserId } = ownerResolution;
 
-    // 3. 文件存在性检查
     const file = formData.get("file");
     if (!(file instanceof File)) {
         return fail("缺少上传文件", 400);
     }
 
-    const targetFormatRaw = formData.get("target_format");
-    const targetFormat =
-        typeof targetFormatRaw === "string" ? targetFormatRaw : "";
-
-    // 4. 文件大小限制检查
     const maxSize = UPLOAD_LIMITS[purpose];
     const label = UPLOAD_LIMIT_LABELS[purpose];
     if (file.size > maxSize) {
         return fail(`文件过大，最大允许 ${label}`, 413);
     }
 
-    // 5. 读取 buffer
-    let buffer = Buffer.from(await file.arrayBuffer());
+    const targetFormatRaw = formData.get("target_format");
+    const targetFormat =
+        typeof targetFormatRaw === "string" ? targetFormatRaw : "";
 
-    // 6. 魔数校验
-    const magic = validateFileMagicBytes(buffer, purpose);
-    if (!magic.valid) {
-        return fail("不支持的文件类型", 400, "UNSUPPORTED_FILE_TYPE");
+    const rawBuffer = Buffer.from(await file.arrayBuffer());
+    const processed = await processUploadBuffer(
+        rawBuffer,
+        file,
+        purpose,
+        targetFormat,
+    );
+    if ("response" in processed) {
+        return processed.response;
     }
 
-    // 7. 图片尺寸校验
-    const dims = await validateImageDimensions(buffer, purpose);
-    if (!dims.valid) {
-        return fail(dims.message || "图片尺寸过大", 400, "IMAGE_TOO_LARGE");
-    }
-
-    // 8. EXIF/GPS 清理
-    buffer = Buffer.from(await sanitizeImage(buffer, magic.detectedMime));
-
-    // 9. ICO 转换
-    let uploadFileName = file.name;
-    let uploadMime = file.type;
-    if (targetFormat === "ico") {
-        try {
-            buffer = Buffer.from(await convertBufferToIco(buffer));
-            const baseName = file.name.replace(/\.[^/.]+$/u, "") || "favicon";
-            uploadFileName = `${baseName}.ico`;
-            uploadMime = "image/x-icon";
-        } catch (error) {
-            console.error("[uploads] favicon ico conversion failed", error);
-            return fail("站点图标转换失败", 400);
-        }
-        if (buffer.length > maxSize) {
-            return fail(`站点图标过大，最大允许 ${label}`, 413);
-        }
-    }
-
-    // 10. 重建 File 对象 → uploadDirectusFile
+    const { buffer, fileName: uploadFileName, mime: uploadMime } = processed;
     const uploadFile = new File([new Uint8Array(buffer)], uploadFileName, {
         type: uploadMime,
     });

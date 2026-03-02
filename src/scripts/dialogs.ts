@@ -75,104 +75,44 @@ function toOverlayField(field: FormDialogField): OverlayDialogField {
 
 export function showAuthRequiredDialog(message?: string): void {
     void showOverlayDialog({
-        ariaLabel: t(I18nKey.dialogAuthRequiredTitle),
-        message: message || t(I18nKey.dialogAuthRequiredMessage),
+        ariaLabel: t(I18nKey.interactionDialogAuthRequiredTitle),
+        message: message || t(I18nKey.interactionDialogAuthRequiredMessage),
         dismissKey: "cancel",
         actions: [
             {
                 key: "login",
-                label: t(I18nKey.dialogGoLogin),
+                label: t(I18nKey.interactionDialogGoLogin),
                 variant: "primary",
                 kind: "link",
                 href: buildLoginUrl(),
             },
             {
                 key: "cancel",
-                label: t(I18nKey.commonCancel),
+                label: t(I18nKey.interactionCommonCancel),
                 variant: "secondary",
             },
         ],
     });
 }
 
-export async function showConfirmDialog(
+async function showSimpleConfirmDialog(
     options: ConfirmDialogOptions,
 ): Promise<boolean> {
-    const manualConfirm = options.manualConfirm;
-    if (!manualConfirm) {
-        const result = await showOverlayDialog({
-            ariaLabel: options.ariaLabel || t(I18nKey.dialogConfirmTitle),
-            message: options.message,
-            dismissKey: "cancel",
-            actions: [
-                {
-                    key: "confirm",
-                    label: options.confirmText || t(I18nKey.commonConfirm),
-                    variant: options.confirmVariant || "primary",
-                },
-                {
-                    key: "cancel",
-                    label: options.cancelText || t(I18nKey.commonCancel),
-                    variant: "secondary",
-                },
-            ],
-        });
-        return result.actionKey === "confirm";
-    }
-
-    const expectedText = String(manualConfirm.expectedText || "").trim();
-    if (!expectedText) {
-        throw new Error("[dialogs] manualConfirm.expectedText cannot be empty");
-    }
-
     const result = await showOverlayDialog({
-        ariaLabel: options.ariaLabel || t(I18nKey.dialogConfirmTitle),
+        ariaLabel:
+            options.ariaLabel || t(I18nKey.interactionDialogConfirmTitle),
         message: options.message,
         dismissKey: "cancel",
-        fields: [
-            {
-                name: "manual_confirm_text",
-                label:
-                    manualConfirm.label || t(I18nKey.dialogManualConfirmLabel),
-                labelHighlightText: manualConfirm.label
-                    ? undefined
-                    : expectedText,
-                labelSuffix: manualConfirm.label
-                    ? undefined
-                    : t(I18nKey.dialogManualConfirmSuffix),
-                kind: "input",
-                required: true,
-                placeholder: manualConfirm.placeholder || expectedText,
-            },
-        ],
-        actionGuard: (actionKey, values) => {
-            if (actionKey !== "confirm") {
-                return null;
-            }
-            const inputText = String(values.manual_confirm_text || "").trim();
-            if (inputText === expectedText) {
-                return null;
-            }
-            return {
-                message:
-                    manualConfirm.mismatchMessage ||
-                    tFmt(
-                        I18nKey.dialogManualConfirmMismatch,
-                        { text: expectedText },
-                        `Input does not match. Please type "${expectedText}"`,
-                    ),
-                invalidFieldNames: ["manual_confirm_text"],
-            };
-        },
         actions: [
             {
                 key: "confirm",
-                label: options.confirmText || t(I18nKey.commonConfirm),
+                label:
+                    options.confirmText || t(I18nKey.interactionCommonConfirm),
                 variant: options.confirmVariant || "primary",
             },
             {
                 key: "cancel",
-                label: options.cancelText || t(I18nKey.commonCancel),
+                label: options.cancelText || t(I18nKey.interactionCommonCancel),
                 variant: "secondary",
             },
         ],
@@ -180,17 +120,108 @@ export async function showConfirmDialog(
     return result.actionKey === "confirm";
 }
 
+function buildManualConfirmActionGuard(
+    expectedText: string,
+    mismatchMessage: string | undefined,
+): (
+    actionKey: string,
+    values: Record<string, string>,
+) => { message: string; invalidFieldNames: string[] } | null {
+    return (actionKey, values) => {
+        if (actionKey !== "confirm") {
+            return null;
+        }
+        const inputText = String(values.manual_confirm_text || "").trim();
+        if (inputText === expectedText) {
+            return null;
+        }
+        return {
+            message:
+                mismatchMessage ||
+                tFmt(
+                    I18nKey.interactionDialogManualConfirmMismatch,
+                    { text: expectedText },
+                    `Input does not match. Please type "${expectedText}"`,
+                ),
+            invalidFieldNames: ["manual_confirm_text"],
+        };
+    };
+}
+
+async function showManualConfirmDialog(
+    options: ConfirmDialogOptions,
+    manualConfirm: NonNullable<ConfirmDialogOptions["manualConfirm"]>,
+): Promise<boolean> {
+    const expectedText = String(manualConfirm.expectedText || "").trim();
+    if (!expectedText) {
+        throw new Error("[dialogs] manualConfirm.expectedText cannot be empty");
+    }
+
+    const result = await showOverlayDialog({
+        ariaLabel:
+            options.ariaLabel || t(I18nKey.interactionDialogConfirmTitle),
+        message: options.message,
+        dismissKey: "cancel",
+        fields: [
+            {
+                name: "manual_confirm_text",
+                label:
+                    manualConfirm.label ||
+                    t(I18nKey.interactionDialogManualConfirmLabel),
+                labelHighlightText: manualConfirm.label
+                    ? undefined
+                    : expectedText,
+                labelSuffix: manualConfirm.label
+                    ? undefined
+                    : t(I18nKey.interactionDialogManualConfirmSuffix),
+                kind: "input",
+                required: true,
+                placeholder: manualConfirm.placeholder || expectedText,
+            },
+        ],
+        actionGuard: buildManualConfirmActionGuard(
+            expectedText,
+            manualConfirm.mismatchMessage,
+        ),
+        actions: [
+            {
+                key: "confirm",
+                label:
+                    options.confirmText || t(I18nKey.interactionCommonConfirm),
+                variant: options.confirmVariant || "primary",
+            },
+            {
+                key: "cancel",
+                label: options.cancelText || t(I18nKey.interactionCommonCancel),
+                variant: "secondary",
+            },
+        ],
+    });
+    return result.actionKey === "confirm";
+}
+
+export async function showConfirmDialog(
+    options: ConfirmDialogOptions,
+): Promise<boolean> {
+    if (!options.manualConfirm) {
+        return showSimpleConfirmDialog(options);
+    }
+    return showManualConfirmDialog(options, options.manualConfirm);
+}
+
 export async function showNoticeDialog(
     options: NoticeDialogOptions,
 ): Promise<void> {
     await showOverlayDialog({
-        ariaLabel: options.ariaLabel || t(I18nKey.dialogNoticeTitle),
+        ariaLabel: options.ariaLabel || t(I18nKey.interactionDialogNoticeTitle),
         message: options.message,
         dismissKey: "ok",
         actions: [
             {
                 key: "ok",
-                label: options.buttonText || t(I18nKey.dialogAcknowledge),
+                label:
+                    options.buttonText ||
+                    t(I18nKey.interactionDialogAcknowledge),
                 variant: "secondary",
             },
         ],
@@ -201,19 +232,20 @@ export async function showFormDialog(
     options: FormDialogOptions,
 ): Promise<Record<string, string> | null> {
     const result = await showOverlayDialog({
-        ariaLabel: options.ariaLabel || t(I18nKey.dialogFormTitle),
+        ariaLabel: options.ariaLabel || t(I18nKey.interactionDialogFormTitle),
         message: options.message,
         dismissKey: "cancel",
         fields: options.fields.map(toOverlayField),
         actions: [
             {
                 key: "confirm",
-                label: options.confirmText || t(I18nKey.commonConfirm),
+                label:
+                    options.confirmText || t(I18nKey.interactionCommonConfirm),
                 variant: options.confirmVariant || "primary",
             },
             {
                 key: "cancel",
-                label: options.cancelText || t(I18nKey.commonCancel),
+                label: options.cancelText || t(I18nKey.interactionCommonCancel),
                 variant: "secondary",
             },
         ],

@@ -67,15 +67,17 @@ if (!invalidPath) {
   {
     invalidPath ? (
       <div class="card-base p-8 rounded-(--radius-large)">
-        <h1 class="text-2xl font-bold mb-2">{i18n(I18nKey.notFoundTitle)}</h1>
-        <p class="text-70">{i18n(I18nKey.pageNotFoundPathCheck)}</p>
+        <h1 class="text-2xl font-bold mb-2">
+          {i18n(I18nKey.coreNotFoundTitle)}
+        </h1>
+        <p class="text-70">{i18n(I18nKey.contentPageNotFoundPathCheck)}</p>
       </div>
     ) : (
       <div class="home-layout">
         <div class="min-w-0">
           {homeFeedItems.length === 0 ? (
             <div class="card-base p-8 rounded-(--radius-large) text-70">
-              {i18n(I18nKey.pageNoPublicPosts)}
+              {i18n(I18nKey.contentPageNoPublicPosts)}
             </div>
           ) : (
             <HomeFeedPage items={homeFeedItems} maxAnimationIndex={15} />
@@ -87,7 +89,7 @@ if (!invalidPath) {
             id="scroll-loading"
             class="hidden text-center py-4 text-sm text-60"
           >
-            {i18n(I18nKey.commonLoading)}
+            {i18n(I18nKey.interactionCommonLoading)}
           </div>
         </div>
         {/* 右侧占位，与归档页筛选面板等宽 */}

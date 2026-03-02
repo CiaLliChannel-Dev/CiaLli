@@ -107,63 +107,131 @@ import { url } from "@utils/url-utils";
     });
   }
 
-  function setAuthState(state: AuthPayload | null) {
-    const userId = state?.user?.id ? String(state.user.id) : "";
-    const username = state?.user?.username ? String(state.user.username) : "";
-    const user = state?.user;
-    const isLoggedIn = Boolean(userId);
-    const isAdmin = Boolean(isLoggedIn && (state?.isAdmin || state?.is_admin));
-    const loginEl = document.getElementById("auth-login");
-    const userEl = document.getElementById("auth-user");
-    const userNameEl = document.getElementById("auth-user-name");
-    const avatarEl = document.getElementById(
-      "auth-user-avatar",
-    ) as HTMLImageElement | null;
-    const iconEl = document.getElementById("auth-user-icon");
-    const adminEl = document.getElementById("auth-admin");
-    if (!loginEl || !userEl || !userNameEl || !adminEl) {
-      publishAuthState(isLoggedIn, isAdmin, userId, username);
-      return;
-    }
-    loginEl.setAttribute("href", buildLoginUrl());
-
-    if (isLoggedIn && user) {
-      loginEl.classList.add("hidden");
-      userEl.classList.remove("hidden");
-      userEl.classList.add("flex");
-      userNameEl.textContent =
-        user.name || user.username || user.email || "Member";
-
-      if (avatarEl && iconEl && user.avatarUrl) {
-        avatarEl.src = user.avatarUrl;
-        avatarEl.classList.remove("hidden");
-        iconEl.classList.add("hidden");
-      } else if (avatarEl && iconEl) {
-        avatarEl.removeAttribute("src");
-        avatarEl.classList.add("hidden");
-        iconEl.classList.remove("hidden");
-      }
-
-      if (isAdmin) {
-        adminEl.classList.add("auth-admin-visible");
-      } else {
-        adminEl.classList.remove("auth-admin-visible");
-      }
-      publishAuthState(isLoggedIn, isAdmin, userId, username);
-      return;
-    }
-
-    userEl.classList.add("hidden");
-    userEl.classList.remove("flex");
-    loginEl.classList.remove("hidden");
-    userNameEl.textContent = "";
-
-    if (avatarEl && iconEl) {
+  function applyAvatarState(
+    avatarEl: HTMLImageElement | null,
+    iconEl: Element | null,
+    avatarUrl: string | undefined,
+  ): void {
+    if (!avatarEl || !iconEl) return;
+    if (avatarUrl) {
+      avatarEl.src = avatarUrl;
+      avatarEl.classList.remove("hidden");
+      iconEl.classList.add("hidden");
+    } else {
       avatarEl.removeAttribute("src");
       avatarEl.classList.add("hidden");
       iconEl.classList.remove("hidden");
     }
+  }
+
+  function applyLoggedInState(
+    loginEl: Element,
+    userEl: Element,
+    userNameEl: Element,
+    avatarEl: HTMLImageElement | null,
+    iconEl: Element | null,
+    adminEl: Element,
+    user: AuthPayload["user"],
+    isAdmin: boolean,
+  ): void {
+    loginEl.classList.add("hidden");
+    userEl.classList.remove("hidden");
+    userEl.classList.add("flex");
+    userNameEl.textContent =
+      user?.name || user?.username || user?.email || "Member";
+    applyAvatarState(avatarEl, iconEl, user?.avatarUrl);
+    if (isAdmin) {
+      adminEl.classList.add("auth-admin-visible");
+    } else {
+      adminEl.classList.remove("auth-admin-visible");
+    }
+  }
+
+  function applyLoggedOutState(
+    loginEl: Element,
+    userEl: Element,
+    userNameEl: Element,
+    avatarEl: HTMLImageElement | null,
+    iconEl: Element | null,
+    adminEl: Element,
+  ): void {
+    userEl.classList.add("hidden");
+    userEl.classList.remove("flex");
+    loginEl.classList.remove("hidden");
+    userNameEl.textContent = "";
+    applyAvatarState(avatarEl, iconEl, undefined);
     adminEl.classList.remove("auth-admin-visible");
+  }
+
+  type AuthElements = {
+    loginEl: HTMLElement;
+    userEl: HTMLElement;
+    userNameEl: HTMLElement;
+    avatarEl: HTMLImageElement | null;
+    iconEl: HTMLElement | null;
+    adminEl: HTMLElement;
+  };
+
+  function queryAuthElements(): AuthElements | null {
+    const loginEl = document.getElementById("auth-login");
+    const userEl = document.getElementById("auth-user");
+    const userNameEl = document.getElementById("auth-user-name");
+    const adminEl = document.getElementById("auth-admin");
+    if (!loginEl || !userEl || !userNameEl || !adminEl) return null;
+    const avatarEl = document.getElementById(
+      "auth-user-avatar",
+    ) as HTMLImageElement | null;
+    const iconEl = document.getElementById("auth-user-icon");
+    return { loginEl, userEl, userNameEl, avatarEl, iconEl, adminEl };
+  }
+
+  type AuthInfo = {
+    userId: string;
+    username: string;
+    isLoggedIn: boolean;
+    isAdmin: boolean;
+    user: AuthPayload["user"];
+  };
+
+  function extractAuthInfo(state: AuthPayload | null): AuthInfo {
+    const userId = state?.user?.id ? String(state.user.id) : "";
+    const username = state?.user?.username ? String(state.user.username) : "";
+    const user = state?.user;
+    const isLoggedIn = Boolean(userId);
+    const adminFlag = state?.isAdmin ?? state?.is_admin ?? false;
+    const isAdmin = Boolean(isLoggedIn && adminFlag);
+    return { userId, username, isLoggedIn, isAdmin, user };
+  }
+
+  function setAuthState(state: AuthPayload | null): void {
+    const info = extractAuthInfo(state);
+    const { userId, username, isLoggedIn, isAdmin, user } = info;
+
+    const els = queryAuthElements();
+    if (!els) {
+      publishAuthState(isLoggedIn, isAdmin, userId, username);
+      return;
+    }
+
+    const { loginEl, userEl, userNameEl, avatarEl, iconEl, adminEl } = els;
+    loginEl.setAttribute("href", buildLoginUrl());
+
+    if (isLoggedIn && user) {
+      applyLoggedInState(
+        loginEl,
+        userEl,
+        userNameEl,
+        avatarEl,
+        iconEl,
+        adminEl,
+        user,
+        isAdmin,
+      );
+      publishAuthState(isLoggedIn, isAdmin, userId, username);
+      return;
+    }
+
+    applyLoggedOutState(loginEl, userEl, userNameEl, avatarEl, iconEl, adminEl);
     publishAuthState(false, false, "", "");
   }
 

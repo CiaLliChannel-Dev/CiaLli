@@ -12,6 +12,7 @@ import type {
     BangumiCollectionStatus,
     BangumiListQuery,
     BangumiListResult,
+    BangumiSubject,
 } from "@/server/bangumi/types";
 
 const PAGE_SIZE = 50;
@@ -114,6 +115,33 @@ function pickGenres(record: BangumiCollectionRecord): string[] {
     return [...set];
 }
 
+function resolveSubjectId(
+    record: BangumiCollectionRecord,
+    subject: BangumiSubject,
+): number | null {
+    return toPositiveInt(record.subject_id) ?? toPositiveInt(subject.id);
+}
+
+function resolveSubjectTitle(subject: BangumiSubject): string | null {
+    const fallbackTitle = String(subject.name || "").trim();
+    const titleCn = String(subject.name_cn || "").trim();
+    return titleCn || fallbackTitle || null;
+}
+
+function resolveSubjectYear(subject: BangumiSubject): string | null {
+    const dateRaw = String(subject.date || "").trim();
+    return /^\d{4}/.test(dateRaw) ? dateRaw.slice(0, 4) : null;
+}
+
+function resolveRating(
+    record: BangumiCollectionRecord,
+    subject: BangumiSubject,
+): number | null {
+    const userRate = toPositiveInt(record.rate);
+    const score = toNumber(subject.score);
+    return userRate ?? (score && score > 0 ? score : null);
+}
+
 function mapBangumiRecord(
     record: BangumiCollectionRecord,
 ): BangumiCollectionItem | null {
@@ -122,24 +150,17 @@ function mapBangumiRecord(
         return null;
     }
 
-    const subjectId =
-        toPositiveInt(record.subject_id) ?? toPositiveInt(subject.id);
+    const subjectId = resolveSubjectId(record, subject);
     if (!subjectId) {
         return null;
     }
 
-    const fallbackTitle = String(subject.name || "").trim();
-    const titleCn = String(subject.name_cn || "").trim();
-    const title = titleCn || fallbackTitle;
+    const title = resolveSubjectTitle(subject);
     if (!title) {
         return null;
     }
 
-    const dateRaw = String(subject.date || "").trim();
-    const year = /^\d{4}/.test(dateRaw) ? dateRaw.slice(0, 4) : null;
-
-    const userRate = toPositiveInt(record.rate);
-    const score = toNumber(subject.score);
+    const titleCn = String(subject.name_cn || "").trim();
 
     return {
         id: `bgm-${subjectId}`,
@@ -147,10 +168,10 @@ function mapBangumiRecord(
         title,
         title_cn: titleCn || null,
         watch_status: pickStatus(record.type),
-        rating: userRate ?? (score && score > 0 ? score : null),
+        rating: resolveRating(record, subject),
         progress: toPositiveInt(record.ep_status),
         total_episodes: toPositiveInt(subject.eps),
-        year,
+        year: resolveSubjectYear(subject),
         studio: null,
         genres: pickGenres(record),
         description: String(subject.short_summary || "").trim() || null,

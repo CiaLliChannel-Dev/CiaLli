@@ -83,7 +83,7 @@ export function initAlbumNewPage(): void {
     const counterElement = document.getElementById("album-title-counter");
     const username = resolveUsername(form);
     const submitDefaultText =
-        submitBtn?.textContent || t(I18nKey.albumCreateSubmit);
+        submitBtn?.textContent || t(I18nKey.contentAlbumCreateSubmit);
 
     const updateCounter = (): void => {
         if (!titleInput || !counterElement) {
@@ -153,73 +153,104 @@ export function initAlbumNewPage(): void {
 
     titleInput?.addEventListener("input", updateCounter, { signal });
 
+    const resetSubmitBtn = (): void => {
+        submitBtn?.removeAttribute("disabled");
+        if (submitBtn) {
+            submitBtn.textContent = submitDefaultText;
+        }
+    };
+
+    const validateTitle = (): string | null => {
+        const title = titleInput?.value.trim() || "";
+        if (!title) {
+            showError(t(I18nKey.contentAlbumTitlePlaceholder));
+            return null;
+        }
+        if (wordLength(title) > ALBUM_TITLE_MAX) {
+            showError(`Title too long (max ${ALBUM_TITLE_MAX})`);
+            return null;
+        }
+        return title;
+    };
+
+    const fetchCreateAlbum = async (
+        title: string,
+    ): Promise<{ response: Response; data: AlbumCreateResponse }> => {
+        const response = await fetch("/api/v1/me/albums", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "x-csrf-token": getCsrfToken(),
+            },
+            body: JSON.stringify({ title, is_public: false }),
+        });
+        const data = (await response.json()) as AlbumCreateResponse;
+        return { response, data };
+    };
+
+    const handleCreateSuccess = (
+        overlayHandle: number | null,
+        data: AlbumCreateResponse,
+    ): void => {
+        updateOverlayTask(overlayHandle, {
+            text: t(I18nKey.interactionCommonProcessing),
+        });
+        const id = String(data.item?.id || "").trim();
+        const shortId = String(data.item?.short_id || "").trim();
+        const targetId = shortId || id;
+        const encodedUsername = encodeURIComponent(username);
+        navigateInternal(`/${encodedUsername}/albums/${targetId}?edit=1`);
+    };
+
+    const handleCreateResponse = (
+        overlayHandle: number | null,
+        response: Response,
+        data: AlbumCreateResponse,
+    ): boolean => {
+        const id = String(data.item?.id || "").trim();
+        const shortId = String(data.item?.short_id || "").trim();
+        const targetId = shortId || id;
+        if (!response.ok || !targetId) {
+            const message =
+                data.error?.message || t(I18nKey.interactionPostActionFailed);
+            showError(message);
+            resetSubmitBtn();
+            return false;
+        }
+        handleCreateSuccess(overlayHandle, data);
+        return true;
+    };
+
     form.addEventListener(
         "submit",
         async (event) => {
             event.preventDefault();
             errorElement?.classList.add("hidden");
 
-            const title = titleInput?.value.trim() || "";
+            const title = validateTitle();
             if (!title) {
-                showError(t(I18nKey.albumTitlePlaceholder));
-                return;
-            }
-            if (wordLength(title) > ALBUM_TITLE_MAX) {
-                showError(`Title too long (max ${ALBUM_TITLE_MAX})`);
                 return;
             }
 
             submitBtn?.setAttribute("disabled", "");
             if (submitBtn) {
-                submitBtn.textContent = t(I18nKey.commonCreateInProgress);
+                submitBtn.textContent = t(
+                    I18nKey.interactionCommonCreateInProgress,
+                );
             }
             const overlayHandle = startOverlayTask({
-                title: t(I18nKey.albumCreateTitle),
+                title: t(I18nKey.contentAlbumCreateTitle),
                 mode: "indeterminate",
-                text: t(I18nKey.commonSubmitting),
+                text: t(I18nKey.interactionCommonSubmitting),
             });
 
             try {
-                const response = await fetch("/api/v1/me/albums", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "x-csrf-token": getCsrfToken(),
-                    },
-                    body: JSON.stringify({ title, is_public: false }),
-                });
-
-                const data = (await response.json()) as AlbumCreateResponse;
-                const id = String(data.item?.id || "").trim();
-                const shortId = String(data.item?.short_id || "").trim();
-                const targetId = shortId || id;
-
-                if (!response.ok || !targetId) {
-                    const message =
-                        data.error?.message || t(I18nKey.postActionFailed);
-                    showError(message);
-                    submitBtn?.removeAttribute("disabled");
-                    if (submitBtn) {
-                        submitBtn.textContent = submitDefaultText;
-                    }
-                    return;
-                }
-
-                updateOverlayTask(overlayHandle, {
-                    text: t(I18nKey.commonProcessing),
-                });
-
-                const encodedUsername = encodeURIComponent(username);
-                navigateInternal(
-                    `/${encodedUsername}/albums/${targetId}?edit=1`,
-                );
+                const { response, data } = await fetchCreateAlbum(title);
+                handleCreateResponse(overlayHandle, response, data);
             } catch (error) {
                 console.error("[album-new] 创建相册失败:", error);
-                showError(t(I18nKey.postActionFailed));
-                submitBtn?.removeAttribute("disabled");
-                if (submitBtn) {
-                    submitBtn.textContent = submitDefaultText;
-                }
+                showError(t(I18nKey.interactionPostActionFailed));
+                resetSubmitBtn();
             } finally {
                 finishOverlayTask(overlayHandle);
             }

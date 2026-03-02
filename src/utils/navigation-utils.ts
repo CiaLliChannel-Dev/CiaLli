@@ -11,13 +11,68 @@ import { scrollToHashBelowTocBaseline } from "@/utils/hash-scroll";
  * @param url 目标页面URL
  * @param options 导航选项
  */
-export function navigateToPage(
-    url: unknown,
-    options?: {
-        replace?: boolean;
-        force?: boolean;
-    },
+type NavigateOptions = {
+    replace?: boolean;
+    force?: boolean;
+};
+
+function isExternalUrl(url: string): boolean {
+    return (
+        url.startsWith("http://") ||
+        url.startsWith("https://") ||
+        url.startsWith("//")
+    );
+}
+
+/**
+ * 处理站内同路径的 hash 导航，返回 true 表示已处理。
+ */
+function handleSamePageHashNavigation(url: string): boolean {
+    try {
+        const target = new URL(url, window.location.origin);
+        const current = new URL(window.location.href);
+        const isSameOrigin = target.origin === current.origin;
+        const isSamePathAndSearch =
+            target.pathname === current.pathname &&
+            target.search === current.search;
+
+        if (!isSameOrigin || !isSamePathAndSearch) {
+            return false;
+        }
+
+        if (target.hash && target.hash !== current.hash) {
+            history.pushState(null, "", target.hash);
+            scrollToHashBelowTocBaseline(target.hash, { behavior: "smooth" });
+            return true;
+        }
+
+        if (target.hash === current.hash) {
+            return true;
+        }
+    } catch {
+        // ignore invalid relative URL parsing and continue navigation fallback
+    }
+    return false;
+}
+
+/**
+ * 使用 Astro View Transitions API 进行站内导航。
+ */
+function navigateWithAstro(
+    url: string,
+    options: NavigateOptions | undefined,
 ): void {
+    try {
+        navigate(url, {
+            history: options?.replace ? "replace" : "push",
+        });
+    } catch (error) {
+        console.error("Astro navigation failed:", error);
+        fallbackNavigation(url, options);
+    }
+}
+
+export function navigateToPage(url: unknown, options?: NavigateOptions): void {
     // 检查 URL 是否有效
     if (typeof url !== "string" || !url) {
         console.warn("navigateToPage: Invalid URL provided");
@@ -25,11 +80,7 @@ export function navigateToPage(
     }
 
     // 如果是外部链接，直接跳转
-    if (
-        url.startsWith("http://") ||
-        url.startsWith("https://") ||
-        url.startsWith("//")
-    ) {
+    if (isExternalUrl(url)) {
         window.open(url, "_blank");
         return;
     }
@@ -41,34 +92,8 @@ export function navigateToPage(
     }
 
     // 站内同 URL 导航直接忽略，避免重复触发过渡与组件重挂载。
-    try {
-        const target = new URL(url, window.location.origin);
-        const current = new URL(window.location.href);
-        const isSameOrigin = target.origin === current.origin;
-        const isSamePathAndSearch =
-            target.pathname === current.pathname &&
-            target.search === current.search;
-
-        if (
-            isSameOrigin &&
-            isSamePathAndSearch &&
-            target.hash &&
-            target.hash !== current.hash
-        ) {
-            history.pushState(null, "", target.hash);
-            scrollToHashBelowTocBaseline(target.hash, { behavior: "smooth" });
-            return;
-        }
-
-        if (
-            isSameOrigin &&
-            isSamePathAndSearch &&
-            target.hash === current.hash
-        ) {
-            return;
-        }
-    } catch {
-        // ignore invalid relative URL parsing and continue navigation fallback
+    if (handleSamePageHashNavigation(url)) {
+        return;
     }
 
     // 强制整页跳转
@@ -78,26 +103,13 @@ export function navigateToPage(
     }
 
     // 使用 Astro View Transitions navigate() API
-    try {
-        navigate(url, {
-            history: options?.replace ? "replace" : "push",
-        });
-    } catch (error) {
-        console.error("Astro navigation failed:", error);
-        fallbackNavigation(url, options);
-    }
+    navigateWithAstro(url, options);
 }
 
 /**
  * 降级导航函数
  */
-function fallbackNavigation(
-    url: string,
-    options?: {
-        replace?: boolean;
-        force?: boolean;
-    },
-): void {
+function fallbackNavigation(url: string, options?: NavigateOptions): void {
     if (options?.replace) {
         window.location.replace(url);
     } else {

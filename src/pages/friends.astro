@@ -127,8 +127,8 @@ const allTags = collectAllTags(friendsList);
 ---
 
 <MainGridLayout
-  title={i18n(I18nKey.friends)}
-  description={i18n(I18nKey.friends)}
+  title={i18n(I18nKey.contentFriends)}
+  description={i18n(I18nKey.contentFriends)}
 >
   <!-- 只在友情链接页面加载脚本 -->
   <script is:inline>
@@ -157,10 +157,10 @@ const allTags = collectAllTags(friendsList);
                   before:w-1 before:h-8 before:rounded-md before:bg-(--primary)
                   before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
             >
-              {i18n(I18nKey.friends)}
+              {i18n(I18nKey.contentFriends)}
             </h1>
             <p class="text-lg text-black/60 dark:text-white/60">
-              {i18n(I18nKey.friendsSubtitle)}
+              {i18n(I18nKey.contentFriendsSubtitle)}
             </p>
           </div>
 
@@ -169,7 +169,7 @@ const allTags = collectAllTags(friendsList);
             <!-- 标签筛选 -->
             <div class="filter-container flex flex-wrap gap-2">
               <button class="filter-tag active" data-tag="all">
-                {i18n(I18nKey.friendsFilterAll)}
+                {i18n(I18nKey.contentFriendsFilterAll)}
               </button>
               {
                 allTags.map((tag) => (
@@ -282,7 +282,7 @@ const allTags = collectAllTags(friendsList);
                             d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
                           />
                         </svg>
-                        {i18n(I18nKey.friendsVisit)}
+                        {i18n(I18nKey.contentFriendsVisit)}
                       </a>
                       <button
                         class="copy-link-btn px-3 py-2 rounded-lg 
@@ -291,7 +291,7 @@ const allTags = collectAllTags(friendsList);
 											 active:scale-95 transition-all duration-200
 											 text-black/70 dark:text-white/70"
                         data-url={item.siteurl}
-                        title={i18n(I18nKey.friendsCopyLink)}
+                        title={i18n(I18nKey.contentFriendsCopyLink)}
                       >
                         <svg
                           class="w-4 h-4"
@@ -336,7 +336,7 @@ const allTags = collectAllTags(friendsList);
               ></path>
             </svg>
             <p class="text-black/50 dark:text-white/50 text-lg">
-              {i18n(I18nKey.friendsNoResults)}
+              {i18n(I18nKey.contentFriendsNoResults)}
             </p>
           </div>
 
@@ -347,7 +347,7 @@ const allTags = collectAllTags(friendsList);
 
           <!-- 隐藏元素用于传递 i18n 文本到全局脚本 -->
           <div id="friends-copy-success-text" style="display: none;">
-            {i18n(I18nKey.friendsCopySuccess)}
+            {i18n(I18nKey.contentFriendsCopySuccess)}
           </div>
         </div>
       </div>

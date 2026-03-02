@@ -98,7 +98,7 @@ export function getCategoryUrl(category: string | null): string {
         !category ||
         category.trim() === "" ||
         category.trim().toLowerCase() ===
-            i18n(I18nKey.uncategorized).toLowerCase()
+            i18n(I18nKey.contentUncategorized).toLowerCase()
     ) {
         return url("/posts?uncategorized=true");
     }

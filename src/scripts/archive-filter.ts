@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- 文件行数较长，按页面驱动与模块边界保留当前结构 */
 /**
  * 归档页筛选与分页逻辑。
  *
@@ -13,6 +14,13 @@ import {
     normalizeAuthorHandle,
     normalizeTagList,
 } from "@/scripts/filter-shared";
+
+import {
+    buildPageNumbers,
+    POSTS_PER_PAGE,
+} from "@/scripts/archive-filter-helpers";
+
+// ---- 类型定义 ----
 
 type CalendarFilterState = {
     type: "day" | "month" | "year";
@@ -32,147 +40,137 @@ type ArchiveRuntimeWindow = Window &
         __archiveFilterCleanup?: () => void;
     };
 
-const POSTS_PER_PAGE = 5;
+export type { CalendarFilterState, FilterState, ArchiveRuntimeWindow };
 
-export function initArchiveFilter(): void {
-    // 清除上一次实例的事件监听
-    const rw = window as ArchiveRuntimeWindow;
-    rw.__archiveFilterCleanup?.();
+// ---- 顶层纯辅助函数 ----
 
-    // 确认当前页面确实是 archive 页
-    const archiveRoot = document.querySelector<HTMLElement>(".archive-posts");
-    if (!archiveRoot) {
+function parseItemTags(item: HTMLElement): string[] {
+    try {
+        const parsed = JSON.parse(item.dataset.tags || "[]") as unknown;
+        return Array.isArray(parsed) ? parsed.map((t) => String(t)) : [];
+    } catch {
+        return [];
+    }
+}
+
+function toggleBtnDisabled(id: string, disabled: boolean): void {
+    const btn = document.getElementById(id);
+    if (!btn) {
         return;
     }
+    btn.classList.toggle("disabled", disabled);
+    if (disabled) {
+        btn.setAttribute("aria-disabled", "true");
+    } else {
+        btn.removeAttribute("aria-disabled");
+    }
+}
 
-    let currentPage = 1;
-    let currentFilter: FilterState = {
+function updatePaginationUI(page: number, totalPages: number): void {
+    const container = document.getElementById("archive-pagination");
+    if (!container) {
+        return;
+    }
+    container.classList.toggle("hidden", totalPages <= 1);
+    if (totalPages <= 1) {
+        return;
+    }
+    const pages = buildPageNumbers(page, totalPages);
+    const numbersEl = document.getElementById("page-numbers");
+    if (numbersEl) {
+        numbersEl.innerHTML = pages
+            .map((p) =>
+                p === -1
+                    ? '<span class="px-1 text-50">...</span>'
+                    : p === page
+                      ? `<span class="page-num active">${p}</span>`
+                      : `<button class="page-num" data-page="${p}">${p}</button>`,
+            )
+            .join("");
+    }
+    toggleBtnDisabled("page-prev", page <= 1);
+    toggleBtnDisabled("page-next", page >= totalPages);
+}
+
+function hasActiveFilters(filter: FilterState): boolean {
+    return (
+        normalizeTagList(filter.tags).length > 0 ||
+        filter.category !== null ||
+        filter.author !== null ||
+        filter.calendar !== null
+    );
+}
+
+// ---- ArchiveFilterCore：封装状态与业务逻辑 ----
+
+class ArchiveFilterCore {
+    private currentPage = 1;
+    private currentFilter: FilterState = {
         tags: [],
         category: null,
         author: null,
         calendar: null,
     };
+    private readonly uncategorizedLabel: string;
+    private readonly originalOrder = new Map<HTMLElement, number>();
 
-    const UNCATEGORIZED_LABEL = archiveRoot.dataset.uncategorizedLabel || "";
+    constructor(uncategorizedLabel: string) {
+        this.uncategorizedLabel = uncategorizedLabel;
+    }
 
-    function isUncategorizedValue(value: string): boolean {
+    getFilter(): FilterState {
+        return this.currentFilter;
+    }
+    getPage(): number {
+        return this.currentPage;
+    }
+    setFilter(f: FilterState): void {
+        this.currentFilter = f;
+    }
+    setPage(p: number): void {
+        this.currentPage = p;
+    }
+
+    isUncategorizedValue(value: string): boolean {
         return (
             value === "uncategorized" ||
-            (UNCATEGORIZED_LABEL !== "" &&
-                value.toLowerCase() === UNCATEGORIZED_LABEL.toLowerCase())
+            (this.uncategorizedLabel !== "" &&
+                value.toLowerCase() === this.uncategorizedLabel.toLowerCase())
         );
     }
 
-    // 每次重新获取 DOM，避免页面切换后引用过期
-    function getPostList() {
-        return document.getElementById("post-list-container");
-    }
-    function getNoResults() {
-        return document.getElementById("archive-no-results");
-    }
-
-    const originalOrder = new Map<HTMLElement, number>();
-
-    function getFilterElements() {
-        return {
-            filterStatus: document.getElementById("filter-status"),
-            filterLabel: document.getElementById("filter-status-label"),
-            filterClearBtn: document.getElementById("filter-clear-btn"),
-        };
-    }
-
-    function getAllPostItems(): HTMLElement[] {
-        const postList = getPostList();
+    getAllPostItems(): HTMLElement[] {
+        const postList = document.getElementById("post-list-container");
         if (!postList) {
             return [];
         }
         const allItems = Array.from(
             postList.querySelectorAll<HTMLElement>(".post-list-item"),
         );
-        if (originalOrder.size === 0) {
-            allItems.forEach((item, index) => {
-                originalOrder.set(item, index);
-            });
+        if (this.originalOrder.size === 0) {
+            allItems.forEach((item, index) =>
+                this.originalOrder.set(item, index),
+            );
         }
         return allItems;
     }
 
-    function getSelectedTags(filter: FilterState): string[] {
-        return normalizeTagList(filter.tags);
-    }
-
-    function readItemAuthorHandleRaw(item: HTMLElement): string {
+    readItemAuthorHandleRaw(item: HTMLElement): string {
         const selfHandle = cleanAuthorHandle(item.dataset.authorHandle || "");
         if (selfHandle) {
             return selfHandle;
         }
-
         const postCard = item.querySelector<HTMLElement>("[data-post-card]");
         return cleanAuthorHandle(postCard?.dataset.authorHandle || "");
     }
 
-    function readItemAuthorHandle(item: HTMLElement): string {
-        return normalizeAuthorHandle(readItemAuthorHandleRaw(item));
+    readItemAuthorHandle(item: HTMLElement): string {
+        return normalizeAuthorHandle(this.readItemAuthorHandleRaw(item));
     }
 
-    function resolveAuthorDisplayByNormalized(normalized: string): string {
-        if (!normalized) {
-            return "";
-        }
-        // 展示始终使用卡片上的原始作者名（保留大小写）
-        const matched = getAllPostItems().find(
-            (item) => readItemAuthorHandle(item) === normalized,
-        );
-        if (!matched) {
-            return "";
-        }
-        return readItemAuthorHandleRaw(matched);
-    }
-
-    function resolveAuthorDisplay(filter: FilterState): string {
-        if (!filter.author) {
-            return "";
-        }
-
-        const normalized = normalizeAuthorHandle(filter.author);
-        return resolveAuthorDisplayByNormalized(normalized) || filter.author;
-    }
-
-    function hasActiveFilters(filter: FilterState): boolean {
-        return (
-            getSelectedTags(filter).length > 0 ||
-            filter.category !== null ||
-            filter.author !== null ||
-            filter.calendar !== null
-        );
-    }
-
-    function parseItemTags(item: HTMLElement): string[] {
-        try {
-            const parsed = JSON.parse(item.dataset.tags || "[]") as unknown;
-            return Array.isArray(parsed)
-                ? parsed.map((tag) => String(tag))
-                : [];
-        } catch (error) {
-            console.warn("[archive] failed to parse item tags:", error);
-            return [];
-        }
-    }
-
-    function getTagMatchCount(item: HTMLElement, tags: string[]): number {
-        if (tags.length === 0) {
-            return 0;
-        }
-        const itemTags = parseItemTags(item);
-        return tags.reduce(
-            (count, tag) => (itemTags.includes(tag) ? count + 1 : count),
-            0,
-        );
-    }
-
-    function getMatchingItems(filter: FilterState): HTMLElement[] {
-        const allItems = getAllPostItems();
-        const selectedTags = getSelectedTags(filter);
+    getMatchingItems(filter: FilterState): HTMLElement[] {
+        const allItems = this.getAllPostItems();
+        const selectedTags = normalizeTagList(filter.tags);
         const hasTagFilter = selectedTags.length > 0;
         const hasCategoryFilter = filter.category !== null;
         const hasAuthorFilter = filter.author !== null;
@@ -192,36 +190,33 @@ export function initArchiveFilter(): void {
 
         const withScores = allItems
             .map((item) => {
+                const itemTags = parseItemTags(item);
                 const tagScore = hasTagFilter
-                    ? getTagMatchCount(item, selectedTags)
+                    ? selectedTags.reduce(
+                          (c, tag) => (itemTags.includes(tag) ? c + 1 : c),
+                          0,
+                      )
                     : 0;
                 const tagMatched =
                     !hasTagFilter || tagScore === selectedTags.length;
-
                 const categoryMatched = hasCategoryFilter
-                    ? isUncategorizedValue(filter.category!)
+                    ? this.isUncategorizedValue(filter.category!)
                         ? !item.dataset.category
                         : item.dataset.category === filter.category
                     : true;
-
                 const authorMatched = hasAuthorFilter
-                    ? readItemAuthorHandle(item) === normalizedAuthor
+                    ? this.readItemAuthorHandle(item) === normalizedAuthor
                     : true;
-
                 let calendarMatched = true;
                 if (hasCalendarFilter && filter.calendar) {
-                    if (filter.calendar.type === "year") {
-                        calendarMatched =
-                            item.dataset.year === filter.calendar.key;
-                    } else if (filter.calendar.type === "month") {
-                        calendarMatched =
-                            item.dataset.month === filter.calendar.key;
-                    } else {
-                        calendarMatched =
-                            item.dataset.day === filter.calendar.key;
-                    }
+                    const { type, key } = filter.calendar;
+                    calendarMatched =
+                        type === "year"
+                            ? item.dataset.year === key
+                            : type === "month"
+                              ? item.dataset.month === key
+                              : item.dataset.day === key;
                 }
-
                 return {
                     item,
                     score: tagScore,
@@ -237,229 +232,146 @@ export function initArchiveFilter(): void {
         if (!hasTagFilter) {
             return withScores.map(({ item }) => item);
         }
-
         return withScores
-            .sort((a, b) => {
-                if (b.score !== a.score) {
-                    return b.score - a.score;
-                }
-                return (
-                    (originalOrder.get(a.item) ?? 0) -
-                    (originalOrder.get(b.item) ?? 0)
-                );
-            })
+            .sort((a, b) =>
+                b.score !== a.score
+                    ? b.score - a.score
+                    : (this.originalOrder.get(a.item) ?? 0) -
+                      (this.originalOrder.get(b.item) ?? 0),
+            )
             .map(({ item }) => item);
     }
 
-    function renderPosts() {
-        const postList = getPostList();
-        const noResults = getNoResults();
+    renderPosts(): void {
+        const postList = document.getElementById("post-list-container");
+        const noResults = document.getElementById("archive-no-results");
         if (!postList) {
             return;
         }
-
-        const allItems = getAllPostItems();
-        const matching = getMatchingItems(currentFilter);
+        const allItems = this.getAllPostItems();
+        const matching = this.getMatchingItems(this.currentFilter);
         const totalPages = Math.max(
             1,
             Math.ceil(matching.length / POSTS_PER_PAGE),
         );
-
-        if (currentPage > totalPages) {
-            currentPage = totalPages;
+        if (this.currentPage > totalPages) {
+            this.currentPage = totalPages;
         }
-
-        const start = (currentPage - 1) * POSTS_PER_PAGE;
+        const start = (this.currentPage - 1) * POSTS_PER_PAGE;
         const pageItems = new Set(
             matching.slice(start, start + POSTS_PER_PAGE),
         );
         const matchingSet = new Set(matching);
+        const selectedTags = normalizeTagList(this.currentFilter.tags);
         const orderedItems =
-            getSelectedTags(currentFilter).length > 0
+            selectedTags.length > 0
                 ? [
                       ...matching,
                       ...allItems.filter((item) => !matchingSet.has(item)),
                   ]
                 : allItems;
         const fragment = document.createDocumentFragment();
-        orderedItems.forEach((item) => {
-            fragment.appendChild(item);
-        });
+        orderedItems.forEach((item) => fragment.appendChild(item));
         postList.appendChild(fragment);
-
-        allItems.forEach((item) => {
-            item.classList.toggle("hidden", !pageItems.has(item));
-        });
-
-        updatePaginationUI(currentPage, totalPages);
-
+        allItems.forEach((item) =>
+            item.classList.toggle("hidden", !pageItems.has(item)),
+        );
+        updatePaginationUI(this.currentPage, totalPages);
         noResults?.classList.toggle(
             "hidden",
-            !hasActiveFilters(currentFilter) || matching.length > 0,
+            !hasActiveFilters(this.currentFilter) || matching.length > 0,
         );
     }
 
-    function buildPageNumbers(page: number, totalPages: number): number[] {
-        const pages: number[] = [];
-        const delta = 2;
-
-        pages.push(1);
-
-        const rangeStart = Math.max(2, page - delta);
-        const rangeEnd = Math.min(totalPages - 1, page + delta);
-
-        if (rangeStart > 2) {
-            pages.push(-1);
-        }
-
-        for (let i = rangeStart; i <= rangeEnd; i++) {
-            pages.push(i);
-        }
-
-        if (rangeEnd < totalPages - 1) {
-            pages.push(-1);
-        }
-
-        if (totalPages > 1) {
-            pages.push(totalPages);
-        }
-
-        return pages;
-    }
-
-    function toggleBtnDisabled(id: string, disabled: boolean) {
-        const btn = document.getElementById(id);
-        if (!btn) {
-            return;
-        }
-        btn.classList.toggle("disabled", disabled);
-        if (disabled) {
-            btn.setAttribute("aria-disabled", "true");
-        } else {
-            btn.removeAttribute("aria-disabled");
-        }
-    }
-
-    function updatePaginationUI(page: number, totalPages: number) {
-        const container = document.getElementById("archive-pagination");
-        if (!container) {
-            return;
-        }
-
-        container.classList.toggle("hidden", totalPages <= 1);
-        if (totalPages <= 1) {
-            return;
-        }
-
-        const pages = buildPageNumbers(page, totalPages);
-        const numbersEl = document.getElementById("page-numbers");
-        if (numbersEl) {
-            numbersEl.innerHTML = pages
-                .map((p) =>
-                    p === -1
-                        ? '<span class="px-1 text-50">...</span>'
-                        : p === page
-                          ? `<span class="page-num active">${p}</span>`
-                          : `<button class="page-num" data-page="${p}">${p}</button>`,
-                )
-                .join("");
-        }
-
-        toggleBtnDisabled("page-prev", page <= 1);
-        toggleBtnDisabled("page-next", page >= totalPages);
-    }
-
-    function scrollToPostList() {
-        getPostList()?.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-        });
-    }
-
-    function updateFilterStatus(filter: FilterState) {
-        const { filterStatus, filterLabel } = getFilterElements();
+    updateFilterStatus(filter: FilterState): void {
+        const filterStatus = document.getElementById("filter-status");
+        const filterLabel = document.getElementById("filter-status-label");
         if (!filterStatus || !filterLabel) {
             return;
         }
-
         if (!hasActiveFilters(filter)) {
             filterStatus.classList.add("is-collapsed");
             return;
         }
-
         filterStatus.classList.remove("is-collapsed");
-
         const segments: string[] = [];
-        const selectedTags = getSelectedTags(filter);
+        const selectedTags = normalizeTagList(filter.tags);
         if (selectedTags.length > 0) {
             segments.push(`标签：${selectedTags.join("、")}`);
         }
         if (filter.category) {
             segments.push(
-                isUncategorizedValue(filter.category)
-                    ? `分类：${UNCATEGORIZED_LABEL || "未分类"}`
+                this.isUncategorizedValue(filter.category)
+                    ? `分类：${this.uncategorizedLabel || "未分类"}`
                     : `分类：${filter.category}`,
             );
         }
         if (filter.author) {
-            segments.push(`作者：@${resolveAuthorDisplay(filter)}`);
+            const normalized = normalizeAuthorHandle(filter.author);
+            const matched = this.getAllPostItems().find(
+                (item) => this.readItemAuthorHandle(item) === normalized,
+            );
+            const display = matched
+                ? this.readItemAuthorHandleRaw(matched)
+                : filter.author;
+            segments.push(`作者：@${display}`);
         }
         if (filter.calendar) {
             segments.push(`日期：${filter.calendar.label}`);
         }
-
         filterLabel.textContent = segments.join(" ｜ ");
     }
 
-    function updateButtonStates(filter: FilterState) {
+    updateButtonStates(filter: FilterState): void {
         document
             .querySelectorAll<HTMLElement>(".archive-filter-btn")
             .forEach((btn) => btn.classList.remove("active"));
-
-        const selectedTags = getSelectedTags(filter);
+        const selectedTags = normalizeTagList(filter.tags);
         selectedTags.forEach((tag) => {
-            const selector = `.archive-filter-btn[data-filter="tag"][data-value="${CSS.escape(tag)}"]`;
             document
-                .querySelector<HTMLElement>(selector)
+                .querySelector<HTMLElement>(
+                    `.archive-filter-btn[data-filter="tag"][data-value="${CSS.escape(tag)}"]`,
+                )
                 ?.classList.add("active");
         });
-
         if (filter.category) {
-            const selector = `.archive-filter-btn[data-filter="category"][data-value="${CSS.escape(filter.category)}"]`;
             document
-                .querySelector<HTMLElement>(selector)
+                .querySelector<HTMLElement>(
+                    `.archive-filter-btn[data-filter="category"][data-value="${CSS.escape(filter.category)}"]`,
+                )
                 ?.classList.add("active");
         }
     }
 
-    function applyFilter(filter: FilterState) {
-        currentFilter = filter;
-        currentPage = 1;
-        renderPosts();
-        updateFilterStatus(filter);
-        updateButtonStates(filter);
+    applyFilter(filter: FilterState): void {
+        this.currentFilter = filter;
+        this.currentPage = 1;
+        this.renderPosts();
+        this.updateFilterStatus(filter);
+        this.updateButtonStates(filter);
     }
 
-    function clearAllFilters() {
+    clearAllFilters(): void {
         window.dispatchEvent(new CustomEvent("calendarFilterClear"));
-
-        currentFilter = {
+        this.currentFilter = {
             tags: [],
             category: null,
             author: null,
             calendar: null,
         };
-        currentPage = 1;
-        renderPosts();
-        updateFilterStatus(currentFilter);
-        updateButtonStates(currentFilter);
+        this.currentPage = 1;
+        this.renderPosts();
+        this.updateFilterStatus(this.currentFilter);
+        this.updateButtonStates(this.currentFilter);
     }
+}
 
-    // --- 使用 AbortController 注册所有事件，便于清理 ---
-    const ac = new AbortController();
-    const signal = ac.signal;
+// ---- 事件绑定（顶层）----
 
-    // 分类/标签按钮点击（事件委托）
+function bindFilterButtonClick(
+    core: ArchiveFilterCore,
+    signal: AbortSignal,
+): void {
     document.addEventListener(
         "click",
         (e) => {
@@ -469,56 +381,41 @@ export function initArchiveFilter(): void {
             if (!btn) {
                 return;
             }
-
             const filterType = btn.dataset.filter as "tag" | "category";
             const filterValue = btn.dataset.value || "";
             if (!filterType || !filterValue) {
                 return;
             }
-
             window.dispatchEvent(new CustomEvent("calendarFilterClear"));
+            const cur = core.getFilter();
             if (filterType === "tag") {
-                const selectedTags = getSelectedTags(currentFilter);
-                const nextSelected = selectedTags.includes(filterValue)
-                    ? selectedTags.filter((tag) => tag !== filterValue)
+                const selectedTags = normalizeTagList(cur.tags);
+                const nextTags = selectedTags.includes(filterValue)
+                    ? selectedTags.filter((t) => t !== filterValue)
                     : normalizeTagList([...selectedTags, filterValue]);
-
-                applyFilter({
-                    ...currentFilter,
-                    tags: nextSelected,
-                    calendar: null,
-                });
+                core.applyFilter({ ...cur, tags: nextTags, calendar: null });
                 return;
             }
-
-            applyFilter({
-                ...currentFilter,
-                category:
-                    currentFilter.category === filterValue ? null : filterValue,
+            core.applyFilter({
+                ...cur,
+                category: cur.category === filterValue ? null : filterValue,
                 calendar: null,
             });
         },
         { signal },
     );
+}
 
-    // 清除按钮
-    getFilterElements().filterClearBtn?.addEventListener(
-        "click",
-        () => {
-            clearAllFilters();
-        },
-        { signal },
-    );
-
-    // 监听日历筛选事件
+function bindCalendarEvents(
+    core: ArchiveFilterCore,
+    signal: AbortSignal,
+): void {
     window.addEventListener(
         "calendarFilterChange",
         (event) => {
-            // 仅在 archive 页面处理
             if (!document.querySelector(".archive-posts")) {
                 return;
             }
-
             const detail = (
                 event as CustomEvent<{
                     type: "day" | "month" | "year";
@@ -529,132 +426,160 @@ export function initArchiveFilter(): void {
             if (!detail) {
                 return;
             }
-
-            currentFilter = {
-                ...currentFilter,
+            const next: FilterState = {
+                ...core.getFilter(),
                 calendar: {
                     type: detail.type,
                     key: detail.key,
                     label: detail.label || detail.key,
                 },
             };
-
-            // 延迟一帧，覆盖 PostPage 的日历筛选结果
+            core.setFilter(next);
             requestAnimationFrame(() => {
-                currentPage = 1;
-                renderPosts();
-                updateFilterStatus(currentFilter);
-                updateButtonStates(currentFilter);
+                core.setPage(1);
+                core.renderPosts();
+                core.updateFilterStatus(next);
+                core.updateButtonStates(next);
             });
         },
         { signal },
     );
 
-    // 监听日历清除事件
     window.addEventListener(
         "calendarFilterClear",
         () => {
-            if (currentFilter.calendar !== null) {
-                currentFilter = {
-                    ...currentFilter,
+            if (core.getFilter().calendar !== null) {
+                const next: FilterState = {
+                    ...core.getFilter(),
                     calendar: null,
                 };
-                currentPage = 1;
+                core.setFilter(next);
+                core.setPage(1);
                 requestAnimationFrame(() => {
-                    renderPosts();
-                    updateFilterStatus(currentFilter);
-                    updateButtonStates(currentFilter);
+                    core.renderPosts();
+                    core.updateFilterStatus(next);
+                    core.updateButtonStates(next);
                 });
             }
         },
         { signal },
     );
+}
 
-    // 分页按钮事件
+function scrollPostListIntoView(): void {
+    document.getElementById("post-list-container")?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+    });
+}
+
+function bindPaginationClick(
+    core: ArchiveFilterCore,
+    signal: AbortSignal,
+): void {
     document.addEventListener(
         "click",
         (e) => {
             const target = e.target as HTMLElement;
-
-            // 上一页
             if (target.id === "page-prev" || target.closest("#page-prev")) {
-                if (currentPage > 1) {
-                    currentPage--;
-                    renderPosts();
-                    scrollToPostList();
+                if (core.getPage() > 1) {
+                    core.setPage(core.getPage() - 1);
+                    core.renderPosts();
+                    scrollPostListIntoView();
                 }
                 return;
             }
-
-            // 下一页
             if (target.id === "page-next" || target.closest("#page-next")) {
-                const matching = getMatchingItems(currentFilter);
+                const matching = core.getMatchingItems(core.getFilter());
                 const totalPages = Math.max(
                     1,
                     Math.ceil(matching.length / POSTS_PER_PAGE),
                 );
-                if (currentPage < totalPages) {
-                    currentPage++;
-                    renderPosts();
-                    scrollToPostList();
+                if (core.getPage() < totalPages) {
+                    core.setPage(core.getPage() + 1);
+                    core.renderPosts();
+                    scrollPostListIntoView();
                 }
                 return;
             }
-
-            // 页码按钮
             const pageBtn = target.closest<HTMLElement>("[data-page]");
             if (pageBtn) {
                 const page = Number(pageBtn.dataset.page);
-                if (page && page !== currentPage) {
-                    currentPage = page;
-                    renderPosts();
-                    scrollToPostList();
+                if (page && page !== core.getPage()) {
+                    core.setPage(page);
+                    core.renderPosts();
+                    scrollPostListIntoView();
                 }
             }
         },
         { signal },
     );
+}
 
-    // 注册清理函数，下次 init 或离开页面时调用
+// ---- 主入口 ----
+
+export function initArchiveFilter(): void {
+    const rw = window as ArchiveRuntimeWindow;
+    rw.__archiveFilterCleanup?.();
+
+    const archiveRoot = document.querySelector<HTMLElement>(".archive-posts");
+    if (!archiveRoot) {
+        return;
+    }
+
+    const core = new ArchiveFilterCore(
+        archiveRoot.dataset.uncategorizedLabel || "",
+    );
+    const ac = new AbortController();
+    const { signal } = ac;
+
+    bindFilterButtonClick(core, signal);
+    bindCalendarEvents(core, signal);
+    bindPaginationClick(core, signal);
+    document
+        .getElementById("filter-clear-btn")
+        ?.addEventListener("click", () => core.clearAllFilters(), { signal });
+
     rw.__archiveFilterCleanup = () => {
         ac.abort();
         rw.__archiveFilterCleanup = undefined;
     };
 
-    // --- 根据 URL 参数初始化 ---
     const params = new URLSearchParams(window.location.search);
     const tag = params.get("tag");
     const category = params.get("category");
     const author = params.get("author") || params.get("author_handle");
     const uncategorized = params.get("uncategorized");
-
     const tagParams = params
         .getAll("tag")
-        .flatMap((value) => value.split(","))
-        .map((value) => value.trim())
+        .flatMap((v) => v.split(","))
+        .map((v) => v.trim())
         .filter(Boolean);
 
+    const initFilter: FilterState = {
+        tags: [],
+        category: null,
+        author: null,
+        calendar: null,
+    };
     if (tagParams.length > 0) {
-        currentFilter.tags = normalizeTagList(tagParams);
+        initFilter.tags = normalizeTagList(tagParams);
     } else if (tag) {
-        currentFilter.tags = normalizeTagList([tag]);
+        initFilter.tags = normalizeTagList([tag]);
     }
-
     if (category) {
-        currentFilter.category = category;
+        initFilter.category = category;
     } else if (uncategorized) {
-        currentFilter.category = "uncategorized";
+        initFilter.category = "uncategorized";
     }
-
     if (author) {
-        const cleanedAuthor = cleanAuthorHandle(author);
-        currentFilter.author = cleanedAuthor || null;
+        const cleaned = cleanAuthorHandle(author);
+        initFilter.author = cleaned || null;
     }
 
-    if (hasActiveFilters(currentFilter)) {
-        applyFilter(currentFilter);
+    if (hasActiveFilters(initFilter)) {
+        core.applyFilter(initFilter);
     } else {
-        // 初始渲染：应用分页
-        renderPosts();
+        core.renderPosts();
     }
 }

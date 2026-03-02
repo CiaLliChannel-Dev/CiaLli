@@ -9,7 +9,9 @@ import { getResolvedSiteSettings } from "@/server/site-settings/service";
 
 function buildEnvErrorResponse(pathname: string): Response {
     const isApiRequest = pathname.startsWith("/api/");
-    const configMissingMessage = i18n(I18nKey.apiServerConfigMissing);
+    const configMissingMessage = i18n(
+        I18nKey.interactionApiServerConfigMissing,
+    );
     if (isApiRequest) {
         return new Response(
             JSON.stringify({

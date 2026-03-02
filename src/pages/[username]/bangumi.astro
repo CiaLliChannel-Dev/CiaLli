@@ -63,17 +63,17 @@ function isBangumiStatus(value: string): value is BangumiStatus {
 function statusLabel(status: string): string {
   switch (status) {
     case "watching":
-      return i18n(I18nKey.animeStatusWatching);
+      return i18n(I18nKey.contentAnimeStatusWatching);
     case "completed":
-      return i18n(I18nKey.animeStatusCompleted);
+      return i18n(I18nKey.contentAnimeStatusCompleted);
     case "planned":
-      return i18n(I18nKey.animeStatusPlanned);
+      return i18n(I18nKey.contentAnimeStatusPlanned);
     case "onhold":
-      return i18n(I18nKey.animeStatusOnHold);
+      return i18n(I18nKey.contentAnimeStatusOnHold);
     case "dropped":
-      return i18n(I18nKey.animeStatusDropped);
+      return i18n(I18nKey.contentAnimeStatusDropped);
     default:
-      return status || i18n(I18nKey.animeUnknownStatus);
+      return status || i18n(I18nKey.contentAnimeUnknownStatus);
   }
 }
 
@@ -115,25 +115,25 @@ const hasSidebarContent = categoryList.length > 0 || tagList.length > 0;
 ---
 
 <MainGridLayout
-  title={i18n(I18nKey.anime)}
-  description={i18n(I18nKey.animePublicSubtitle)}
+  title={i18n(I18nKey.contentAnime)}
+  description={i18n(I18nKey.contentAnimePublicSubtitle)}
 >
   {
     result.status === "not_found" || result.status === "permission_denied" ? (
       <ContentNotVisible
         mode="not_found"
-        title={i18n(I18nKey.userNotFoundTitle)}
-        description={i18n(I18nKey.userNotFoundDescription)}
+        title={i18n(I18nKey.contentUserNotFoundTitle)}
+        description={i18n(I18nKey.contentUserNotFoundDescription)}
         backHref="/"
-        backLabel={i18n(I18nKey.userBackToHome)}
+        backLabel={i18n(I18nKey.contentUserBackToHome)}
       />
     ) : (
       <div
         class="bangumi-list-root"
         data-enter-skeleton-page="user-bangumi"
         data-enter-skeleton-target="user-bangumi"
-        data-tags-label={i18n(I18nKey.tags)}
-        data-category-label={i18n(I18nKey.commonCategory)}
+        data-tags-label={i18n(I18nKey.contentTags)}
+        data-category-label={i18n(I18nKey.interactionCommonCategory)}
       >
         <div data-enter-skeleton-inline-content>
           <section class="card-base px-9 py-6 rounded-(--radius-large) mb-4 text-90">
@@ -142,14 +142,16 @@ const hasSidebarContent = categoryList.length > 0 || tagList.length > 0;
 					before:w-1 before:h-8 before:rounded-md before:bg-(--primary)
 					before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
             >
-              {i18n(I18nKey.anime)}
+              {i18n(I18nKey.contentAnime)}
             </h1>
-            <p class="text-base text-70">{i18n(I18nKey.animePublicSubtitle)}</p>
+            <p class="text-base text-70">
+              {i18n(I18nKey.contentAnimePublicSubtitle)}
+            </p>
           </section>
 
           {items.length === 0 ? (
             <div class="card-base p-8 rounded-(--radius-large) text-70">
-              {i18n(I18nKey.animeNoPublic)}
+              {i18n(I18nKey.contentAnimeNoPublic)}
             </div>
           ) : (
             <>
@@ -178,11 +180,12 @@ const hasSidebarContent = categoryList.length > 0 || tagList.length > 0;
                           {item.year && <span>{item.year}</span>}
                         </div>
                         <div class="text-xs text-70">
-                          {i18n(I18nKey.animeProgressLabel)}：
+                          {i18n(I18nKey.contentAnimeProgressLabel)}：
                           {item.progress ?? 0}/{item.total_episodes ?? "?"}
                           {typeof item.rating === "number" && (
                             <span class="ml-2">
-                              {i18n(I18nKey.animeRatingLabel)}：{item.rating}
+                              {i18n(I18nKey.contentAnimeRatingLabel)}：
+                              {item.rating}
                             </span>
                           )}
                         </div>
@@ -207,7 +210,7 @@ const hasSidebarContent = categoryList.length > 0 || tagList.length > 0;
                             rel="noopener noreferrer"
                             class="text-xs text-(--primary) hover:underline"
                           >
-                            {i18n(I18nKey.commonViewLink)}
+                            {i18n(I18nKey.interactionCommonViewLink)}
                           </a>
                         )}
                       </div>
@@ -219,7 +222,7 @@ const hasSidebarContent = categoryList.length > 0 || tagList.length > 0;
                 id="bangumi-no-results"
                 class="hidden card-base p-8 rounded-(--radius-large) text-70 mt-4"
               >
-                {i18n(I18nKey.animeNoMatch)}
+                {i18n(I18nKey.contentAnimeNoMatch)}
               </div>
             </>
           )}
@@ -293,7 +296,7 @@ const hasSidebarContent = categoryList.length > 0 || tagList.length > 0;
 						before:w-1 before:h-4 before:rounded-md before:bg-(--primary)
 						before:absolute before:left-[-16px] before:top-[5.5px]"
             >
-              {i18n(I18nKey.commonCategory)}
+              {i18n(I18nKey.interactionCommonCategory)}
             </div>
             <div class="px-4 flex flex-col gap-0.5" id="bangumi-categories">
               {categoryList.map((category) => (
@@ -333,7 +336,7 @@ const hasSidebarContent = categoryList.length > 0 || tagList.length > 0;
 						before:w-1 before:h-4 before:rounded-md before:bg-(--primary)
 						before:absolute before:left-[-16px] before:top-[5.5px]"
             >
-              {i18n(I18nKey.tags)}
+              {i18n(I18nKey.contentTags)}
             </div>
             <div
               class="px-4 flex gap-2 flex-wrap max-h-100 overflow-y-auto bangumi-tags-scroll"
@@ -364,7 +367,7 @@ const hasSidebarContent = categoryList.length > 0 || tagList.length > 0;
             id="bangumi-filter-clear-btn"
             class="shrink-0 text-sm text-(--primary) hover:underline cursor-pointer"
           >
-            {i18n(I18nKey.commonClear)}
+            {i18n(I18nKey.interactionCommonClear)}
           </button>
         </div>
       </div>

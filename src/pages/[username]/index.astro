@@ -65,17 +65,17 @@ const sectionOrder =
 ---
 
 <MainGridLayout
-  title={payload?.owner?.name || i18n(I18nKey.userProfileTitle)}
+  title={payload?.owner?.name || i18n(I18nKey.contentUserProfileTitle)}
   description={payload?.profile?.bio || ""}
 >
   {
     result.status === "not_found" || result.status === "permission_denied" ? (
       <ContentNotVisible
         mode="not_found"
-        title={i18n(I18nKey.userNotFoundTitle)}
-        description={i18n(I18nKey.userNotFoundDescription)}
+        title={i18n(I18nKey.contentUserNotFoundTitle)}
+        description={i18n(I18nKey.contentUserNotFoundDescription)}
         backHref="/"
-        backLabel={i18n(I18nKey.userBackToHome)}
+        backLabel={i18n(I18nKey.contentUserBackToHome)}
       />
     ) : (
       <>
@@ -90,7 +90,7 @@ const sectionOrder =
                 <a
                   href="/me/homepage"
                   class="absolute top-3 right-3 z-10 flex items-center justify-center w-9 h-9 rounded-full bg-black/30 hover:bg-black/50 text-white transition-colors backdrop-blur-sm"
-                  title={i18n(I18nKey.commonEdit)}
+                  title={i18n(I18nKey.interactionCommonEdit)}
                 >
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -136,7 +136,7 @@ const sectionOrder =
                   <div class="pb-1">
                     <h1 class="text-2xl font-bold text-90">
                       {payload!.owner?.name ||
-                        i18n(I18nKey.userProfileDefaultName)}
+                        i18n(I18nKey.contentUserProfileDefaultName)}
                     </h1>
                     <p class="text-xs text-60">@{ownerUsername}</p>
                   </div>
@@ -158,7 +158,7 @@ const sectionOrder =
               ) {
                 return (
                   <HorizontalScrollSection
-                    title={i18n(I18nKey.postList)}
+                    title={i18n(I18nKey.contentPostList)}
                     moreHref={`/posts?author=${ownerUsername}`}
                   >
                     {payload!.articles.map((item) => (
@@ -177,7 +177,7 @@ const sectionOrder =
               ) {
                 return (
                   <HorizontalScrollSection
-                    title={i18n(I18nKey.diary)}
+                    title={i18n(I18nKey.contentDiary)}
                     moreHref={`/${ownerUsername}/diary`}
                   >
                     {payload!.diaries.map((item) => (
@@ -193,7 +193,7 @@ const sectionOrder =
               ) {
                 return (
                   <HorizontalScrollSection
-                    title={i18n(I18nKey.anime)}
+                    title={i18n(I18nKey.contentAnime)}
                     moreHref={`/${ownerUsername}/bangumi`}
                   >
                     {payload!.bangumi.map((item) => (
@@ -209,7 +209,7 @@ const sectionOrder =
               ) {
                 return (
                   <HorizontalScrollSection
-                    title={i18n(I18nKey.albums)}
+                    title={i18n(I18nKey.contentAlbums)}
                     moreHref={`/${ownerUsername}/albums?author=${ownerUsername}`}
                   >
                     {payload!.albums.map((item) => (

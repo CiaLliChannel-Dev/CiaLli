@@ -226,6 +226,59 @@ function logRenderMetrics(params: {
     );
 }
 
+type RenderTimings = {
+    parseTransformMs: number;
+    sanitizeMs: number;
+    expressiveMs: number;
+};
+
+type ParseAndSanitizeResult = {
+    sanitizedHtml: string;
+    timings: Pick<RenderTimings, "parseTransformMs" | "sanitizeMs">;
+};
+
+async function parseAndSanitize(
+    source: string,
+    mode: MarkdownRenderMode,
+    allowBlobImages: boolean,
+    features: RuntimeMarkdownFeatures,
+): Promise<ParseAndSanitizeResult> {
+    const processor = getMarkdownProcessor(mode, features);
+
+    const parseTransformStart = performance.now();
+    const rendered = await processor.process(source);
+    const parseTransformMs = performance.now() - parseTransformStart;
+
+    const sanitizeStart = performance.now();
+    const sanitizedHtml = sanitizeMarkdownHtml(String(rendered.value || ""), {
+        allowBlobImages,
+    });
+    const sanitizeMs = performance.now() - sanitizeStart;
+
+    return { sanitizedHtml, timings: { parseTransformMs, sanitizeMs } };
+}
+
+async function applyExpressiveCode(sanitizedHtml: string): Promise<{
+    result: string;
+    expressiveMs: number;
+}> {
+    const expressiveStart = performance.now();
+    try {
+        const highlighted =
+            await expressiveCodeProcessor.process(sanitizedHtml);
+        return {
+            result: String(highlighted.value || ""),
+            expressiveMs: performance.now() - expressiveStart,
+        };
+    } catch (error) {
+        console.error("[markdown] expressive code render failed:", error);
+        return {
+            result: sanitizedHtml,
+            expressiveMs: performance.now() - expressiveStart,
+        };
+    }
+}
+
 export async function renderMarkdown(
     markdown: string,
     options: RenderMarkdownOptions = {},
@@ -261,17 +314,14 @@ export async function renderMarkdown(
     }
 
     const features = detectMarkdownFeatures(source);
-    const processor = getMarkdownProcessor(mode, features);
-
-    const parseTransformStart = performance.now();
-    const rendered = await processor.process(source);
-    const parseTransformMs = performance.now() - parseTransformStart;
-
-    const sanitizeStart = performance.now();
-    const sanitizedHtml = sanitizeMarkdownHtml(String(rendered.value || ""), {
+    const { sanitizedHtml, timings } = await parseAndSanitize(
+        source,
+        mode,
         allowBlobImages,
-    });
-    const sanitizeMs = performance.now() - sanitizeStart;
+        features,
+    );
+    const { parseTransformMs, sanitizeMs } = timings;
+
     if (!sanitizedHtml) {
         logRenderMetrics({
             target,
@@ -314,37 +364,18 @@ export async function renderMarkdown(
         return sanitizedHtml;
     }
 
-    const expressiveStart = performance.now();
-    try {
-        const highlighted =
-            await expressiveCodeProcessor.process(sanitizedHtml);
-        const result = String(highlighted.value || "");
-        const expressiveMs = performance.now() - expressiveStart;
-        void cacheManager.set("markdown", cacheKey, result);
-        logRenderMetrics({
-            target,
-            mode,
-            parseTransformMs,
-            sanitizeMs,
-            expressiveMs,
-            totalMs: performance.now() - totalStart,
-            cache: "miss",
-        });
-        return result;
-    } catch (error) {
-        console.error("[markdown] expressive code render failed:", error);
-        const expressiveMs = performance.now() - expressiveStart;
-        logRenderMetrics({
-            target,
-            mode,
-            parseTransformMs,
-            sanitizeMs,
-            expressiveMs,
-            totalMs: performance.now() - totalStart,
-            cache: "miss",
-        });
-        return sanitizedHtml;
-    }
+    const { result, expressiveMs } = await applyExpressiveCode(sanitizedHtml);
+    void cacheManager.set("markdown", cacheKey, result);
+    logRenderMetrics({
+        target,
+        mode,
+        parseTransformMs,
+        sanitizeMs,
+        expressiveMs,
+        totalMs: performance.now() - totalStart,
+        cache: "miss",
+    });
+    return result;
 }
 
 export async function renderMarkdownHtml(markdown: string): Promise<string> {

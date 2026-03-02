@@ -61,6 +61,16 @@ declare global {
         __CIALLI_RUNTIME_SETTINGS__?: ResolvedSiteSettings;
         __CIALLI_I18N__?: Partial<Record<keyof Translation, string>>;
         __CIALLI_PROGRESS_OVERLAY__?: ProgressOverlayApi;
+        __ppFromBase64Url?: (input: unknown) => Uint8Array;
+        __ppSanitizeDecryptedHtml?: (rawHtml: unknown) => string;
+        __ppResolveProtectedHtml?: (rawContent: unknown) => string;
+        __ppDecryptPayloadV2?: (
+            input: unknown,
+            password: string,
+        ) => Promise<string>;
+        __ppDispatchPostDecryptTasks?: (
+            contentBodyDiv: HTMLElement,
+        ) => Promise<void>;
         siteConfig?: SiteConfig;
     }
 }

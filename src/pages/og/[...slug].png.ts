@@ -186,41 +186,27 @@ function resolveLocalAssetPath(
     return fallbackPath;
 }
 
-export async function GET({
-    props,
-}: APIContext<{ post: OgPost }>): Promise<Response> {
-    const { post } = props;
-    const resolvedSiteSettings = await getResolvedSiteSettings();
-    const settings = resolvedSiteSettings.settings;
-    const system = resolvedSiteSettings.system;
-    const { regular: fontRegular, bold: fontBold } =
-        await fetchNotoSansSCFonts();
+function loadImageAsBase64(path: string): string {
+    const buffer = fs.readFileSync(path);
+    return `data:image/png;base64,${buffer.toString("base64")}`;
+}
 
-    const avatarPath = resolveLocalAssetPath(
-        settings.profile.avatar,
-        "./src/assets/images/avatar.webp",
-    );
-    const avatarBuffer = fs.readFileSync(avatarPath);
-    const avatarBase64 = `data:image/png;base64,${avatarBuffer.toString("base64")}`;
+type OgTemplateParams = {
+    post: OgPost;
+    siteTitle: string;
+    profileName: string;
+    avatarBase64: string;
+    iconBase64: string;
+    pubDate: string;
+    primaryColor: string;
+    textColor: string;
+    subtleTextColor: string;
+    backgroundColor: string;
+};
 
-    const iconPath = resolveLocalAssetPath(
-        settings.site.favicon[0]?.src,
-        "./public/favicon/favicon.ico",
-    );
-    const iconBuffer = fs.readFileSync(iconPath);
-    const iconBase64 = `data:image/png;base64,${iconBuffer.toString("base64")}`;
-
-    const hue = system.themeColor.hue;
-    const primaryColor = `hsl(${hue}, 90%, 65%)`;
-    const textColor = "hsl(0, 0%, 95%)";
-
-    const subtleTextColor = `hsl(${hue}, 10%, 75%)`;
-    const backgroundColor = `hsl(${hue}, 15%, 12%)`;
-
-    const pubDate = resolvePublishedDate(post);
-    const description = post.summary;
-
-    const template = {
+function buildOgTemplate(p: OgTemplateParams): object {
+    const description = p.post.summary;
+    return {
         type: "div",
         props: {
             style: {
@@ -228,17 +214,175 @@ export async function GET({
                 width: "100%",
                 display: "flex",
                 flexDirection: "column",
-                backgroundColor,
+                backgroundColor: p.backgroundColor,
                 fontFamily:
                     '"Noto Sans SC", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
                 padding: "60px",
+            },
+            children: [
+                buildOgHeader(p.iconBase64, p.siteTitle, p.subtleTextColor),
+                buildOgBody(
+                    p.post.title,
+                    description,
+                    p.primaryColor,
+                    p.textColor,
+                    p.subtleTextColor,
+                ),
+                buildOgFooter(
+                    p.avatarBase64,
+                    p.profileName,
+                    p.pubDate,
+                    p.textColor,
+                    p.subtleTextColor,
+                ),
+            ],
+        },
+    };
+}
+
+function buildOgHeader(
+    iconBase64: string,
+    siteTitle: string,
+    subtleTextColor: string,
+): object {
+    return {
+        type: "div",
+        props: {
+            style: {
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
+                gap: "20px",
+            },
+            children: [
+                {
+                    type: "img",
+                    props: {
+                        src: iconBase64,
+                        width: 48,
+                        height: 48,
+                        style: { borderRadius: "10px" },
+                    },
+                },
+                {
+                    type: "div",
+                    props: {
+                        style: {
+                            fontSize: "36px",
+                            fontWeight: 600,
+                            color: subtleTextColor,
+                        },
+                        children: siteTitle,
+                    },
+                },
+            ],
+        },
+    };
+}
+
+function buildOgBody(
+    title: string,
+    description: string | null,
+    primaryColor: string,
+    textColor: string,
+    subtleTextColor: string,
+): object {
+    return {
+        type: "div",
+        props: {
+            style: {
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                flexGrow: 1,
+                gap: "20px",
+            },
+            children: [
+                {
+                    type: "div",
+                    props: {
+                        style: { display: "flex", alignItems: "flex-start" },
+                        children: [
+                            {
+                                type: "div",
+                                props: {
+                                    style: {
+                                        width: "10px",
+                                        height: "68px",
+                                        backgroundColor: primaryColor,
+                                        borderRadius: "6px",
+                                        marginTop: "14px",
+                                    },
+                                },
+                            },
+                            {
+                                type: "div",
+                                props: {
+                                    style: {
+                                        fontSize: "72px",
+                                        fontWeight: 700,
+                                        lineHeight: 1.2,
+                                        color: textColor,
+                                        marginLeft: "25px",
+                                        display: "-webkit-box",
+                                        overflow: "hidden",
+                                        textOverflow: "ellipsis",
+                                        lineClamp: 3,
+                                        WebkitLineClamp: 3,
+                                        WebkitBoxOrient: "vertical",
+                                    },
+                                    children: title,
+                                },
+                            },
+                        ],
+                    },
+                },
+                description
+                    ? {
+                          type: "div",
+                          props: {
+                              style: {
+                                  fontSize: "32px",
+                                  lineHeight: 1.5,
+                                  color: subtleTextColor,
+                                  paddingLeft: "35px",
+                                  display: "-webkit-box",
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  lineClamp: 2,
+                                  WebkitLineClamp: 2,
+                                  WebkitBoxOrient: "vertical",
+                              },
+                              children: description,
+                          },
+                      }
+                    : null,
+            ].filter(Boolean),
+        },
+    };
+}
+
+function buildOgFooter(
+    avatarBase64: string,
+    profileName: string,
+    pubDate: string,
+    textColor: string,
+    subtleTextColor: string,
+): object {
+    return {
+        type: "div",
+        props: {
+            style: {
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                width: "100%",
             },
             children: [
                 {
                     type: "div",
                     props: {
                         style: {
-                            width: "100%",
                             display: "flex",
                             alignItems: "center",
                             gap: "20px",
@@ -247,143 +391,10 @@ export async function GET({
                             {
                                 type: "img",
                                 props: {
-                                    src: iconBase64,
-                                    width: 48,
-                                    height: 48,
-                                    style: { borderRadius: "10px" },
-                                },
-                            },
-                            {
-                                type: "div",
-                                props: {
-                                    style: {
-                                        fontSize: "36px",
-                                        fontWeight: 600,
-                                        color: subtleTextColor,
-                                    },
-                                    children: settings.site.title,
-                                },
-                            },
-                        ],
-                    },
-                },
-                {
-                    type: "div",
-                    props: {
-                        style: {
-                            display: "flex",
-                            flexDirection: "column",
-                            justifyContent: "center",
-                            flexGrow: 1,
-                            gap: "20px",
-                        },
-                        children: [
-                            {
-                                type: "div",
-                                props: {
-                                    style: {
-                                        display: "flex",
-                                        alignItems: "flex-start",
-                                    },
-                                    children: [
-                                        {
-                                            type: "div",
-                                            props: {
-                                                style: {
-                                                    width: "10px",
-                                                    height: "68px",
-                                                    backgroundColor:
-                                                        primaryColor,
-                                                    borderRadius: "6px",
-                                                    marginTop: "14px",
-                                                },
-                                            },
-                                        },
-                                        {
-                                            type: "div",
-                                            props: {
-                                                style: {
-                                                    fontSize: "72px",
-                                                    fontWeight: 700,
-                                                    lineHeight: 1.2,
-                                                    color: textColor,
-                                                    marginLeft: "25px",
-                                                    display: "-webkit-box",
-                                                    overflow: "hidden",
-                                                    textOverflow: "ellipsis",
-                                                    lineClamp: 3,
-                                                    WebkitLineClamp: 3,
-                                                    WebkitBoxOrient: "vertical",
-                                                },
-                                                children: post.title,
-                                            },
-                                        },
-                                    ],
-                                },
-                            },
-                            description
-                                ? {
-                                      type: "div",
-                                      props: {
-                                          style: {
-                                              fontSize: "32px",
-                                              lineHeight: 1.5,
-                                              color: subtleTextColor,
-                                              paddingLeft: "35px",
-                                              display: "-webkit-box",
-                                              overflow: "hidden",
-                                              textOverflow: "ellipsis",
-                                              lineClamp: 2,
-                                              WebkitLineClamp: 2,
-                                              WebkitBoxOrient: "vertical",
-                                          },
-                                          children: description,
-                                      },
-                                  }
-                                : null,
-                        ].filter(Boolean),
-                    },
-                },
-                {
-                    type: "div",
-                    props: {
-                        style: {
-                            display: "flex",
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            width: "100%",
-                        },
-                        children: [
-                            {
-                                type: "div",
-                                props: {
-                                    style: {
-                                        display: "flex",
-                                        alignItems: "center",
-                                        gap: "20px",
-                                    },
-                                    children: [
-                                        {
-                                            type: "img",
-                                            props: {
-                                                src: avatarBase64,
-                                                width: 60,
-                                                height: 60,
-                                                style: { borderRadius: "50%" },
-                                            },
-                                        },
-                                        {
-                                            type: "div",
-                                            props: {
-                                                style: {
-                                                    fontSize: "28px",
-                                                    fontWeight: 600,
-                                                    color: textColor,
-                                                },
-                                                children: settings.profile.name,
-                                            },
-                                        },
-                                    ],
+                                    src: avatarBase64,
+                                    width: 60,
+                                    height: 60,
+                                    style: { borderRadius: "50%" },
                                 },
                             },
                             {
@@ -391,18 +402,31 @@ export async function GET({
                                 props: {
                                     style: {
                                         fontSize: "28px",
-                                        color: subtleTextColor,
+                                        fontWeight: 600,
+                                        color: textColor,
                                     },
-                                    children: pubDate,
+                                    children: profileName,
                                 },
                             },
                         ],
                     },
                 },
+                {
+                    type: "div",
+                    props: {
+                        style: { fontSize: "28px", color: subtleTextColor },
+                        children: pubDate,
+                    },
+                },
             ],
         },
     };
+}
 
+function buildFontList(
+    fontRegular: Buffer | null,
+    fontBold: Buffer | null,
+): FontOptions[] {
     const fonts: FontOptions[] = [];
     if (fontRegular) {
         fonts.push({
@@ -420,11 +444,50 @@ export async function GET({
             style: "normal",
         });
     }
+    return fonts;
+}
+
+export async function GET({
+    props,
+}: APIContext<{ post: OgPost }>): Promise<Response> {
+    const { post } = props;
+    const resolvedSiteSettings = await getResolvedSiteSettings();
+    const settings = resolvedSiteSettings.settings;
+    const system = resolvedSiteSettings.system;
+    const { regular: fontRegular, bold: fontBold } =
+        await fetchNotoSansSCFonts();
+
+    const avatarBase64 = loadImageAsBase64(
+        resolveLocalAssetPath(
+            settings.profile.avatar,
+            "./src/assets/images/avatar.webp",
+        ),
+    );
+    const iconBase64 = loadImageAsBase64(
+        resolveLocalAssetPath(
+            settings.site.favicon[0]?.src,
+            "./public/favicon/favicon.ico",
+        ),
+    );
+
+    const hue = system.themeColor.hue;
+    const template = buildOgTemplate({
+        post,
+        siteTitle: settings.site.title,
+        profileName: settings.profile.name,
+        avatarBase64,
+        iconBase64,
+        pubDate: resolvePublishedDate(post),
+        primaryColor: `hsl(${hue}, 90%, 65%)`,
+        textColor: "hsl(0, 0%, 95%)",
+        subtleTextColor: `hsl(${hue}, 10%, 75%)`,
+        backgroundColor: `hsl(${hue}, 15%, 12%)`,
+    });
 
     const svg = await satori(template, {
         width: 1200,
         height: 630,
-        fonts,
+        fonts: buildFontList(fontRegular, fontBold),
     });
 
     const png = await sharp(Buffer.from(svg)).png().toBuffer();

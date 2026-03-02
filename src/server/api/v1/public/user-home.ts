@@ -16,6 +16,15 @@ import {
 } from "../public-data";
 import { parseRouteId } from "../shared";
 
+type ModuleKey = "home" | "bangumi" | "diary" | "albums";
+
+const VALID_MODULE_KEYS: ReadonlySet<string> = new Set<ModuleKey>([
+    "home",
+    "bangumi",
+    "diary",
+    "albums",
+]);
+
 function statusFromQuery(value: string): BangumiCollectionStatus | undefined {
     switch (value) {
         case "planned":
@@ -37,6 +46,135 @@ function failFromLoadResult(result: ContentLoadResult<unknown>): Response {
     return fail("资源不存在", 404);
 }
 
+async function handleHomeModule(
+    username: string,
+    viewerId: string | null,
+): Promise<Response> {
+    const result = await loadUserHomeData(username, { viewerId });
+    if (result.status !== "ok") {
+        return failFromLoadResult(result);
+    }
+    return ok(result.data);
+}
+
+async function handleBangumiModule(
+    context: APIContext,
+    username: string,
+    detailId: string,
+    viewerId: string | null,
+): Promise<Response> {
+    if (detailId) {
+        return fail("未找到接口", 404);
+    }
+    const { page, limit } = parsePagination(context.url);
+    const status = statusFromQuery(
+        context.url.searchParams.get("status")?.trim() || "",
+    );
+    const result = await loadUserBangumiList(username, {
+        page,
+        limit,
+        status,
+        viewerId,
+    });
+    if (result.status !== "ok") {
+        return failFromLoadResult(result);
+    }
+    return ok(result.data);
+}
+
+async function handleDiaryDetail(
+    username: string,
+    detailId: string,
+    viewerId: string | null,
+): Promise<Response> {
+    const result = await loadUserDiaryDetail(username, detailId, { viewerId });
+    if (result.status !== "ok") {
+        return failFromLoadResult(result);
+    }
+    return ok({ item: result.data });
+}
+
+async function handleDiaryList(
+    context: APIContext,
+    username: string,
+    viewerId: string | null,
+): Promise<Response> {
+    const { page, limit } = parsePagination(context.url);
+    const result = await loadUserDiaryList(username, { page, limit, viewerId });
+    if (result.status !== "ok") {
+        return failFromLoadResult(result);
+    }
+    return ok(result.data);
+}
+
+async function handleDiaryModule(
+    context: APIContext,
+    username: string,
+    detailId: string,
+    viewerId: string | null,
+): Promise<Response> {
+    if (detailId) {
+        return handleDiaryDetail(username, detailId, viewerId);
+    }
+    return handleDiaryList(context, username, viewerId);
+}
+
+async function handleAlbumDetail(
+    username: string,
+    detailId: string,
+    viewerId: string | null,
+): Promise<Response> {
+    const result = await loadUserAlbumDetail(username, detailId, { viewerId });
+    if (result.status !== "ok") {
+        return failFromLoadResult(result);
+    }
+    return ok({ item: result.data });
+}
+
+async function handleAlbumList(
+    context: APIContext,
+    username: string,
+    viewerId: string | null,
+): Promise<Response> {
+    const { page, limit } = parsePagination(context.url);
+    const result = await loadUserAlbumList(username, { page, limit, viewerId });
+    if (result.status !== "ok") {
+        return failFromLoadResult(result);
+    }
+    return ok(result.data);
+}
+
+async function handleAlbumsModule(
+    context: APIContext,
+    username: string,
+    detailId: string,
+    viewerId: string | null,
+): Promise<Response> {
+    if (detailId) {
+        return handleAlbumDetail(username, detailId, viewerId);
+    }
+    return handleAlbumList(context, username, viewerId);
+}
+
+async function dispatchModule(
+    context: APIContext,
+    moduleKey: ModuleKey,
+    username: string,
+    detailId: string,
+    viewerId: string | null,
+): Promise<Response> {
+    if (moduleKey === "home") {
+        return handleHomeModule(username, viewerId);
+    }
+    if (moduleKey === "bangumi") {
+        return handleBangumiModule(context, username, detailId, viewerId);
+    }
+    if (moduleKey === "diary") {
+        return handleDiaryModule(context, username, detailId, viewerId);
+    }
+    return handleAlbumsModule(context, username, detailId, viewerId);
+}
+
 export async function handleUserHome(
     context: APIContext,
     segments: string[],
@@ -54,12 +192,7 @@ export async function handleUserHome(
     }
 
     const moduleKey = segments[2];
-    if (
-        moduleKey !== "home" &&
-        moduleKey !== "bangumi" &&
-        moduleKey !== "diary" &&
-        moduleKey !== "albums"
-    ) {
+    if (!VALID_MODULE_KEYS.has(moduleKey)) {
         return fail("未找到接口", 404);
     }
 
@@ -67,83 +200,20 @@ export async function handleUserHome(
         return fail("未找到接口", 404);
     }
 
-    const sessionUser = await getSessionUser(context);
-    const viewerId = sessionUser?.id ?? null;
-
-    if (moduleKey === "home") {
-        const result = await loadUserHomeData(username, { viewerId });
-        if (result.status !== "ok") {
-            return failFromLoadResult(result);
-        }
-        return ok(result.data);
-    }
-
-    const detailId = segments.length === 4 ? parseRouteId(segments[3]) : "";
-    if (segments.length === 4 && !detailId) {
+    const rawDetailId = segments.length === 4 ? parseRouteId(segments[3]) : "";
+    if (segments.length === 4 && !rawDetailId) {
         return fail("缺少内容 ID", 400);
     }
 
-    if (moduleKey === "bangumi") {
-        if (detailId) {
-            return fail("未找到接口", 404);
-        }
-        const { page, limit } = parsePagination(context.url);
-        const status = statusFromQuery(
-            context.url.searchParams.get("status")?.trim() || "",
-        );
-        const result = await loadUserBangumiList(username, {
-            page,
-            limit,
-            status,
-            viewerId,
-        });
-        if (result.status !== "ok") {
-            return failFromLoadResult(result);
-        }
-        return ok(result.data);
-    }
+    const sessionUser = await getSessionUser(context);
+    const viewerId = sessionUser?.id ?? null;
+    const detailId = rawDetailId ?? "";
 
-    if (moduleKey === "diary") {
-        if (detailId) {
-            const result = await loadUserDiaryDetail(username, detailId, {
-                viewerId,
-            });
-            if (result.status !== "ok") {
-                return failFromLoadResult(result);
-            }
-            return ok({ item: result.data });
-        }
-
-        const { page, limit } = parsePagination(context.url);
-        const result = await loadUserDiaryList(username, {
-            page,
-            limit,
-            viewerId,
-        });
-        if (result.status !== "ok") {
-            return failFromLoadResult(result);
-        }
-        return ok(result.data);
-    }
-
-    if (detailId) {
-        const result = await loadUserAlbumDetail(username, detailId, {
-            viewerId,
-        });
-        if (result.status !== "ok") {
-            return failFromLoadResult(result);
-        }
-        return ok({ item: result.data });
-    }
-
-    const { page, limit } = parsePagination(context.url);
-    const result = await loadUserAlbumList(username, {
-        page,
-        limit,
+    return dispatchModule(
+        context,
+        moduleKey as ModuleKey,
+        username,
+        detailId,
         viewerId,
-    });
-    if (result.status !== "ok") {
-        return failFromLoadResult(result);
-    }
-    return ok(result.data);
+    );
 }

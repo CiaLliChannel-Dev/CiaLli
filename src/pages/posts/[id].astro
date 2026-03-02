@@ -241,7 +241,7 @@ const publishedMetaText = formatArticleMetaDate(article?.published_at);
 
 <MainGridLayout
   setOGTypeArticle={true}
-  title={article?.title || i18n(I18nKey.articleNotFoundTitle)}
+  title={article?.title || i18n(I18nKey.contentArticleNotFoundTitle)}
   description={article?.summary || ""}
 >
   {
@@ -259,10 +259,10 @@ const publishedMetaText = formatArticleMetaDate(article?.published_at);
     !article ? (
       <ContentNotVisible
         mode="not_found"
-        title={i18n(I18nKey.articleNotFoundTitle)}
-        description={i18n(I18nKey.articleNotFoundDescription)}
+        title={i18n(I18nKey.contentArticleNotFoundTitle)}
+        description={i18n(I18nKey.contentArticleNotFoundDescription)}
         backHref="/"
-        backLabel={i18n(I18nKey.userBackToHome)}
+        backLabel={i18n(I18nKey.contentUserBackToHome)}
       />
     ) : (
       <>
@@ -378,7 +378,7 @@ const publishedMetaText = formatArticleMetaDate(article?.published_at);
           dockToBackTop={true}
           editHref={`/posts/${encodeURIComponent(article.short_id || rawId)}/edit`}
           deleteEndpoint={`/api/v1/me/articles/${encodeURIComponent(article.id)}`}
-          deleteConfirmMessage={i18n(I18nKey.articleDeleteConfirm)}
+          deleteConfirmMessage={i18n(I18nKey.contentArticleDeleteConfirm)}
           deleteSuccessHref="/"
         />
 

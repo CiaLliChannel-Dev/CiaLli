@@ -21,7 +21,7 @@ export async function GET(context: APIContext): Promise<Response> {
     const user = await getSessionUser(context);
     if (!user) {
         return json(
-            { ok: false, message: i18n(I18nKey.apiAuthNotLoggedIn) },
+            { ok: false, message: i18n(I18nKey.interactionApiAuthNotLoggedIn) },
             { status: 401 },
         );
     }
@@ -59,7 +59,7 @@ export async function GET(context: APIContext): Promise<Response> {
         return json(
             {
                 ok: false,
-                message: i18n(I18nKey.apiAuthGetUserFailed),
+                message: i18n(I18nKey.interactionApiAuthGetUserFailed),
             },
             { status: 500 },
         );

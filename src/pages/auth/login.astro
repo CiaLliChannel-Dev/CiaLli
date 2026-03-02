@@ -52,7 +52,16 @@ const loginI18n = {
             </div>
 
             <div class="mt-6">
-              <form id="login-form" class="login-fields">
+              <form
+                id="login-form"
+                class="login-fields"
+                data-i18n-hide-password={loginI18n.hidePassword}
+                data-i18n-show-password={loginI18n.showPassword}
+                data-i18n-empty-credentials={loginI18n.emptyCredentials}
+                data-i18n-logging-in={loginI18n.loggingIn}
+                data-i18n-login-failed={loginI18n.loginFailed}
+                data-i18n-login-submit={loginI18n.loginSubmit}
+              >
                 <div class="login-field-group">
                   <label for="login-email" class="login-field-label text-75"
                     >{i18n(I18nKey.authEmailLabel)}</label
@@ -247,156 +256,9 @@ const loginI18n = {
     </div>
   </div>
 
-  <script is:inline define:vars={{ loginI18n }}>
-    (function () {
-      const API_LOGIN = "/api/auth/login";
-      function getCsrfToken() {
-        const element = document.querySelector(
-          'meta[name="cialli-csrf-token"]',
-        );
-        if (!(element instanceof HTMLMetaElement)) {
-          return "";
-        }
-        return element.content || "";
-      }
-
-      function normalizeRedirectTarget(redirect) {
-        const candidate = String(redirect || "").trim();
-        if (
-          !candidate ||
-          !candidate.startsWith("/") ||
-          candidate.startsWith("//")
-        ) {
-          return "/";
-        }
-        if (candidate === "/auth/login" || candidate === "/login") {
-          return "/";
-        }
-        return candidate;
-      }
-
-      function getRedirectTarget() {
-        try {
-          const u = new URL(window.location.href);
-          return normalizeRedirectTarget(u.searchParams.get("redirect"));
-        } catch {
-          return "/";
-        }
-      }
-
-      function setError(message) {
-        const errorEl = document.getElementById("login-error");
-        if (!errorEl) return;
-        if (message) {
-          errorEl.textContent = message;
-          errorEl.classList.remove("hidden");
-        } else {
-          errorEl.textContent = "";
-          errorEl.classList.add("hidden");
-        }
-      }
-
-      async function initLoginForm() {
-        const form = document.getElementById("login-form");
-        const emailEl = document.getElementById("login-email");
-        const pwdEl = document.getElementById("login-password");
-        const rememberEl = document.getElementById("login-remember");
-        const submitBtn = document.getElementById("login-submit");
-        const passwordToggleEl = document.getElementById(
-          "login-password-toggle",
-        );
-
-        if (
-          !form ||
-          !emailEl ||
-          !pwdEl ||
-          !rememberEl ||
-          !submitBtn ||
-          !passwordToggleEl
-        ) {
-          return;
-        }
-
-        if (form.dataset.bound) {
-          return;
-        }
-        form.dataset.bound = "1";
-
-        passwordToggleEl.addEventListener("click", () => {
-          const isPassword = pwdEl.type === "password";
-          pwdEl.type = isPassword ? "text" : "password";
-          pwdEl.classList.toggle("is-masked", !isPassword);
-          passwordToggleEl
-            .querySelector(".login-password-icon-show")
-            ?.classList.toggle("hidden", isPassword);
-          passwordToggleEl
-            .querySelector(".login-password-icon-hide")
-            ?.classList.toggle("hidden", !isPassword);
-          passwordToggleEl.setAttribute(
-            "aria-label",
-            isPassword ? loginI18n.hidePassword : loginI18n.showPassword,
-          );
-          passwordToggleEl.setAttribute(
-            "aria-pressed",
-            isPassword ? "true" : "false",
-          );
-        });
-
-        form.addEventListener("submit", async (e) => {
-          e.preventDefault();
-          setError("");
-
-          const email = String(emailEl.value || "").trim();
-          const password = String(pwdEl.value || "");
-          if (!email || !password) {
-            setError(loginI18n.emptyCredentials);
-            return;
-          }
-
-          submitBtn.disabled = true;
-          submitBtn.classList.add("is-loading");
-          const textEl = submitBtn.querySelector(".login-submit-text");
-          if (textEl) textEl.textContent = loginI18n.loggingIn;
-
-          try {
-            const resp = await fetch(API_LOGIN, {
-              method: "POST",
-              credentials: "include",
-              headers: {
-                "Content-Type": "application/json",
-                Accept: "application/json",
-                "x-csrf-token": getCsrfToken(),
-              },
-              body: JSON.stringify({
-                email,
-                password,
-                remember: rememberEl.checked,
-              }),
-            });
-
-            const data = await resp.json().catch(() => null);
-            if (!resp.ok || !data?.ok) {
-              setError(
-                data?.message || data?.error?.message || loginI18n.loginFailed,
-              );
-              return;
-            }
-
-            window.location.href = getRedirectTarget();
-          } catch (err) {
-            console.error("Login failed:", err);
-            setError(loginI18n.loginFailed);
-          } finally {
-            submitBtn.disabled = false;
-            submitBtn.classList.remove("is-loading");
-            if (textEl) textEl.textContent = loginI18n.loginSubmit;
-          }
-        });
-      }
-
-      initLoginForm();
-      document.addEventListener("astro:after-swap", initLoginForm);
-    })();
+  <script>
+    import { init } from "@/scripts/login-page";
+    init();
   </script>
 
   <style>

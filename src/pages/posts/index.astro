@@ -16,10 +16,10 @@ export const prerender = false;
 const allPosts = await getSortedPosts();
 const tags = await getTagList();
 const categories = await getCategoryList();
-const uncategorizedLabel = i18n(I18nKey.uncategorized);
+const uncategorizedLabel = i18n(I18nKey.contentUncategorized);
 ---
 
-<MainGridLayout title={i18n(I18nKey.archive)}>
+<MainGridLayout title={i18n(I18nKey.coreArchive)}>
   <!-- 默认 slot: 文章列表 -->
   <div
     class="archive-posts min-w-0"
@@ -87,7 +87,7 @@ const uncategorizedLabel = i18n(I18nKey.uncategorized);
 				before:w-1 before:h-4 before:rounded-md before:bg-(--primary)
 				before:absolute before:left-[-16px] before:top-[5.5px]"
       >
-        {i18n(I18nKey.categories)}
+        {i18n(I18nKey.contentCategories)}
       </div>
       <div class="px-4 flex flex-col gap-0.5" id="archive-categories">
         {
@@ -128,7 +128,7 @@ const uncategorizedLabel = i18n(I18nKey.uncategorized);
 				before:w-1 before:h-4 before:rounded-md before:bg-(--primary)
 				before:absolute before:left-[-16px] before:top-[5.5px]"
       >
-        {i18n(I18nKey.tags)}
+        {i18n(I18nKey.contentTags)}
       </div>
       <div class="px-4 flex gap-2 flex-wrap" id="archive-tags">
         {

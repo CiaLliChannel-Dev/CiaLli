@@ -110,6 +110,95 @@ export function createInitialLayoutState(
     };
 }
 
+function handleInitOrRouteChanged(
+    state: LayoutState,
+    intent: Extract<LayoutIntent, { type: "INIT_PAGE" | "ROUTE_CHANGED" }>,
+    config: LayoutReducerConfig,
+): LayoutState {
+    const isHome = isHomePath(intent.path);
+    return {
+        ...state,
+        mode: resolveModeForRoute(
+            isHome,
+            state.bannerEnabled,
+            config.defaultWallpaperMode,
+        ),
+        isHome,
+        scrollTop: intent.scrollTop,
+        viewportWidth: intent.viewportWidth,
+        reason: intent.reason ?? "route-change",
+    };
+}
+
+function handleScrollUpdate(
+    state: LayoutState,
+    intent: Extract<LayoutIntent, { type: "SCROLL_UPDATE" }>,
+): LayoutState {
+    return {
+        ...state,
+        scrollTop: intent.scrollTop,
+        viewportWidth: intent.viewportWidth,
+        reason: intent.reason ?? "scroll-update",
+    };
+}
+
+function handleCollapseBanner(
+    state: LayoutState,
+    intent: Extract<LayoutIntent, { type: "COLLAPSE_BANNER" }>,
+    config: LayoutReducerConfig,
+): LayoutState {
+    if (
+        !state.bannerEnabled ||
+        !state.isHome ||
+        state.viewportWidth < config.desktopCollapseMinWidth ||
+        state.mode !== "banner"
+    ) {
+        return state;
+    }
+    return {
+        ...state,
+        mode: "collapsed",
+        reason: intent.reason ?? "scroll-collapse",
+    };
+}
+
+function handleExpandBanner(
+    state: LayoutState,
+    intent: Extract<LayoutIntent, { type: "EXPAND_BANNER" }>,
+): LayoutState {
+    if (!state.bannerEnabled || !state.isHome || state.mode !== "collapsed") {
+        return state;
+    }
+    return {
+        ...state,
+        mode: "banner",
+        reason: intent.reason ?? "expand",
+    };
+}
+
+function handleLogoClick(state: LayoutState): LayoutState {
+    if (!state.bannerEnabled || !state.isHome || state.mode !== "collapsed") {
+        return state;
+    }
+    return {
+        ...state,
+        mode: "banner",
+        reason: "logo-click",
+    };
+}
+
+function handleResize(
+    state: LayoutState,
+    intent: Extract<LayoutIntent, { type: "RESIZE" }>,
+): LayoutState {
+    return {
+        ...state,
+        scrollTop: intent.scrollTop,
+        viewportWidth: intent.viewportWidth,
+        reason: intent.reason ?? "resize",
+    };
+}
+
 export function reduceLayoutState(
     state: LayoutState,
     intent: LayoutIntent,
@@ -117,75 +206,18 @@ export function reduceLayoutState(
 ): LayoutState {
     switch (intent.type) {
         case "INIT_PAGE":
-        case "ROUTE_CHANGED": {
-            const isHome = isHomePath(intent.path);
-            return {
-                ...state,
-                mode: resolveModeForRoute(
-                    isHome,
-                    state.bannerEnabled,
-                    config.defaultWallpaperMode,
-                ),
-                isHome,
-                scrollTop: intent.scrollTop,
-                viewportWidth: intent.viewportWidth,
-                reason: intent.reason ?? "route-change",
-            };
-        }
+        case "ROUTE_CHANGED":
+            return handleInitOrRouteChanged(state, intent, config);
         case "SCROLL_UPDATE":
-            return {
-                ...state,
-                scrollTop: intent.scrollTop,
-                viewportWidth: intent.viewportWidth,
-                reason: intent.reason ?? "scroll-update",
-            };
+            return handleScrollUpdate(state, intent);
         case "COLLAPSE_BANNER":
-            if (
-                !state.bannerEnabled ||
-                !state.isHome ||
-                state.viewportWidth < config.desktopCollapseMinWidth ||
-                state.mode !== "banner"
-            ) {
-                return state;
-            }
-            return {
-                ...state,
-                mode: "collapsed",
-                reason: intent.reason ?? "scroll-collapse",
-            };
+            return handleCollapseBanner(state, intent, config);
         case "EXPAND_BANNER":
-            if (
-                !state.bannerEnabled ||
-                !state.isHome ||
-                state.mode !== "collapsed"
-            ) {
-                return state;
-            }
-            return {
-                ...state,
-                mode: "banner",
-                reason: intent.reason ?? "expand",
-            };
+            return handleExpandBanner(state, intent);
         case "LOGO_CLICK":
-            if (
-                !state.bannerEnabled ||
-                !state.isHome ||
-                state.mode !== "collapsed"
-            ) {
-                return state;
-            }
-            return {
-                ...state,
-                mode: "banner",
-                reason: "logo-click",
-            };
+            return handleLogoClick(state);
         case "RESIZE":
-            return {
-                ...state,
-                scrollTop: intent.scrollTop,
-                viewportWidth: intent.viewportWidth,
-                reason: intent.reason ?? "resize",
-            };
+            return handleResize(state, intent);
         default:
             return state;
     }

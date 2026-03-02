@@ -152,6 +152,54 @@ async function fetchUsersByIds(
     return userMap;
 }
 
+function resolveUsername(
+    profile: AppProfile | undefined,
+    userId: string,
+): string {
+    const rawUsername = String(profile?.username || "").trim();
+    const usernameWithoutDomain = rawUsername.includes("@")
+        ? (rawUsername.split("@")[0] || "").trim()
+        : rawUsername;
+    return usernameWithoutDomain || `user-${String(userId || "").slice(0, 8)}`;
+}
+
+function resolveDisplayName(
+    profile: AppProfile | undefined,
+    user: AuthorUser | undefined,
+    username: string,
+): string {
+    return (
+        String(profile?.display_name || "").trim() ||
+        user?.name?.trim() ||
+        username ||
+        "Member"
+    );
+}
+
+function resolveAvatarUrl(
+    profile: AppProfile | undefined,
+    user: AuthorUser | undefined,
+): string | undefined {
+    if (profile?.avatar_url?.trim()) {
+        return profile.avatar_url;
+    }
+    if (profile?.avatar_file) {
+        return buildPublicAssetUrl(profile.avatar_file, {
+            width: 96,
+            height: 96,
+            fit: "cover",
+        });
+    }
+    if (user?.avatar) {
+        return buildPublicAssetUrl(user.avatar, {
+            width: 96,
+            height: 96,
+            fit: "cover",
+        });
+    }
+    return undefined;
+}
+
 function buildAuthor(
     userId: string,
     profileMap: Map<string, AppProfile>,
@@ -160,34 +208,10 @@ function buildAuthor(
     const profile = profileMap.get(userId);
     const user = userMap.get(userId);
 
-    const rawUsername = String(profile?.username || "").trim();
-    const usernameWithoutDomain = rawUsername.includes("@")
-        ? (rawUsername.split("@")[0] || "").trim()
-        : rawUsername;
-    const username =
-        usernameWithoutDomain || `user-${String(userId || "").slice(0, 8)}`;
-    const displayName =
-        String(profile?.display_name || "").trim() ||
-        user?.name?.trim() ||
-        username;
+    const username = resolveUsername(profile, userId);
+    const displayName = resolveDisplayName(profile, user, username);
     const name = displayName || username || "Member";
-
-    let avatarUrl: string | undefined;
-    if (profile?.avatar_url?.trim()) {
-        avatarUrl = profile.avatar_url;
-    } else if (profile?.avatar_file) {
-        avatarUrl = buildPublicAssetUrl(profile.avatar_file, {
-            width: 96,
-            height: 96,
-            fit: "cover",
-        });
-    } else if (user?.avatar) {
-        avatarUrl = buildPublicAssetUrl(user.avatar, {
-            width: 96,
-            height: 96,
-            fit: "cover",
-        });
-    }
+    const avatarUrl = resolveAvatarUrl(profile, user);
 
     return {
         id: userId,
@@ -267,6 +291,82 @@ async function fetchArticleLikeCountMap(
     }
 }
 
+type PostMappingContext = {
+    profileMap: Map<string, AppProfile>;
+    userMap: Map<string, AuthorUser>;
+    commentCountMap: Map<string, number>;
+    likeCountMap: Map<string, number>;
+};
+
+type PostIds = {
+    normalizedSlug: string;
+    slug: string | null;
+    title: string;
+    category: string;
+    articleId: string;
+    authorId: string;
+    shortId: string | null;
+    routeId: string;
+};
+
+function extractPostIds(post: AppArticle): PostIds {
+    const normalizedSlug = String(post.slug || "").trim();
+    const slug = normalizedSlug || null;
+    const title = String(post.title || "").trim();
+    const category = post.category ? String(post.category).trim() : "";
+    const articleId = String(post.id || "").trim();
+    const authorId = String(post.author_id || "").trim();
+    const shortId = String(post.short_id || "").trim() || null;
+    const routeId = shortId || articleId || normalizedSlug;
+    return {
+        normalizedSlug,
+        slug,
+        title,
+        category,
+        articleId,
+        authorId,
+        shortId,
+        routeId,
+    };
+}
+
+function buildPostData(
+    post: AppArticle,
+    ids: PostIds,
+    ctx: PostMappingContext,
+): DirectusPostEntry["data"] {
+    const { title, normalizedSlug, articleId, authorId, category } = ids;
+    return {
+        article_id: articleId,
+        author_id: authorId,
+        author: buildAuthor(authorId, ctx.profileMap, ctx.userMap),
+        title: title || normalizedSlug || articleId || "Untitled",
+        description: post.summary || undefined,
+        image: resolveCoverImage(post),
+        tags: normalizeTags(post.tags),
+        category: category || undefined,
+        comment_count: ctx.commentCountMap.get(articleId) || 0,
+        like_count: ctx.likeCountMap.get(articleId) || 0,
+        published: resolvePublishedAt(post),
+        updated: resolveUpdatedAt(post),
+        encrypted: isProtectedContentBody(post.body_markdown),
+    };
+}
+
+function mapPostToEntry(
+    post: AppArticle,
+    ctx: PostMappingContext,
+): DirectusPostEntry {
+    const ids = extractPostIds(post);
+    return {
+        id: ids.routeId,
+        slug: ids.slug,
+        body: String(post.body_markdown || ""),
+        url: buildPostUrl(ids.shortId, ids.articleId),
+        data: buildPostData(post, ids, ctx),
+    } satisfies DirectusPostEntry;
+}
+
 async function loadDirectusPosts(): Promise<DirectusPostEntry[]> {
     const andFilters: JsonObject[] = [
         { is_public: { _eq: true } },
@@ -301,37 +401,14 @@ async function loadDirectusPosts(): Promise<DirectusPostEntry[]> {
                 fetchArticleLikeCountMap(articleIds),
             ]);
 
-        const mapped = rows.map((post) => {
-            const normalizedSlug = String(post.slug || "").trim();
-            const slug = normalizedSlug || null;
-            const title = String(post.title || "").trim();
-            const category = post.category ? String(post.category).trim() : "";
-            const articleId = String(post.id || "").trim();
-            const authorId = String(post.author_id || "").trim();
-            const shortId = String(post.short_id || "").trim() || null;
-            const routeId = shortId || articleId || normalizedSlug;
-            return {
-                id: routeId,
-                slug,
-                body: String(post.body_markdown || ""),
-                url: buildPostUrl(shortId, articleId),
-                data: {
-                    article_id: articleId,
-                    author_id: authorId,
-                    author: buildAuthor(authorId, profileMap, userMap),
-                    title: title || normalizedSlug || articleId || "Untitled",
-                    description: post.summary || undefined,
-                    image: resolveCoverImage(post),
-                    tags: normalizeTags(post.tags),
-                    category: category || undefined,
-                    comment_count: commentCountMap.get(articleId) || 0,
-                    like_count: likeCountMap.get(articleId) || 0,
-                    published: resolvePublishedAt(post),
-                    updated: resolveUpdatedAt(post),
-                    encrypted: isProtectedContentBody(post.body_markdown),
-                },
-            } satisfies DirectusPostEntry;
-        });
+        const ctx: PostMappingContext = {
+            profileMap,
+            userMap,
+            commentCountMap,
+            likeCountMap,
+        };
+
+        const mapped = rows.map((post) => mapPostToEntry(post, ctx));
 
         return mapped.sort(
             (a, b) => b.data.published.getTime() - a.data.published.getTime(),
@@ -416,7 +493,7 @@ export async function getCategoryList(): Promise<Category[]> {
 
     for (const post of allBlogPosts) {
         if (!post.data.category) {
-            const uncategorizedKey = i18n(I18nKey.uncategorized);
+            const uncategorizedKey = i18n(I18nKey.contentUncategorized);
             count[uncategorizedKey] = (count[uncategorizedKey] || 0) + 1;
             continue;
         }

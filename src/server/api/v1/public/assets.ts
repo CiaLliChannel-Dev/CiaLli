@@ -7,61 +7,13 @@ import { isUuid } from "@/server/utils/short-id";
 
 import { parseRouteId, toDirectusAssetQuery } from "../shared";
 
-export async function handlePublicAsset(
-    context: APIContext,
-    segments: string[],
-): Promise<Response> {
-    if (context.request.method !== "GET") {
-        return fail("方法不允许", 405);
-    }
-
-    if (segments.length !== 3) {
-        return fail("资源不存在", 404);
-    }
-
-    const fileId = parseRouteId(segments[2]);
-    if (!fileId) {
-        return fail("缺少文件 ID", 400);
-    }
-    if (!isUuid(fileId)) {
-        return fail("资源不存在", 404);
-    }
-
-    let response: Response;
-    try {
-        response = await readDirectusAssetResponse({
-            fileId,
-            query: toDirectusAssetQuery(context.url.searchParams),
-        });
-    } catch (error) {
-        if (
-            error instanceof AppError &&
-            (error.status === 403 || error.status === 404)
-        ) {
-            return fail("资源不存在", 404);
-        }
-        throw error;
-    }
-
-    if (!response.ok) {
-        if (response.status === 404 || response.status === 403) {
-            return fail("资源不存在", 404);
-        }
-        throw new AppError(
-            "ASSET_FETCH_FAILED",
-            `资源获取失败: ${response.status} ${response.statusText}`,
-            response.status >= 400 && response.status < 500
-                ? response.status
-                : 502,
-        );
-    }
-
+function buildResponseHeaders(upstreamResponse: Response): Headers {
     const headers = new Headers();
-    const contentType = response.headers.get("content-type");
-    const contentLength = response.headers.get("content-length");
-    const cacheControl = response.headers.get("cache-control");
-    const etag = response.headers.get("etag");
-    const lastModified = response.headers.get("last-modified");
+    const contentType = upstreamResponse.headers.get("content-type");
+    const contentLength = upstreamResponse.headers.get("content-length");
+    const cacheControl = upstreamResponse.headers.get("cache-control");
+    const etag = upstreamResponse.headers.get("etag");
+    const lastModified = upstreamResponse.headers.get("last-modified");
 
     if (contentType) {
         headers.set("content-type", contentType);
@@ -84,6 +36,87 @@ export async function handlePublicAsset(
             ? "public, max-age=31536000, immutable"
             : cacheControl || "public, max-age=300, s-maxage=300",
     );
+
+    return headers;
+}
+
+async function fetchAssetResponse(
+    fileId: string,
+    searchParams: URLSearchParams,
+): Promise<Response | AppError> {
+    try {
+        return await readDirectusAssetResponse({
+            fileId,
+            query: toDirectusAssetQuery(searchParams),
+        });
+    } catch (error) {
+        if (
+            error instanceof AppError &&
+            (error.status === 403 || error.status === 404)
+        ) {
+            return error;
+        }
+        throw error;
+    }
+}
+
+function toNotFoundOnAuthError(_err: AppError): Response {
+    return fail("资源不存在", 404);
+}
+
+function assertUpstreamOk(response: Response): void {
+    if (!response.ok) {
+        if (response.status === 404 || response.status === 403) {
+            return;
+        }
+        throw new AppError(
+            "ASSET_FETCH_FAILED",
+            `资源获取失败: ${response.status} ${response.statusText}`,
+            response.status >= 400 && response.status < 500
+                ? response.status
+                : 502,
+        );
+    }
+}
+
+export async function handlePublicAsset(
+    context: APIContext,
+    segments: string[],
+): Promise<Response> {
+    if (context.request.method !== "GET") {
+        return fail("方法不允许", 405);
+    }
+
+    if (segments.length !== 3) {
+        return fail("资源不存在", 404);
+    }
+
+    const fileId = parseRouteId(segments[2]);
+    if (!fileId) {
+        return fail("缺少文件 ID", 400);
+    }
+    if (!isUuid(fileId)) {
+        return fail("资源不存在", 404);
+    }
+
+    const fetchResult = await fetchAssetResponse(
+        fileId,
+        context.url.searchParams,
+    );
+
+    if (fetchResult instanceof AppError) {
+        return toNotFoundOnAuthError(fetchResult);
+    }
+
+    const response = fetchResult;
+    if (!response.ok) {
+        if (response.status === 404 || response.status === 403) {
+            return fail("资源不存在", 404);
+        }
+        assertUpstreamOk(response);
+    }
+
+    const headers = buildResponseHeaders(response);
 
     return new Response(response.body, {
         status: 200,

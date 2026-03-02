@@ -3,8 +3,6 @@ import ContentNotVisible from "@components/misc/ContentNotVisible.astro";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
-import { buildPublicAssetUrl } from "@/server/directus-auth";
-import { resolveAuthorIdentity } from "@/utils/author-identity";
 import {
   loadProfileForViewer,
   loadUserAlbumList,
@@ -15,6 +13,12 @@ import type {
   PaginatedResult,
 } from "@/server/api/v1/public-data";
 import { getSessionUser } from "@/server/auth/session";
+import {
+  resolveAlbumCoverUrl,
+  formatAlbumDate,
+  buildGoogleMapsSearchUrl,
+  resolveAlbumAuthor,
+} from "@/utils/album-page-utils";
 
 export const prerender = false;
 
@@ -75,6 +79,18 @@ try {
 
 const items = result.status === "ok" ? result.data.items : [];
 
+const enrichedItems = items.map((item) => {
+  const author = resolveAlbumAuthor(item);
+  return {
+    ...item,
+    author,
+    coverSrc: resolveAlbumCoverUrl(item),
+    formattedDate: formatAlbumDate(item.date),
+    mapsUrl: item.location ? buildGoogleMapsSearchUrl(item.location) : null,
+    albumHref: `/${username}/albums/${item.short_id ?? item.id}`,
+  };
+});
+
 // Aggregate tags and categories for sidebar filters
 const tagCounts = new Map<string, number>();
 const categoryCounts = new Map<string, number>();
@@ -97,60 +113,20 @@ const categoryList = Array.from(categoryCounts.entries())
   .map(([name, count]) => ({ name, count }));
 
 const hasSidebarContent = tagList.length > 0 || categoryList.length > 0;
-
-function coverUrl(item: {
-  cover_file: string | null;
-  cover_url: string | null;
-  layout: "grid" | "masonry";
-}): string | null {
-  if (item.cover_url) {
-    return item.cover_url;
-  }
-  if (item.cover_file) {
-    if (item.layout === "masonry") {
-      return buildPublicAssetUrl(item.cover_file, {
-        width: 960,
-      });
-    }
-    return buildPublicAssetUrl(item.cover_file, {
-      width: 960,
-      height: 640,
-      fit: "cover",
-    });
-  }
-  return null;
-}
-
-function formatAlbumDate(value: string | null | undefined): string {
-  const raw = String(value || "").trim();
-  if (!raw) {
-    return "";
-  }
-  const parsed = new Date(raw);
-  if (Number.isNaN(parsed.getTime())) {
-    return raw;
-  }
-  return `${parsed.getFullYear()}/${String(parsed.getMonth() + 1).padStart(2, "0")}/${String(parsed.getDate()).padStart(2, "0")}`;
-}
-
-function buildGoogleMapsSearchUrl(value: string | null | undefined): string {
-  const query = String(value || "").trim();
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-}
 ---
 
 <MainGridLayout
-  title={i18n(I18nKey.albums)}
-  description={i18n(I18nKey.albumsPublicSubtitle)}
+  title={i18n(I18nKey.contentAlbums)}
+  description={i18n(I18nKey.contentAlbumsPublicSubtitle)}
 >
   {
     result.status === "not_found" || result.status === "permission_denied" ? (
       <ContentNotVisible
         mode="not_found"
-        title={i18n(I18nKey.userNotFoundTitle)}
-        description={i18n(I18nKey.userNotFoundDescription)}
+        title={i18n(I18nKey.contentUserNotFoundTitle)}
+        description={i18n(I18nKey.contentUserNotFoundDescription)}
         backHref="/"
-        backLabel={i18n(I18nKey.userBackToHome)}
+        backLabel={i18n(I18nKey.contentUserBackToHome)}
       />
     ) : (
       <div
@@ -166,10 +142,10 @@ function buildGoogleMapsSearchUrl(value: string | null | undefined): string {
             before:w-1 before:h-8 before:rounded-md before:bg-(--primary)
 						before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
               >
-                {i18n(I18nKey.albums)}
+                {i18n(I18nKey.contentAlbums)}
               </h1>
               <p class="text-base text-70">
-                {i18n(I18nKey.albumsPublicSubtitle)}
+                {i18n(I18nKey.contentAlbumsPublicSubtitle)}
               </p>
             </div>
             {isOwner && (
@@ -192,156 +168,134 @@ function buildGoogleMapsSearchUrl(value: string | null | undefined): string {
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
-                {i18n(I18nKey.albumCreateTitle)}
+                {i18n(I18nKey.contentAlbumCreateTitle)}
               </a>
             )}
           </section>
 
-          {items.length === 0 ? (
+          {enrichedItems.length === 0 ? (
             <div class="card-base p-8 rounded-(--radius-large) text-70">
-              {i18n(I18nKey.albumsNoPublic)}
+              {i18n(I18nKey.contentAlbumsNoPublic)}
             </div>
           ) : (
             <div class="grid grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-5">
-              {items.map((item) => {
-                const authorIdentity = resolveAuthorIdentity(
-                  {
-                    id: item.author?.id,
-                    name: item.author?.name,
-                    display_name: item.author?.display_name,
-                    username: item.author?.username,
-                  },
-                  item.author_id,
-                );
-                const authorHandle = String(
-                  authorIdentity.username || item.author_id || "",
-                )
-                  .trim()
-                  .replace(/^@+/, "");
-                return (
-                  <article
-                    class="album-list-item card-base rounded-(--radius-large) overflow-hidden border border-(--line-divider) text-90"
-                    data-tags={JSON.stringify(item.tags)}
-                    data-category={item.category || ""}
-                    data-author-id={item.author_id}
-                    data-author-handle={authorHandle}
-                  >
-                    <a
-                      href={`/${username}/albums/${item.short_id || item.id}`}
-                      class="block"
-                    >
-                      {coverUrl(item) &&
-                        (item.layout === "masonry" ? (
-                          <div class="w-full h-56 bg-black flex items-center justify-center">
-                            <img
-                              src={coverUrl(item) || ""}
-                              alt={item.title}
-                              class="w-full h-full object-contain"
-                              loading="lazy"
-                            />
-                          </div>
-                        ) : (
+              {enrichedItems.map((item) => (
+                <article
+                  class="album-list-item card-base rounded-(--radius-large) overflow-hidden border border-(--line-divider) text-90"
+                  data-tags={JSON.stringify(item.tags)}
+                  data-category={item.category ?? ""}
+                  data-author-id={item.author_id}
+                  data-author-handle={item.author.handle}
+                >
+                  <a href={item.albumHref} class="block">
+                    {item.coverSrc &&
+                      (item.layout === "masonry" ? (
+                        <div class="w-full h-56 bg-black flex items-center justify-center">
                           <img
-                            src={coverUrl(item) || ""}
+                            src={item.coverSrc}
                             alt={item.title}
-                            class="w-full h-56 object-cover"
+                            class="w-full h-full object-contain"
                             loading="lazy"
                           />
-                        ))}
-                    </a>
-                    <div class="p-5 space-y-2">
-                      <a
-                        href={`/${username}/albums/${item.short_id || item.id}`}
-                        class="block space-y-2"
-                      >
-                        <h2 class="text-lg font-semibold line-clamp-1">
-                          {item.title}
-                        </h2>
-                        {item.description && (
-                          <p class="text-sm text-75 line-clamp-1">
-                            {item.description}
-                          </p>
-                        )}
-                        <div
-                          class="h-px bg-(--line-divider)"
-                          aria-hidden="true"
+                        </div>
+                      ) : (
+                        <img
+                          src={item.coverSrc}
+                          alt={item.title}
+                          class="w-full h-56 object-cover"
+                          loading="lazy"
                         />
-                      </a>
-                      <div class="text-xs text-60 font-semibold flex items-center gap-1.5 min-w-0">
-                        <span class="truncate text-90 border-b border-transparent hover:border-current transition-colors">
-                          {authorIdentity.displayName}
-                        </span>
-                        <span class="shrink-0 hover:text-(--primary) transition-colors">
-                          @{authorIdentity.username}
-                        </span>
-                        {formatAlbumDate(item.date) && (
-                          <>
-                            <span
-                              class="text-(--meta-divider)"
-                              aria-hidden="true"
-                            >
-                              ·
-                            </span>
-                            <span class="shrink-0 text-60">
-                              {formatAlbumDate(item.date)}
-                            </span>
-                          </>
-                        )}
-                        {item.location && (
-                          <>
-                            <span
-                              class="text-(--meta-divider)"
-                              aria-hidden="true"
-                            >
-                              ·
-                            </span>
-                            <a
-                              class="inline-flex items-center gap-1 min-w-0 hover:text-(--primary) transition-colors"
-                              href={buildGoogleMapsSearchUrl(item.location)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              aria-label={i18n(
-                                I18nKey.albumsGoogleMapSearchAria,
-                              ).replace("{location}", item.location)}
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                class="w-3.5 h-3.5 shrink-0"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
-                                aria-hidden="true"
-                              >
-                                <path d="M12 22s8-6.2 8-12a8 8 0 10-16 0c0 5.8 8 12 8 12z" />
-                                <circle cx="12" cy="10" r="3" />
-                              </svg>
-                              <span class="truncate">{item.location}</span>
-                            </a>
-                          </>
-                        )}
-                      </div>
-                      <div class="text-xs text-60 flex flex-wrap items-center gap-2">
-                        {item.category && (
-                          <span class="px-1.5 py-0.5 rounded bg-(--btn-plain-bg-hover)">
-                            {item.category}
+                      ))}
+                  </a>
+                  <div class="p-5 space-y-2">
+                    <a href={item.albumHref} class="block space-y-2">
+                      <h2 class="text-lg font-semibold line-clamp-1">
+                        {item.title}
+                      </h2>
+                      {item.description && (
+                        <p class="text-sm text-75 line-clamp-1">
+                          {item.description}
+                        </p>
+                      )}
+                      <div
+                        class="h-px bg-(--line-divider)"
+                        aria-hidden="true"
+                      />
+                    </a>
+                    <div class="text-xs text-60 font-semibold flex items-center gap-1.5 min-w-0">
+                      <span class="truncate text-90 border-b border-transparent hover:border-current transition-colors">
+                        {item.author.displayName}
+                      </span>
+                      <span class="shrink-0 hover:text-(--primary) transition-colors">
+                        @{item.author.username}
+                      </span>
+                      {item.formattedDate && (
+                        <>
+                          <span
+                            class="text-(--meta-divider)"
+                            aria-hidden="true"
+                          >
+                            ·
                           </span>
-                        )}
-                        {item.tags.length > 0 &&
-                          item.tags
-                            .slice(0, 4)
-                            .map((tag) => (
-                              <span class="btn-regular h-6 text-xs px-2.5 rounded-lg">
-                                #{tag}
-                              </span>
-                            ))}
-                      </div>
+                          <span class="shrink-0 text-60">
+                            {item.formattedDate}
+                          </span>
+                        </>
+                      )}
+                      {item.mapsUrl && (
+                        <>
+                          <span
+                            class="text-(--meta-divider)"
+                            aria-hidden="true"
+                          >
+                            ·
+                          </span>
+                          <a
+                            class="inline-flex items-center gap-1 min-w-0 hover:text-(--primary) transition-colors"
+                            href={item.mapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label={i18n(
+                              I18nKey.contentAlbumsGoogleMapSearchAria,
+                            ).replace("{location}", item.location ?? "")}
+                          >
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              class="w-3.5 h-3.5 shrink-0"
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              stroke="currentColor"
+                              stroke-width="2"
+                              stroke-linecap="round"
+                              stroke-linejoin="round"
+                              aria-hidden="true"
+                            >
+                              <path d="M12 22s8-6.2 8-12a8 8 0 10-16 0c0 5.8 8 12 8 12z" />
+                              <circle cx="12" cy="10" r="3" />
+                            </svg>
+                            <span class="truncate">{item.location}</span>
+                          </a>
+                        </>
+                      )}
                     </div>
-                  </article>
-                );
-              })}
+                    <div class="text-xs text-60 flex flex-wrap items-center gap-2">
+                      {item.category && (
+                        <span class="px-1.5 py-0.5 rounded bg-(--btn-plain-bg-hover)">
+                          {item.category}
+                        </span>
+                      )}
+                      {item.tags.length > 0 &&
+                        item.tags
+                          .slice(0, 4)
+                          .map((tag) => (
+                            <span class="btn-regular h-6 text-xs px-2.5 rounded-lg">
+                              #{tag}
+                            </span>
+                          ))}
+                    </div>
+                  </div>
+                </article>
+              ))}
             </div>
           )}
 
@@ -350,7 +304,7 @@ function buildGoogleMapsSearchUrl(value: string | null | undefined): string {
             id="album-no-results"
             class="hidden card-base p-8 rounded-(--radius-large) text-70 mt-4"
           >
-            {i18n(I18nKey.albumsNoMatch)}
+            {i18n(I18nKey.contentAlbumsNoMatch)}
           </div>
         </div>
         <div
@@ -421,7 +375,7 @@ function buildGoogleMapsSearchUrl(value: string | null | undefined): string {
             before:w-1 before:h-4 before:rounded-md before:bg-(--primary)
 						before:absolute before:left-[-16px] before:top-[5.5px]"
             >
-              {i18n(I18nKey.commonCategory)}
+              {i18n(I18nKey.interactionCommonCategory)}
             </div>
             <div class="px-4 flex flex-col gap-0.5" id="album-categories">
               {categoryList.map((c) => (
@@ -462,7 +416,7 @@ function buildGoogleMapsSearchUrl(value: string | null | undefined): string {
             before:w-1 before:h-4 before:rounded-md before:bg-(--primary)
 						before:absolute before:left-[-16px] before:top-[5.5px]"
             >
-              {i18n(I18nKey.tags)}
+              {i18n(I18nKey.contentTags)}
             </div>
             <div class="px-4 flex gap-2 flex-wrap" id="album-tags">
               {tagList.map((t) => (
@@ -491,7 +445,7 @@ function buildGoogleMapsSearchUrl(value: string | null | undefined): string {
             id="album-filter-clear-btn"
             class="shrink-0 text-sm text-(--primary) hover:underline cursor-pointer"
           >
-            {i18n(I18nKey.commonClear)}
+            {i18n(I18nKey.interactionCommonClear)}
           </button>
         </div>
       </div>
@@ -511,8 +465,6 @@ function buildGoogleMapsSearchUrl(value: string | null | undefined): string {
     background-color: rgba(156, 163, 175, 0.3);
     border-radius: 2px;
   }
-
-  /* Mobile: natural height */
 
   /* Active filter button */
   :global(.album-filter-btn.active) {

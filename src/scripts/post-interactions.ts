@@ -3,15 +3,18 @@ import {
     subscribeAuthState,
     type AuthState,
 } from "@/scripts/auth-state";
-import {
-    showAuthRequiredDialog,
-    showConfirmDialog,
-    showFormDialog,
-    showNoticeDialog,
-} from "@/scripts/dialogs";
-import I18nKey from "@i18n/i18nKey";
+import { showAuthRequiredDialog, showNoticeDialog } from "@/scripts/dialogs";
+import I18nKey from "@/i18n/i18nKey";
 import { t } from "@/scripts/i18n-runtime";
-import { getCsrfToken } from "@/utils/csrf";
+import {
+    fetchAllLikedIds,
+    handleBlockUserAction,
+    handleDeleteArticleAction,
+    handleDeleteDiaryAction,
+    handleToggleLikeAction,
+    resolveCardContext,
+    type LikeButtonHelpers,
+} from "@/scripts/post-interactions-helpers";
 
 type CalendarFilterDetail = {
     type: "day" | "month" | "year";
@@ -33,7 +36,10 @@ type RuntimeWindow = Window &
 
 const runtimeWindow = window as RuntimeWindow;
 
-function getFilterDom() {
+function getFilterDom(): {
+    postList: HTMLElement | null;
+    pagination: HTMLElement | null;
+} {
     return {
         postList: document.getElementById("post-list-container"),
         pagination: document.getElementById("pagination-container"),
@@ -44,7 +50,7 @@ function isArchivePage(): boolean {
     return Boolean(document.querySelector(".archive-posts"));
 }
 
-function applyCalendarFilter(detail: CalendarFilterDetail) {
+function applyCalendarFilter(detail: CalendarFilterDetail): void {
     // archive 页面有自己的筛选系统，跳过此处理
     if (isArchivePage()) {
         return;
@@ -69,7 +75,7 @@ function applyCalendarFilter(detail: CalendarFilterDetail) {
     pagination?.classList.add("hidden");
 }
 
-function clearCalendarFilter() {
+function clearCalendarFilter(): void {
     // archive 页面有自己的筛选系统，跳过此处理
     if (isArchivePage()) {
         return;
@@ -85,7 +91,7 @@ function clearCalendarFilter() {
     pagination?.classList.remove("hidden");
 }
 
-function setupCalendarFilterListeners() {
+function setupCalendarFilterListeners(): void {
     if (runtimeWindow._calendarFilterListenerAttached) {
         return;
     }
@@ -112,11 +118,11 @@ let currentAuthState: AuthState = {
     isLoggedIn: false,
 };
 
-function updateCurrentAuthState(state: AuthState) {
+function updateCurrentAuthState(state: AuthState): void {
     currentAuthState = state;
 }
 
-async function applyBlockedUsersFilter() {
+async function applyBlockedUsersFilter(): Promise<void> {
     if (!currentAuthState.isLoggedIn) {
         return;
     }
@@ -146,7 +152,7 @@ function applyCardActionVisibility(
     state: AuthState,
     deleteOwnAction: string,
     deleteAdminAction: string,
-) {
+): void {
     const authorId = String(card.dataset.authorId || "");
     const deleteOwnBtn = card.querySelector<HTMLButtonElement>(
         `button[data-action="${deleteOwnAction}"]`,
@@ -182,7 +188,7 @@ function applyCardActionVisibility(
     }
 }
 
-function updateCardActionVisibility(state: AuthState) {
+function updateCardActionVisibility(state: AuthState): void {
     const postCards =
         document.querySelectorAll<HTMLElement>("[data-post-card]");
     postCards.forEach((card) => {
@@ -210,7 +216,7 @@ function setLikeButtonState(
     button: HTMLButtonElement,
     liked: boolean,
     likeCount?: number,
-) {
+): void {
     button.dataset.liked = liked ? "true" : "false";
     button.classList.toggle("text-(--primary)", liked);
     button.classList.toggle("text-50", !liked);
@@ -254,76 +260,7 @@ function getLikeButtonCount(button: HTMLButtonElement): number {
     return 0;
 }
 
-const LIKE_SYNC_PAGE_LIMIT = 100;
-
-type LikeRelationField = "article_id" | "diary_id";
-
-type FetchAllLikedIdsOptions = {
-    endpoint: string;
-    idField: LikeRelationField;
-};
-
-function normalizeRelationId(value: unknown): string {
-    if (typeof value === "string" || typeof value === "number") {
-        return String(value).trim();
-    }
-    if (value && typeof value === "object" && "id" in value) {
-        const relationId = (value as { id?: unknown }).id;
-        if (typeof relationId === "string" || typeof relationId === "number") {
-            return String(relationId).trim();
-        }
-    }
-    return "";
-}
-
-async function fetchAllLikedIds({
-    endpoint,
-    idField,
-}: FetchAllLikedIdsOptions): Promise<Set<string>> {
-    const likedIds = new Set<string>();
-    let page = 1;
-    let total: number | null = null;
-    let fetched = 0;
-    let hasMore = true;
-
-    while (hasMore) {
-        const response = await fetch(
-            `${endpoint}?page=${page}&limit=${LIKE_SYNC_PAGE_LIMIT}`,
-            {
-                credentials: "include",
-            },
-        );
-        const data = await response.json().catch(() => ({}));
-        if (!response.ok || !data?.ok || !Array.isArray(data.items)) {
-            throw new Error(`failed to fetch likes list: ${endpoint}`);
-        }
-        if (typeof data.total === "number" && Number.isFinite(data.total)) {
-            total = Math.max(0, Math.floor(data.total));
-        }
-
-        const items = data.items as Array<Record<string, unknown>>;
-        fetched += items.length;
-        for (const item of items) {
-            const id = normalizeRelationId(item[idField]);
-            if (id) {
-                likedIds.add(id);
-            }
-        }
-
-        hasMore = !(
-            items.length < LIKE_SYNC_PAGE_LIMIT ||
-            items.length === 0 ||
-            (total !== null && fetched >= total)
-        );
-        if (hasMore) {
-            page += 1;
-        }
-    }
-
-    return likedIds;
-}
-
-async function syncLikeButtons() {
+async function syncLikeButtons(): Promise<void> {
     const likeButtons = document.querySelectorAll<HTMLButtonElement>(
         'button[data-action="toggle-like"]',
     );
@@ -379,7 +316,7 @@ async function syncLikeButtons() {
     }
 }
 
-function removeCardByArticleId(articleId: string) {
+function removeCardByArticleId(articleId: string): void {
     const card = document.querySelector<HTMLElement>(
         `[data-post-card][data-article-id="${CSS.escape(articleId)}"]`,
     );
@@ -390,7 +327,7 @@ function removeCardByArticleId(articleId: string) {
     row?.remove();
 }
 
-function removeCardByDiaryId(diaryId: string) {
+function removeCardByDiaryId(diaryId: string): void {
     const card = document.querySelector<HTMLElement>(
         `[data-diary-card][data-diary-id="${CSS.escape(diaryId)}"]`,
     );
@@ -401,7 +338,7 @@ function removeCardByDiaryId(diaryId: string) {
     row.remove();
 }
 
-function removeCardsByAuthorId(authorId: string) {
+function removeCardsByAuthorId(authorId: string): void {
     const escaped = CSS.escape(authorId);
     const cards = document.querySelectorAll<HTMLElement>(
         `[data-post-card][data-author-id="${escaped}"], [data-diary-card][data-author-id="${escaped}"]`,
@@ -415,145 +352,70 @@ function removeCardsByAuthorId(authorId: string) {
     });
 }
 
-function getErrorMessage(
-    data: Record<string, unknown> | null,
-    fallback: string,
-): string {
-    const error = data?.error as Record<string, unknown> | undefined;
-    return (error?.message as string | undefined) || fallback;
-}
-
-async function requestDeleteArticle(articleId: string) {
-    const response = await fetch(
-        `/api/v1/me/articles/${encodeURIComponent(articleId)}`,
-        {
-            method: "DELETE",
-            credentials: "include",
-            headers: { "x-csrf-token": getCsrfToken() },
-        },
-    );
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data?.ok) {
-        throw new Error(getErrorMessage(data, t(I18nKey.postDeleteFailed)));
-    }
-}
-
-async function requestDeleteDiary(diaryId: string) {
-    const response = await fetch(
-        `/api/v1/me/diaries/${encodeURIComponent(diaryId)}`,
-        {
-            method: "DELETE",
-            credentials: "include",
-            headers: { "x-csrf-token": getCsrfToken() },
-        },
-    );
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data?.ok) {
-        throw new Error(getErrorMessage(data, t(I18nKey.postDeleteFailed)));
-    }
-}
-
-async function requestBlockUser(blockedUserId: string, reason?: string) {
-    const response = await fetch("/api/v1/me/blocks", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-            "content-type": "application/json",
-            "x-csrf-token": getCsrfToken(),
-        },
-        body: JSON.stringify({
-            blocked_user_id: blockedUserId,
-            reason: reason || undefined,
-        }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data?.ok) {
-        throw new Error(getErrorMessage(data, t(I18nKey.postActionFailed)));
-    }
-}
-
-async function requestToggleLike(articleId: string): Promise<{
-    liked: boolean;
-    like_count: number;
-}> {
-    const response = await fetch("/api/v1/me/article-likes", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-            "content-type": "application/json",
-            "x-csrf-token": getCsrfToken(),
-        },
-        body: JSON.stringify({
-            article_id: articleId,
-        }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data?.ok) {
-        throw new Error(getErrorMessage(data, t(I18nKey.postActionFailed)));
-    }
+function buildLikeButtonHelpers(): LikeButtonHelpers {
     return {
-        liked: Boolean(data.liked),
-        like_count: Number(data.like_count || 0),
+        isLikeButtonPending,
+        getLikeButtonCount,
+        setLikeButtonPending,
+        setLikeButtonState,
     };
 }
 
-async function requestToggleDiaryLike(diaryId: string): Promise<{
-    liked: boolean;
-    like_count: number;
-}> {
-    const response = await fetch("/api/v1/me/diary-likes", {
-        method: "POST",
-        credentials: "include",
-        headers: {
-            "content-type": "application/json",
-            "x-csrf-token": getCsrfToken(),
-        },
-        body: JSON.stringify({
-            diary_id: diaryId,
-        }),
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data?.ok) {
-        throw new Error(getErrorMessage(data, t(I18nKey.postActionFailed)));
-    }
-    return {
-        liked: Boolean(data.liked),
-        like_count: Number(data.like_count || 0),
-    };
-}
-
-function resolveCardContext(actionEl: HTMLElement): {
-    cardType: "post" | "diary";
-    card: HTMLElement;
-    itemId: string;
-    authorId: string;
-} | null {
-    const postCard = actionEl.closest<HTMLElement>("[data-post-card]");
-    if (postCard) {
-        return {
-            cardType: "post",
-            card: postCard,
-            itemId: String(postCard.dataset.articleId || ""),
-            authorId: String(postCard.dataset.authorId || ""),
-        };
-    }
-    const diaryCard = actionEl.closest<HTMLElement>("[data-diary-card]");
-    if (diaryCard) {
-        return {
-            cardType: "diary",
-            card: diaryCard,
-            itemId: String(diaryCard.dataset.diaryId || ""),
-            authorId: String(diaryCard.dataset.authorId || ""),
-        };
-    }
-    return null;
-}
-
-function setupPostCardActions() {
-    if (runtimeWindow._postCardActionsAttached) {
+async function handleCardAction(
+    actionEl: HTMLElement,
+    action: string,
+): Promise<void> {
+    const ctx = resolveCardContext(actionEl);
+    if (!ctx || !ctx.itemId) {
         return;
     }
 
+    const { cardType, itemId, authorId } = ctx;
+
+    if (action === "delete-own-article" || action === "delete-admin-article") {
+        await handleDeleteArticleAction(
+            itemId,
+            authorId,
+            action,
+            currentAuthState,
+            removeCardByArticleId,
+        );
+        return;
+    }
+
+    if (action === "delete-own-diary" || action === "delete-admin-diary") {
+        await handleDeleteDiaryAction(
+            itemId,
+            authorId,
+            action,
+            currentAuthState,
+            removeCardByDiaryId,
+        );
+        return;
+    }
+
+    if (action === "toggle-like") {
+        const button = actionEl as HTMLButtonElement;
+        await handleToggleLikeAction(
+            button,
+            cardType,
+            itemId,
+            buildLikeButtonHelpers(),
+        );
+        return;
+    }
+
+    if (action === "block-user") {
+        await handleBlockUserAction(
+            authorId,
+            currentAuthState.userId,
+            removeCardsByAuthorId,
+        );
+        return;
+    }
+}
+
+function setupMenuAuthGuard(): void {
     document.addEventListener("click", (event) => {
         const target = event.target as HTMLElement | null;
         if (!target) {
@@ -567,7 +429,9 @@ function setupPostCardActions() {
             showAuthRequiredDialog();
         }
     });
+}
 
+function setupCardActionHandler(): void {
     document.addEventListener("click", async (event) => {
         const target = event.target as HTMLElement | null;
         if (!target) {
@@ -583,9 +447,6 @@ function setupPostCardActions() {
             return;
         }
 
-        const { cardType, itemId, authorId } = ctx;
-        const action = String(actionEl.dataset.action || "");
-
         if (!currentAuthState.isLoggedIn) {
             showAuthRequiredDialog();
             return;
@@ -594,191 +455,24 @@ function setupPostCardActions() {
         const details = actionEl.closest("details");
         details?.removeAttribute("open");
 
+        const action = String(actionEl.dataset.action || "");
+
         try {
-            if (
-                action === "delete-own-article" ||
-                action === "delete-admin-article"
-            ) {
-                const canDelete =
-                    currentAuthState.isAdmin ||
-                    currentAuthState.userId === authorId;
-                if (!canDelete) {
-                    await showNoticeDialog({
-                        ariaLabel: t(I18nKey.dialogNoticeTitle),
-                        message: t(I18nKey.postNoPermissionDeleteArticle),
-                    });
-                    return;
-                }
-                const confirmText =
-                    action === "delete-admin-article"
-                        ? t(I18nKey.postDeleteConfirmAdminArticle)
-                        : t(I18nKey.postDeleteConfirmOwnArticle);
-                const confirmed = await showConfirmDialog({
-                    ariaLabel: t(I18nKey.dialogConfirmTitle),
-                    message: confirmText,
-                    confirmText: t(I18nKey.commonDelete),
-                    cancelText: t(I18nKey.commonCancel),
-                    confirmVariant: "danger",
-                });
-                if (!confirmed) {
-                    return;
-                }
-                try {
-                    await requestDeleteArticle(itemId);
-                    removeCardByArticleId(itemId);
-                } catch (error) {
-                    const message =
-                        error instanceof Error
-                            ? error.message
-                            : t(I18nKey.postDeleteFailed);
-                    await showNoticeDialog({
-                        ariaLabel: t(I18nKey.dialogNoticeTitle),
-                        message,
-                    });
-                }
-                return;
-            }
-
-            if (
-                action === "delete-own-diary" ||
-                action === "delete-admin-diary"
-            ) {
-                const canDelete =
-                    currentAuthState.isAdmin ||
-                    currentAuthState.userId === authorId;
-                if (!canDelete) {
-                    await showNoticeDialog({
-                        ariaLabel: t(I18nKey.dialogNoticeTitle),
-                        message: t(I18nKey.postNoPermissionDeleteDiary),
-                    });
-                    return;
-                }
-                const confirmText =
-                    action === "delete-admin-diary"
-                        ? t(I18nKey.postDeleteConfirmAdminDiary)
-                        : t(I18nKey.postDeleteConfirmOwnDiary);
-                const confirmed = await showConfirmDialog({
-                    ariaLabel: t(I18nKey.dialogConfirmTitle),
-                    message: confirmText,
-                    confirmText: t(I18nKey.commonDelete),
-                    cancelText: t(I18nKey.commonCancel),
-                    confirmVariant: "danger",
-                });
-                if (!confirmed) {
-                    return;
-                }
-                try {
-                    await requestDeleteDiary(itemId);
-                    removeCardByDiaryId(itemId);
-                } catch (error) {
-                    const message =
-                        error instanceof Error
-                            ? error.message
-                            : t(I18nKey.postDeleteFailed);
-                    await showNoticeDialog({
-                        ariaLabel: t(I18nKey.dialogNoticeTitle),
-                        message,
-                    });
-                }
-                return;
-            }
-
-            if (action === "toggle-like") {
-                const button = actionEl as HTMLButtonElement;
-                if (isLikeButtonPending(button)) {
-                    return;
-                }
-                const previousLiked = button.dataset.liked === "true";
-                const previousLikeCount = getLikeButtonCount(button);
-                const optimisticLiked = !previousLiked;
-                const optimisticLikeCount = Math.max(
-                    0,
-                    previousLikeCount + (optimisticLiked ? 1 : -1),
-                );
-
-                setLikeButtonPending(button, true);
-                setLikeButtonState(
-                    button,
-                    optimisticLiked,
-                    optimisticLikeCount,
-                );
-                try {
-                    if (cardType === "diary") {
-                        const result = await requestToggleDiaryLike(itemId);
-                        setLikeButtonState(
-                            button,
-                            result.liked,
-                            result.like_count,
-                        );
-                    } else {
-                        const result = await requestToggleLike(itemId);
-                        setLikeButtonState(
-                            button,
-                            result.liked,
-                            result.like_count,
-                        );
-                    }
-                } catch (error) {
-                    setLikeButtonState(
-                        button,
-                        previousLiked,
-                        previousLikeCount,
-                    );
-                    throw error;
-                } finally {
-                    setLikeButtonPending(button, false);
-                }
-                return;
-            }
-
-            if (action === "block-user") {
-                if (!authorId || currentAuthState.userId === authorId) {
-                    await showNoticeDialog({
-                        ariaLabel: t(I18nKey.dialogNoticeTitle),
-                        message: t(I18nKey.postCannotBlockUser),
-                    });
-                    return;
-                }
-                const formValues = await showFormDialog({
-                    ariaLabel: t(I18nKey.postBlockUserTitle),
-                    message: t(I18nKey.postBlockUserMessage),
-                    confirmText: t(I18nKey.commonConfirm),
-                    cancelText: t(I18nKey.commonCancel),
-                    confirmVariant: "danger",
-                    fields: [
-                        {
-                            name: "reason",
-                            label: t(I18nKey.postBlockReasonLabel),
-                            type: "textarea",
-                            placeholder: t(I18nKey.postBlockReasonPlaceholder),
-                            rows: 3,
-                        },
-                    ],
-                });
-                if (!formValues) {
-                    return;
-                }
-                const reason = String(formValues.reason || "").trim();
-                await requestBlockUser(authorId, reason);
-                removeCardsByAuthorId(authorId);
-                await showNoticeDialog({
-                    ariaLabel: t(I18nKey.dialogNoticeTitle),
-                    message: t(I18nKey.postBlockSuccess),
-                });
-                return;
-            }
+            await handleCardAction(actionEl, action);
         } catch (error) {
             const message =
                 error instanceof Error
                     ? error.message
-                    : t(I18nKey.postActionFailed);
+                    : t(I18nKey.interactionPostActionFailed);
             await showNoticeDialog({
-                ariaLabel: t(I18nKey.dialogNoticeTitle),
+                ariaLabel: t(I18nKey.interactionDialogNoticeTitle),
                 message,
             });
         }
     });
+}
 
+function setupMenuCloseOnOutsideClick(): void {
     document.addEventListener("click", (event) => {
         const target = event.target as HTMLElement | null;
         if (!target) {
@@ -792,6 +486,16 @@ function setupPostCardActions() {
                 }
             });
     });
+}
+
+function setupPostCardActions(): void {
+    if (runtimeWindow._postCardActionsAttached) {
+        return;
+    }
+
+    setupMenuAuthGuard();
+    setupCardActionHandler();
+    setupMenuCloseOnOutsideClick();
 
     subscribeAuthState((state) => {
         updateCurrentAuthState(state);

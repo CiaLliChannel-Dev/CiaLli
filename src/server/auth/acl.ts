@@ -46,35 +46,84 @@ function normalizeHomeSectionOrder(input: unknown): string[] | null {
         .map((item) => (item === "anime" ? "bangumi" : item));
 }
 
-function normalizeProfile(raw: Partial<AppProfile>): AppProfile {
+function clampTypingSpeed(raw: Partial<AppProfile>): number {
+    return Math.max(
+        10,
+        Math.min(500, Math.floor(Number(raw.bio_typewriter_speed) || 80)),
+    );
+}
+
+function normalizeProfileIdentity(
+    raw: Partial<AppProfile>,
+): Pick<AppProfile, "id" | "user_id" | "username" | "display_name" | "status"> {
     return {
         id: raw.id || "",
         user_id: raw.user_id || "",
         username: raw.username || "",
         display_name: raw.display_name || "",
-        bio: raw.bio ?? null,
-        bio_typewriter_enable: raw.bio_typewriter_enable ?? true,
-        bio_typewriter_speed: Math.max(
-            10,
-            Math.min(500, Math.floor(Number(raw.bio_typewriter_speed) || 80)),
-        ),
+        status: raw.status || "published",
+    };
+}
+
+function normalizeProfileMedia(
+    raw: Partial<AppProfile>,
+): Pick<AppProfile, "avatar_file" | "avatar_url" | "header_file"> {
+    return {
         avatar_file: raw.avatar_file ?? null,
         avatar_url: raw.avatar_url ?? null,
         header_file: raw.header_file ?? null,
+    };
+}
+
+function normalizeProfileVisibility(
+    raw: Partial<AppProfile>,
+): Pick<
+    AppProfile,
+    | "profile_public"
+    | "show_articles_on_profile"
+    | "show_diaries_on_profile"
+    | "show_bangumi_on_profile"
+    | "show_albums_on_profile"
+    | "show_comments_on_profile"
+> {
+    return {
         profile_public: raw.profile_public ?? true,
         show_articles_on_profile: raw.show_articles_on_profile ?? true,
         show_diaries_on_profile: raw.show_diaries_on_profile ?? true,
         show_bangumi_on_profile: raw.show_bangumi_on_profile ?? true,
         show_albums_on_profile: raw.show_albums_on_profile ?? true,
         show_comments_on_profile: raw.show_comments_on_profile ?? true,
+    };
+}
+
+function normalizeProfileBangumi(
+    raw: Partial<AppProfile>,
+): Pick<
+    AppProfile,
+    | "bangumi_username"
+    | "bangumi_include_private"
+    | "bangumi_access_token_encrypted"
+> {
+    return {
         bangumi_username: raw.bangumi_username ?? null,
         bangumi_include_private: raw.bangumi_include_private ?? false,
         bangumi_access_token_encrypted:
             raw.bangumi_access_token_encrypted ?? null,
+    };
+}
+
+function normalizeProfile(raw: Partial<AppProfile>): AppProfile {
+    return {
+        ...normalizeProfileIdentity(raw),
+        bio: raw.bio ?? null,
+        bio_typewriter_enable: raw.bio_typewriter_enable ?? true,
+        bio_typewriter_speed: clampTypingSpeed(raw),
+        ...normalizeProfileMedia(raw),
+        ...normalizeProfileVisibility(raw),
+        ...normalizeProfileBangumi(raw),
         social_links: raw.social_links ?? null,
         home_section_order: normalizeHomeSectionOrder(raw.home_section_order),
         is_official: raw.is_official ?? false,
-        status: raw.status || "published",
     };
 }
 

@@ -185,322 +185,171 @@ const {
 <script>
   import { getAuthState, subscribeAuthState } from "@/scripts/auth-state";
   import type { AuthState } from "@/scripts/auth-state";
-  import {
-    showAuthRequiredDialog,
-    showConfirmDialog,
-    showNoticeDialog,
-  } from "@/scripts/dialogs";
+  import { showAuthRequiredDialog } from "@/scripts/dialogs";
   import { navigateToPage } from "@/utils/navigation-utils";
-  import { getCsrfToken } from "@/utils/csrf";
+  import {
+    queryDetailElements,
+    resolveAndMountElement,
+    handleDeleteAction,
+    handleLikeAction,
+  } from "@/scripts/detail-action-float-helpers";
+  import type { LikeActionState } from "@/scripts/detail-action-float-helpers";
+
+  function bindDetailRoot(rootEl: HTMLElement): void {
+    rootEl.dataset.bound = "1";
+    const dockToBackTop = rootEl.dataset.dockToBackTop === "1";
+    resolveAndMountElement({ rootEl, dockToBackTop });
+
+    const contentType = String(rootEl.dataset.contentType || "");
+    const contentId = String(rootEl.dataset.contentId || "");
+    const authorId = String(rootEl.dataset.authorId || "");
+    const editHref = String(rootEl.dataset.editHref || "");
+    const deleteEndpoint = String(rootEl.dataset.deleteEndpoint || "");
+    const deleteConfirmMessage = String(
+      rootEl.dataset.deleteConfirmMessage || "确认删除该内容？删除后不可恢复。",
+    );
+    const deleteSuccessHref = String(rootEl.dataset.deleteSuccessHref || "/");
+
+    const els = queryDetailElements(rootEl);
+    const {
+      likeBtn,
+      commentBtn,
+      manageBtn,
+      panel,
+      editBtn,
+      deleteBtn,
+      likeCountText,
+    } = els;
+
+    const likeState: LikeActionState = {
+      liked: rootEl.dataset.liked === "1",
+      likeCount: Number(rootEl.dataset.likeCount || "0") || 0,
+      likePending: false,
+    };
+    let isOpen = false;
+
+    function applyLikeUI(): void {
+      const count = Math.max(0, likeState.likeCount);
+      likeState.likeCount = count;
+      rootEl.dataset.liked = likeState.liked ? "1" : "0";
+      rootEl.dataset.likeCount = String(count);
+      likeBtn?.classList.toggle("active", likeState.liked);
+      likeBtn?.classList.toggle("is-pending", likeState.likePending);
+      if (likeBtn) {
+        likeBtn.disabled = likeState.likePending;
+      }
+      if (likeCountText) {
+        likeCountText.textContent = String(count);
+      }
+    }
+
+    function applyActionVisibility(state: AuthState): void {
+      const canManage =
+        state.isLoggedIn &&
+        Boolean(state.userId) &&
+        (state.isAdmin || state.userId === authorId);
+      const canOpenPanel = canManage || state.isLoggedIn;
+
+      manageBtn?.classList.toggle("hidden", !canOpenPanel);
+      editBtn?.classList.toggle("hidden", !canManage);
+      deleteBtn?.classList.toggle("hidden", !canManage);
+
+      if (!canOpenPanel && isOpen) {
+        panel?.classList.remove("show");
+        isOpen = false;
+      }
+    }
+
+    function openPanel(): void {
+      isOpen = true;
+      panel?.classList.add("show");
+      manageBtn?.classList.add("active");
+    }
+
+    function closePanel(): void {
+      isOpen = false;
+      panel?.classList.remove("show");
+      manageBtn?.classList.remove("active");
+    }
+
+    applyLikeUI();
+    applyActionVisibility(getAuthState());
+    subscribeAuthState((state) => applyActionVisibility(state));
+
+    manageBtn?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      if (isOpen) {
+        closePanel();
+      } else {
+        openPanel();
+      }
+    });
+
+    document.addEventListener("click", (event) => {
+      if (!isOpen) return;
+      if (!rootEl.contains(event.target as Node)) {
+        closePanel();
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && isOpen) {
+        closePanel();
+      }
+    });
+
+    editBtn?.addEventListener("click", () => {
+      if (!editHref) return;
+      closePanel();
+      navigateToPage(editHref, { force: contentType === "diary" });
+    });
+
+    deleteBtn?.addEventListener("click", () => {
+      if (!deleteBtn) return;
+      void handleDeleteAction({
+        deleteEndpoint,
+        deleteConfirmMessage,
+        deleteSuccessHref,
+        contentType,
+        deleteBtn,
+        closePanel,
+      });
+    });
+
+    likeBtn?.addEventListener("click", () => {
+      if (likeState.likePending || !contentId) return;
+      const auth = getAuthState();
+      if (!auth.isLoggedIn) {
+        showAuthRequiredDialog();
+        return;
+      }
+      if (!likeBtn) return;
+      void handleLikeAction({
+        contentType,
+        contentId,
+        likeBtn,
+        likeCountText,
+        rootEl,
+        state: likeState,
+        applyLikeUI,
+      });
+    });
+
+    commentBtn?.addEventListener("click", () => {
+      const commentRoot = document.getElementById("comment-root");
+      if (commentRoot) {
+        commentRoot.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      navigateToPage(`${window.location.pathname}#comment-root`);
+    });
+  }
 
   function initDetailActionFloat(): void {
     const roots = document.querySelectorAll<HTMLElement>(
       ".detail-action-float:not([data-bound='1'])",
     );
-
-    roots.forEach((rootEl) => {
-      rootEl.dataset.bound = "1";
-      const dockToBackTop = rootEl.dataset.dockToBackTop === "1";
-
-      const customSlot = document.querySelector<HTMLElement>(
-        "[data-detail-float-slot]",
-      );
-      const canMountToCustomSlot =
-        customSlot instanceof HTMLElement &&
-        window.getComputedStyle(customSlot).display !== "none";
-
-      if (
-        !dockToBackTop &&
-        canMountToCustomSlot &&
-        rootEl.parentElement !== customSlot
-      ) {
-        customSlot.appendChild(rootEl);
-      }
-
-      const rightSidebarSlot = document.getElementById("right-sidebar-slot");
-      const tocWrapper = document.querySelector<HTMLElement>(
-        "#right-sidebar-slot #toc-wrapper",
-      );
-      const tocRoot = document.querySelector<HTMLElement>(
-        "#right-sidebar-slot #toc",
-      );
-      const mountTarget =
-        tocWrapper || tocRoot?.parentElement || rightSidebarSlot || null;
-      const canMountToSidebar =
-        mountTarget instanceof HTMLElement &&
-        window.getComputedStyle(mountTarget).display !== "none";
-      if (
-        !dockToBackTop &&
-        !canMountToCustomSlot &&
-        canMountToSidebar &&
-        rootEl.parentElement !== mountTarget
-      ) {
-        mountTarget.appendChild(rootEl);
-      }
-
-      const sidebarHidden =
-        !canMountToCustomSlot && (!mountTarget || !canMountToSidebar);
-      // 停靠到返回顶部按钮上方时，必须挂到不带 transform 的锚点
-      // 否则 fixed 会被祖先 transform 捕获，视觉上回退到评论区附近
-      if (dockToBackTop) {
-        const dockAnchor = document.getElementById(
-          "detail-action-float-anchor",
-        );
-        const canMountToDockAnchor =
-          dockAnchor instanceof HTMLElement &&
-          window.getComputedStyle(dockAnchor).display !== "none";
-
-        if (canMountToDockAnchor && rootEl.parentElement !== dockAnchor) {
-          dockAnchor.appendChild(rootEl);
-        }
-        if (!canMountToDockAnchor && rootEl.parentElement !== document.body) {
-          document.body.appendChild(rootEl);
-        }
-        rootEl.classList.remove("slot-mode");
-        rootEl.classList.add("fixed-mode");
-      } else {
-        rootEl.classList.toggle("slot-mode", canMountToCustomSlot);
-        rootEl.classList.toggle("fixed-mode", sidebarHidden);
-      }
-
-      const contentType = String(rootEl.dataset.contentType || "");
-      const contentId = String(rootEl.dataset.contentId || "");
-      const authorId = String(rootEl.dataset.authorId || "");
-      const editHref = String(rootEl.dataset.editHref || "");
-      const deleteEndpoint = String(rootEl.dataset.deleteEndpoint || "");
-      const deleteConfirmMessage = String(
-        rootEl.dataset.deleteConfirmMessage ||
-          "确认删除该内容？删除后不可恢复。",
-      );
-      const deleteSuccessHref = String(rootEl.dataset.deleteSuccessHref || "/");
-
-      const likeBtn =
-        rootEl.querySelector<HTMLButtonElement>(".detail-like-btn");
-      const commentBtn = rootEl.querySelector<HTMLButtonElement>(
-        ".detail-comment-btn",
-      );
-      const manageBtn = rootEl.querySelector<HTMLButtonElement>(
-        ".detail-manage-toggle",
-      );
-      const panel = rootEl.querySelector<HTMLElement>(".detail-manage-panel");
-      const editBtn = rootEl.querySelector<HTMLButtonElement>(
-        ".detail-manage-edit",
-      );
-      const deleteBtn = rootEl.querySelector<HTMLButtonElement>(
-        ".detail-manage-delete",
-      );
-      const likeCountText = rootEl.querySelector<HTMLElement>(
-        "[data-like-count-text]",
-      );
-
-      let liked = rootEl.dataset.liked === "1";
-      let likeCount = Number(rootEl.dataset.likeCount || "0") || 0;
-      let isOpen = false;
-      let likePending = false;
-
-      function applyLikeUI(): void {
-        const normalizedLikeCount = Math.max(0, likeCount);
-        likeCount = normalizedLikeCount;
-        rootEl.dataset.liked = liked ? "1" : "0";
-        rootEl.dataset.likeCount = String(normalizedLikeCount);
-        likeBtn?.classList.toggle("active", liked);
-        likeBtn?.classList.toggle("is-pending", likePending);
-        if (likeBtn) {
-          likeBtn.disabled = likePending;
-        }
-        if (likeCountText) {
-          likeCountText.textContent = String(normalizedLikeCount);
-        }
-      }
-
-      function applyActionVisibility(state: AuthState): void {
-        const canManage =
-          state.isLoggedIn &&
-          Boolean(state.userId) &&
-          (state.isAdmin || state.userId === authorId);
-        const canOpenPanel = canManage || state.isLoggedIn;
-
-        manageBtn?.classList.toggle("hidden", !canOpenPanel);
-        editBtn?.classList.toggle("hidden", !canManage);
-        deleteBtn?.classList.toggle("hidden", !canManage);
-
-        if (!canOpenPanel && isOpen) {
-          panel?.classList.remove("show");
-          isOpen = false;
-        }
-      }
-
-      function openPanel(): void {
-        isOpen = true;
-        panel?.classList.add("show");
-        manageBtn?.classList.add("active");
-      }
-
-      function closePanel(): void {
-        isOpen = false;
-        panel?.classList.remove("show");
-        manageBtn?.classList.remove("active");
-      }
-
-      applyLikeUI();
-      applyActionVisibility(getAuthState());
-
-      subscribeAuthState((state) => {
-        applyActionVisibility(state);
-      });
-
-      manageBtn?.addEventListener("click", (event) => {
-        event.stopPropagation();
-        if (isOpen) {
-          closePanel();
-        } else {
-          openPanel();
-        }
-      });
-
-      document.addEventListener("click", (event) => {
-        if (!isOpen) return;
-        if (!rootEl.contains(event.target as Node)) {
-          closePanel();
-        }
-      });
-
-      document.addEventListener("keydown", (event) => {
-        if (event.key === "Escape" && isOpen) {
-          closePanel();
-        }
-      });
-
-      editBtn?.addEventListener("click", () => {
-        if (!editHref) {
-          return;
-        }
-        closePanel();
-        navigateToPage(editHref, {
-          force: contentType === "diary",
-        });
-      });
-
-      deleteBtn?.addEventListener("click", async () => {
-        if (!deleteEndpoint) {
-          return;
-        }
-        const confirmed = await showConfirmDialog({
-          ariaLabel: "删除确认",
-          message: deleteConfirmMessage,
-          confirmText: "确认删除",
-          cancelText: "取消",
-          confirmVariant: "danger",
-        });
-        if (!confirmed) {
-          closePanel();
-          return;
-        }
-
-        deleteBtn.disabled = true;
-        try {
-          const response = await fetch(deleteEndpoint, {
-            method: "DELETE",
-            credentials: "include",
-            headers: {
-              Accept: "application/json",
-              "x-csrf-token": getCsrfToken(),
-            },
-          });
-          const data = await response.json().catch(() => null);
-          if (!response.ok || !data?.ok) {
-            await showNoticeDialog({
-              ariaLabel: "删除失败",
-              message: data?.error?.message || "删除失败",
-            });
-            return;
-          }
-          navigateToPage(deleteSuccessHref || "/");
-        } catch (error) {
-          console.error(`[detail-action] delete ${contentType} failed:`, error);
-          await showNoticeDialog({
-            ariaLabel: "删除失败",
-            message: "删除失败，请稍后重试。",
-          });
-        } finally {
-          deleteBtn.disabled = false;
-          closePanel();
-        }
-      });
-
-      likeBtn?.addEventListener("click", async () => {
-        if (likePending || !contentId) {
-          return;
-        }
-
-        const auth = getAuthState();
-        if (!auth.isLoggedIn) {
-          showAuthRequiredDialog();
-          return;
-        }
-
-        const previousLiked = liked;
-        const previousLikeCount = likeCount;
-        liked = !previousLiked;
-        likeCount = Math.max(0, previousLikeCount + (liked ? 1 : -1));
-
-        likePending = true;
-        applyLikeUI();
-        try {
-          const endpoint =
-            contentType === "diary"
-              ? "/api/v1/me/diary-likes"
-              : "/api/v1/me/article-likes";
-          const body =
-            contentType === "diary"
-              ? { diary_id: contentId }
-              : { article_id: contentId };
-          const response = await fetch(endpoint, {
-            method: "POST",
-            credentials: "include",
-            headers: {
-              "content-type": "application/json",
-              "x-csrf-token": getCsrfToken(),
-            },
-            body: JSON.stringify(body),
-          });
-          const data = await response.json().catch(() => null);
-          if (!response.ok || !data?.ok) {
-            throw new Error(
-              data?.error?.message || "点赞操作失败，请稍后重试。",
-            );
-          }
-
-          liked = Boolean(data?.liked);
-          likeCount = Number(data?.like_count || 0);
-          applyLikeUI();
-        } catch (error) {
-          console.error("[detail-action] like request failed:", error);
-          liked = previousLiked;
-          likeCount = previousLikeCount;
-          applyLikeUI();
-          await showNoticeDialog({
-            ariaLabel: "点赞失败",
-            message:
-              error instanceof Error && error.message
-                ? error.message
-                : "点赞操作失败，请稍后重试。",
-          });
-        } finally {
-          likePending = false;
-          applyLikeUI();
-        }
-      });
-
-      commentBtn?.addEventListener("click", () => {
-        const commentRoot = document.getElementById("comment-root");
-        if (commentRoot) {
-          commentRoot.scrollIntoView({ behavior: "smooth", block: "start" });
-          return;
-        }
-        navigateToPage(`${window.location.pathname}#comment-root`);
-      });
-    });
+    roots.forEach((rootEl) => bindDetailRoot(rootEl));
   }
 
   if (document.readyState === "loading") {

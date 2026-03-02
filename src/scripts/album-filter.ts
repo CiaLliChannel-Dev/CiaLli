@@ -24,6 +24,114 @@ type AlbumFilterRuntimeWindow = Window &
         __albumFilterCleanup?: () => void;
     };
 
+function getAlbumItems(): HTMLElement[] {
+    return Array.from(
+        document.querySelectorAll<HTMLElement>(".album-list-item"),
+    );
+}
+
+function parseItemTags(item: HTMLElement): string[] {
+    try {
+        const parsed = JSON.parse(item.dataset.tags || "[]") as unknown;
+        return Array.isArray(parsed) ? parsed.map((tag) => String(tag)) : [];
+    } catch {
+        return [];
+    }
+}
+
+function getSelectedTags(filter: FilterState): string[] {
+    return normalizeTagList(filter.tags);
+}
+
+function hasActiveFilters(filter: FilterState): boolean {
+    return (
+        getSelectedTags(filter).length > 0 ||
+        filter.category !== null ||
+        filter.author !== null
+    );
+}
+
+function readItemAuthorHandleRaw(item: HTMLElement): string {
+    return cleanAuthorHandle(item.dataset.authorHandle || "");
+}
+
+function readItemAuthorHandle(item: HTMLElement): string {
+    return normalizeAuthorHandle(readItemAuthorHandleRaw(item));
+}
+
+function resolveAuthorDisplay(filter: FilterState): string {
+    if (!filter.author) {
+        return "";
+    }
+    const normalized = normalizeAuthorHandle(filter.author);
+    const matched = getAlbumItems().find(
+        (item) => readItemAuthorHandle(item) === normalized,
+    );
+    if (!matched) {
+        return filter.author;
+    }
+    return readItemAuthorHandleRaw(matched) || filter.author;
+}
+
+function getMatchingItems(filter: FilterState): Set<HTMLElement> {
+    const allItems = getAlbumItems();
+    const selectedTags = getSelectedTags(filter);
+    const hasTagFilter = selectedTags.length > 0;
+    const hasCategoryFilter = filter.category !== null;
+    const hasAuthorFilter = filter.author !== null;
+    const normalizedAuthor = hasAuthorFilter
+        ? normalizeAuthorHandle(filter.author || "")
+        : "";
+
+    if (!hasTagFilter && !hasCategoryFilter && !hasAuthorFilter) {
+        return new Set(allItems);
+    }
+
+    const matched = new Set<HTMLElement>();
+    for (const item of allItems) {
+        const tagMatched =
+            !hasTagFilter ||
+            (() => {
+                const itemTags = parseItemTags(item);
+                return selectedTags.every((tag) => itemTags.includes(tag));
+            })();
+        const categoryMatched =
+            !hasCategoryFilter || item.dataset.category === filter.category;
+        const authorMatched =
+            !hasAuthorFilter || readItemAuthorHandle(item) === normalizedAuthor;
+
+        if (tagMatched && categoryMatched && authorMatched) {
+            matched.add(item);
+        }
+    }
+    return matched;
+}
+
+function readUrlFilterState(): FilterState {
+    const params = new URLSearchParams(window.location.search);
+    const tagParams = params
+        .getAll("tag")
+        .flatMap((value) => value.split(","))
+        .map((value) => value.trim())
+        .filter(Boolean);
+    const category = params.get("category");
+    const author = params.get("author") || params.get("author_handle");
+
+    const filter: FilterState = { tags: [], category: null, author: null };
+
+    if (tagParams.length > 0) {
+        filter.tags = normalizeTagList(tagParams);
+    }
+    if (category) {
+        filter.category = category;
+    }
+    if (author) {
+        const cleanedAuthor = cleanAuthorHandle(author);
+        filter.author = cleanedAuthor || null;
+    }
+    return filter;
+}
+
 export function initAlbumFilter(): void {
     const rw = window as AlbumFilterRuntimeWindow;
     rw.__albumFilterCleanup?.();
@@ -39,11 +147,6 @@ export function initAlbumFilter(): void {
         author: null,
     };
 
-    function getAlbumItems(): HTMLElement[] {
-        return Array.from(
-            document.querySelectorAll<HTMLElement>(".album-list-item"),
-        );
-    }
     function getNoResults() {
         return document.getElementById("album-no-results");
     }
@@ -53,87 +156,6 @@ export function initAlbumFilter(): void {
             filterLabel: document.getElementById("album-filter-status-label"),
             filterClearBtn: document.getElementById("album-filter-clear-btn"),
         };
-    }
-
-    function getSelectedTags(filter: FilterState): string[] {
-        return normalizeTagList(filter.tags);
-    }
-
-    function readItemAuthorHandleRaw(item: HTMLElement): string {
-        return cleanAuthorHandle(item.dataset.authorHandle || "");
-    }
-
-    function readItemAuthorHandle(item: HTMLElement): string {
-        return normalizeAuthorHandle(readItemAuthorHandleRaw(item));
-    }
-
-    function resolveAuthorDisplay(filter: FilterState): string {
-        if (!filter.author) {
-            return "";
-        }
-
-        const normalized = normalizeAuthorHandle(filter.author);
-        const matched = getAlbumItems().find(
-            (item) => readItemAuthorHandle(item) === normalized,
-        );
-        if (!matched) {
-            return filter.author;
-        }
-        return readItemAuthorHandleRaw(matched) || filter.author;
-    }
-
-    function hasActiveFilters(filter: FilterState): boolean {
-        return (
-            getSelectedTags(filter).length > 0 ||
-            filter.category !== null ||
-            filter.author !== null
-        );
-    }
-
-    function parseItemTags(item: HTMLElement): string[] {
-        try {
-            const parsed = JSON.parse(item.dataset.tags || "[]") as unknown;
-            return Array.isArray(parsed)
-                ? parsed.map((tag) => String(tag))
-                : [];
-        } catch {
-            return [];
-        }
-    }
-
-    function getMatchingItems(filter: FilterState): Set<HTMLElement> {
-        const allItems = getAlbumItems();
-        const selectedTags = getSelectedTags(filter);
-        const hasTagFilter = selectedTags.length > 0;
-        const hasCategoryFilter = filter.category !== null;
-        const hasAuthorFilter = filter.author !== null;
-        const normalizedAuthor = hasAuthorFilter
-            ? normalizeAuthorHandle(filter.author || "")
-            : "";
-
-        if (!hasTagFilter && !hasCategoryFilter && !hasAuthorFilter) {
-            return new Set(allItems);
-        }
-
-        const matched = new Set<HTMLElement>();
-        for (const item of allItems) {
-            const tagMatched =
-                !hasTagFilter ||
-                (() => {
-                    const itemTags = parseItemTags(item);
-                    return selectedTags.every((tag) => itemTags.includes(tag));
-                })();
-            const categoryMatched =
-                !hasCategoryFilter || item.dataset.category === filter.category;
-            const authorMatched =
-                !hasAuthorFilter ||
-                readItemAuthorHandle(item) === normalizedAuthor;
-
-            if (tagMatched && categoryMatched && authorMatched) {
-                matched.add(item);
-            }
-        }
-        return matched;
     }
 
     function render() {
@@ -267,25 +289,7 @@ export function initAlbumFilter(): void {
     };
 
     // 读取 URL 查询参数并初始化筛选状态
-    const params = new URLSearchParams(window.location.search);
-    const tagParams = params
-        .getAll("tag")
-        .flatMap((value) => value.split(","))
-        .map((value) => value.trim())
-        .filter(Boolean);
-    const category = params.get("category");
-    const author = params.get("author") || params.get("author_handle");
-
-    if (tagParams.length > 0) {
-        currentFilter.tags = normalizeTagList(tagParams);
-    }
-    if (category) {
-        currentFilter.category = category;
-    }
-    if (author) {
-        const cleanedAuthor = cleanAuthorHandle(author);
-        currentFilter.author = cleanedAuthor || null;
-    }
+    currentFilter = readUrlFilterState();
 
     if (hasActiveFilters(currentFilter)) {
         applyFilter(currentFilter);

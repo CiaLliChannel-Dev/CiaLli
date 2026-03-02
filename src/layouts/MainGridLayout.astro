@@ -12,25 +12,13 @@ import TypewriterText from "../components/TypewriterText.astro";
 import TOC from "../components/widget/TOC.astro";
 import { buildLegacySiteConfig } from "@/config";
 import { getResolvedSiteSettings } from "@/server/site-settings/service";
-import {
-  BANNER_HEIGHT_EXTEND,
-  BANNER_HEIGHT_HOME,
-} from "../constants/constants";
-import { widgetManager } from "@utils/widget-manager";
+import { BANNER_HEIGHT_EXTEND } from "../constants/constants";
 import Layout from "@layouts/Layout.astro";
-
-const resolvedSiteSettings =
-  Astro.locals.siteSettings ?? (await getResolvedSiteSettings());
-const siteConfig = buildLegacySiteConfig(
-  resolvedSiteSettings.system,
-  resolvedSiteSettings.settings,
-);
-const tocMode = siteConfig.toc.mode || "float";
-const isFloatTOC = tocMode === "float";
-const isSidebarTOC = tocMode === "sidebar";
-const isPostDetailPage = /^\/posts\/[^/]+\/?$/.test(Astro.url.pathname);
-const shouldShowPostTocSidebar =
-  siteConfig.toc.enable && isSidebarTOC && isPostDetailPage;
+import {
+  buildMainGridLayoutState,
+  getBannerImages,
+} from "@utils/main-grid-layout-utils";
+import "@/styles/main-grid-layout.css";
 
 interface Props {
   title?: string;
@@ -41,44 +29,13 @@ interface Props {
   headings?: MarkdownHeading[];
 }
 
-const normalizeBannerList = (value: string | string[]): string[] => {
-  if (typeof value === "string") {
-    const normalized = value.trim();
-    return normalized ? [normalized] : [];
-  }
-  if (Array.isArray(value)) {
-    return value.map((entry) => String(entry || "").trim()).filter(Boolean);
-  }
-  return [];
-};
-
-const getBannerImages = async (): Promise<string[]> => {
-  let bannerSrc = siteConfig.banner.src;
-
-  if (siteConfig.banner.imageApi?.enable && siteConfig.banner.imageApi?.url) {
-    try {
-      const response = await fetch(siteConfig.banner.imageApi.url);
-      const text = await response.text();
-      const apiImages = text
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean);
-
-      if (apiImages.length > 0) {
-        bannerSrc = apiImages;
-      }
-    } catch (error) {
-      console.warn(
-        "[main-grid-layout] failed to fetch images from API:",
-        error,
-      );
-    }
-  }
-
-  return normalizeBannerList(bannerSrc);
-};
-
-const bannerImages = await getBannerImages();
+const resolvedSiteSettings =
+  Astro.locals.siteSettings ?? (await getResolvedSiteSettings());
+const siteConfig = buildLegacySiteConfig(
+  resolvedSiteSettings.system,
+  resolvedSiteSettings.settings,
+);
+const bannerImages = await getBannerImages(siteConfig);
 
 const {
   title,
@@ -90,94 +47,26 @@ const {
 } = Astro.props;
 
 const hasCustomRightSidebar = Astro.slots.has("sidebar-right");
-const isHomePage = Astro.url.pathname === "/" || Astro.url.pathname === "";
-const normalizedPath = Astro.url.pathname.replace(/\/+$/, "");
-const isFullWidthPage =
-  normalizedPath === "/posts/new" ||
-  /^\/posts\/[^/]+\/edit$/.test(normalizedPath);
-const showHomeText = siteConfig.banner.homeText?.enable && isHomePage;
-
-const configuredWallpaperMode = siteConfig.wallpaperMode.defaultMode;
-const initialWallpaperMode = isHomePage ? configuredWallpaperMode : "none";
-const mainPanelTop =
-  initialWallpaperMode === "banner" ? `${BANNER_HEIGHT_HOME}vh` : "5.5rem";
-const finalMainPanelTop =
-  initialWallpaperMode === "banner" ? mainPanelTop : "5.5rem";
-
-const hasLeftSidebarComponents =
-  widgetManager.getComponentsByPosition("top", "left").length > 0 ||
-  widgetManager.getComponentsByPosition("sticky", "left").length > 0;
-
-const rightTopComponents = widgetManager.getComponentsByPosition(
-  "top",
-  "right",
+const {
+  isFloatTOC,
+  showHomeText,
+  initialWallpaperMode,
+  finalMainPanelTop,
+  shouldRenderDedicatedPostToc,
+  shouldFixRightSidebarSlot,
+  desktopShowLeftSidebar,
+  gridCols,
+  sidebarClass,
+  rightSidebarClass,
+  mainContentClass,
+  hasCarousel,
+  hasRightSidebarComponents,
+} = buildMainGridLayoutState(
+  siteConfig,
+  bannerImages,
+  Astro.url.pathname,
+  hasCustomRightSidebar,
 );
-const rightStickyComponents = widgetManager.getComponentsByPosition(
-  "sticky",
-  "right",
-);
-const hasRightSidebarComponents =
-  rightTopComponents.length > 0 || rightStickyComponents.length > 0;
-
-const hasRightSidebarTocWidget = [
-  ...rightTopComponents,
-  ...rightStickyComponents,
-].some((component) => component.type === "toc");
-
-const shouldRenderDedicatedPostToc =
-  shouldShowPostTocSidebar && !hasRightSidebarTocWidget;
-const hasRightSidebarContent =
-  hasRightSidebarComponents || shouldRenderDedicatedPostToc;
-const shouldFixRightSidebarSlot =
-  shouldRenderDedicatedPostToc || hasCustomRightSidebar;
-
-const desktopShowLeftSidebar = hasLeftSidebarComponents && !isFullWidthPage;
-const effectiveShowRightSidebar =
-  (hasRightSidebarContent || hasCustomRightSidebar) && !isFullWidthPage;
-const desktopShowSidebar =
-  hasLeftSidebarComponents || effectiveShowRightSidebar;
-
-let gridCols = "grid-cols-1";
-if (desktopShowLeftSidebar && effectiveShowRightSidebar) {
-  gridCols = "grid-cols-[17.5rem_minmax(0,1fr)_17.5rem]";
-} else if (desktopShowLeftSidebar) {
-  gridCols = "grid-cols-[17.5rem_minmax(0,1fr)]";
-} else if (effectiveShowRightSidebar) {
-  gridCols = "grid-cols-[minmax(0,1fr)_17.5rem]";
-}
-
-const sidebarClass = desktopShowLeftSidebar
-  ? "onload-animation mb-4 max-w-[17.5rem] col-start-1 col-end-2 row-start-1 row-end-2"
-  : "hidden";
-
-let rightSidebarClass = "hidden";
-if (hasCustomRightSidebar) {
-  rightSidebarClass = `onload-animation block mb-4 max-w-[17.5rem] row-start-1 row-end-2 ${desktopShowLeftSidebar ? "col-start-3 col-end-4" : "col-start-2 col-end-3"}`;
-} else if (hasRightSidebarComponents || shouldRenderDedicatedPostToc) {
-  rightSidebarClass = `onload-animation block overflow-x-hidden mb-4 max-w-[17.5rem] row-start-1 row-end-2 ${desktopShowLeftSidebar ? "col-start-3 col-end-4" : "col-start-2 col-end-3"}`;
-}
-
-let mainGridPositionClass = "col-span-1";
-if (desktopShowLeftSidebar && effectiveShowRightSidebar) {
-  mainGridPositionClass = "col-start-2 col-end-3";
-} else if (desktopShowLeftSidebar) {
-  mainGridPositionClass = "col-start-2 col-end-3";
-} else if (effectiveShowRightSidebar) {
-  mainGridPositionClass = "col-start-1 col-end-2";
-}
-
-const mainContentClass = `
-  transition-fade overflow-clip w-full
-  col-span-1 row-start-1 row-end-2
-  ${desktopShowSidebar ? mainGridPositionClass : "col-span-1"}
-`
-  .trim()
-  .replace(/\s+/g, " ");
-
-const hasCarousel =
-  siteConfig.banner.carousel?.enable &&
-  Array.isArray(bannerImages) &&
-  bannerImages.length > 1;
 ---
 
 <Layout
@@ -525,336 +414,3 @@ const hasCarousel =
 
   <slot name="modal" />
 </Layout>
-
-<style>
-  :root {
-    --layout-mode-transition-duration: 0.98s;
-    --layout-mode-transition-easing: cubic-bezier(0.16, 1, 0.4, 1);
-    --layout-banner-route-transition-duration: 920ms;
-    --layout-banner-route-transition-easing: cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .navbar-scrim {
-    position: absolute;
-    top: 0;
-    right: 0;
-    left: 0;
-    height: calc(clamp(5.5rem, 12vh, 8.5rem) + env(safe-area-inset-top, 0px));
-    pointer-events: none;
-    z-index: 15;
-    background: linear-gradient(
-      to bottom,
-      rgba(255, 255, 255, 0.78) 0%,
-      rgba(255, 255, 255, 0.42) 48%,
-      rgba(255, 255, 255, 0) 100%
-    );
-  }
-
-  :root.dark .navbar-scrim {
-    background: linear-gradient(
-      to bottom,
-      rgba(0, 0, 0, 0.7) 0%,
-      rgba(0, 0, 0, 0.38) 48%,
-      rgba(0, 0, 0, 0) 100%
-    );
-  }
-
-  .banner-title {
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.7);
-    animation: fadeInUp 1s ease-out;
-    font-weight: bold;
-  }
-
-  .banner-subtitle {
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6);
-    animation: fadeInUp 1s ease-out 0.3s both;
-    min-height: 1.5em;
-    line-height: 1.2;
-  }
-
-  @keyframes fadeInUp {
-    from {
-      opacity: 0;
-      transform: translateY(30px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  :global(#sidebar) {
-    overflow-x: clip;
-  }
-
-  :global(#right-sidebar-slot) {
-    overflow: visible;
-  }
-
-  :global(html.layout-banner-to-spec-transition) #banner-wrapper,
-  :global(html.layout-banner-to-spec-transition) .main-panel-wrapper {
-    transition:
-      transform var(--layout-banner-route-transition-duration, 920ms)
-        var(
-          --layout-banner-route-transition-easing,
-          cubic-bezier(0.22, 1, 0.36, 1)
-        ),
-      opacity var(--layout-banner-route-transition-duration, 920ms)
-        var(
-          --layout-banner-route-transition-easing,
-          cubic-bezier(0.22, 1, 0.36, 1)
-        );
-    will-change: transform;
-  }
-
-  :global(
-      html.layout-banner-to-spec-transition.layout-banner-to-spec-transition-active
-    )
-    .main-panel-wrapper {
-    transform: translateY(calc(-1 * var(--layout-banner-route-up-shift, 0px)));
-  }
-
-  :global(
-      html.layout-banner-to-spec-transition.layout-banner-to-spec-transition-active
-    )
-    #banner-wrapper {
-    transform: translateY(
-      calc(-1 * var(--layout-banner-route-banner-extra-shift, 0px))
-    );
-    opacity: 0;
-  }
-
-  :global(html.layout-banner-to-spec-transition .transition-main),
-  :global(html.layout-banner-to-spec-transition .transition-leaving),
-  :global(html.layout-banner-to-spec-transition .transition-fade) {
-    transition-duration: 280ms !important;
-  }
-
-  :global(html.layout-banner-to-spec-transition #content-wrapper) {
-    transition: opacity 240ms cubic-bezier(0.22, 1, 0.36, 1) !important;
-  }
-
-  :global(
-    html.layout-banner-to-spec-transition.layout-banner-to-spec-transition-active.layout-banner-to-spec-navbar-sync
-      #navbar
-      > div
-  ) {
-    border-radius: 0 !important;
-    background: var(--page-bg) !important;
-    box-shadow: none !important;
-    backdrop-filter: none !important;
-    transition-property:
-      border-radius, background-color, box-shadow, backdrop-filter !important;
-    transition-duration: var(
-      --layout-banner-route-transition-duration,
-      920ms
-    ) !important;
-    transition-timing-function: var(
-      --layout-banner-route-transition-easing,
-      cubic-bezier(0.22, 1, 0.36, 1)
-    ) !important;
-  }
-
-  :global(
-    html.layout-banner-to-spec-transition.layout-banner-to-spec-transition-active.layout-banner-to-spec-navbar-sync
-      #navbar-logo
-  ),
-  :global(
-    html.layout-banner-to-spec-transition.layout-banner-to-spec-transition-active.layout-banner-to-spec-navbar-sync
-      #navbar-logo
-      img
-  ) {
-    transition-duration: var(
-      --layout-banner-route-transition-duration,
-      920ms
-    ) !important;
-    transition-timing-function: var(
-      --layout-banner-route-transition-easing,
-      cubic-bezier(0.22, 1, 0.36, 1)
-    ) !important;
-  }
-
-  :global(
-    html.layout-banner-to-spec-transition.layout-banner-to-spec-navbar-commit-freeze
-      #navbar
-      > div
-  ),
-  :global(
-    html.layout-banner-to-spec-transition.layout-banner-to-spec-navbar-commit-freeze
-      #navbar-logo
-  ),
-  :global(
-    html.layout-banner-to-spec-transition.layout-banner-to-spec-navbar-commit-freeze
-      #navbar-logo
-      img
-  ) {
-    transition: none !important;
-  }
-
-  :global(html.layout-banner-to-spec-transition) #top-row,
-  :global(
-      html.layout-banner-to-spec-transition.layout-banner-to-spec-transition-active
-    )
-    #top-row {
-    transform: translate3d(0px, 0px, 0px) !important;
-  }
-
-  :global(#right-sidebar-slot.right-sidebar-toc-fixed) {
-    position: sticky;
-    top: 5.5rem;
-    align-self: start;
-  }
-
-  :global(.wallpaper-layer) {
-    opacity: 1;
-    transition: opacity var(--layout-mode-transition-duration)
-      var(--layout-mode-transition-easing);
-    will-change: opacity;
-  }
-
-  :global(.wallpaper-layer-hidden) {
-    opacity: 0 !important;
-    pointer-events: none;
-  }
-
-  body[data-layout-mode="none"] #banner-wrapper,
-  body[data-layout-mode="collapsed"] #banner-wrapper {
-    display: none !important;
-    height: 0 !important;
-    min-height: 0 !important;
-    max-height: 0 !important;
-    top: 0 !important;
-    overflow: hidden !important;
-    opacity: 0 !important;
-    visibility: hidden !important;
-    transition: none !important;
-    pointer-events: none !important;
-  }
-
-  .main-panel-wrapper {
-    transition:
-      top var(--layout-mode-transition-duration)
-        var(--layout-mode-transition-easing),
-      min-height var(--layout-mode-transition-duration)
-        var(--layout-mode-transition-easing);
-    will-change: top;
-  }
-
-  #toc-inner-wrapper {
-    transition:
-      top var(--layout-mode-transition-duration)
-        var(--layout-mode-transition-easing),
-      max-height var(--layout-mode-transition-duration)
-        var(--layout-mode-transition-easing);
-  }
-
-  body[data-layout-mode="none"] #main-grid,
-  body[data-layout-mode="collapsed"] #main-grid,
-  body[data-layout-mode="none"] .main-panel-wrapper,
-  body[data-layout-mode="collapsed"] .main-panel-wrapper,
-  body[data-layout-mode="none"] #toc-inner-wrapper,
-  body[data-layout-mode="collapsed"] #toc-inner-wrapper {
-    transition: none !important;
-  }
-
-  body[data-layout-mode="none"] #content-wrapper,
-  body[data-layout-mode="collapsed"] #content-wrapper {
-    overflow-anchor: none;
-  }
-
-  #top-row {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: auto;
-    z-index: 50;
-  }
-
-  body[data-layout-mode="none"] .main-panel-wrapper,
-  body[data-layout-mode="collapsed"] .main-panel-wrapper,
-  .no-banner-layout {
-    top: 5.5rem !important;
-    min-height: calc(100vh - 5.5rem) !important;
-  }
-
-  body[data-layout-mode="none"] #toc-inner-wrapper,
-  body[data-layout-mode="collapsed"] #toc-inner-wrapper {
-    top: 5.5rem !important;
-    max-height: calc(100vh - 8rem) !important;
-  }
-
-  .waves {
-    overflow: visible;
-    z-index: 5;
-    transform: translateZ(0);
-    will-change: transform;
-    contain: layout style paint;
-  }
-
-  .waves svg {
-    width: 100%;
-    height: 100%;
-    display: block;
-    transform: translateZ(0);
-    backface-visibility: hidden;
-  }
-
-  .waves use {
-    will-change: fill;
-  }
-
-  body[data-layout-mode="none"] .waves > .parallax use,
-  body[data-layout-mode="collapsed"] .waves > .parallax use {
-    animation-play-state: paused;
-  }
-
-  :global(body[data-layout-mode="banner"][data-route-home="true"] #sidebar),
-  :global(body[data-layout-mode="none"] #sidebar),
-  :global(body[data-layout-mode="none"] #right-sidebar),
-  :global(body[data-layout-mode="collapsed"] #sidebar),
-  :global(body[data-layout-mode="collapsed"] #right-sidebar) {
-    position: sticky;
-    top: 5.5rem;
-    align-self: start;
-  }
-
-  :global(
-    body[data-layout-mode="banner"][data-route-home="true"]
-      #sidebar[data-scrollable="true"]
-  ),
-  :global(body[data-layout-mode="none"] #sidebar[data-scrollable="true"]),
-  :global(body[data-layout-mode="none"] #right-sidebar),
-  :global(body[data-layout-mode="collapsed"] #sidebar[data-scrollable="true"]),
-  :global(body[data-layout-mode="collapsed"] #right-sidebar) {
-    max-height: calc(100vh - 6.5rem);
-    overflow-y: auto;
-    scrollbar-width: thin;
-  }
-
-  :global(
-    body[data-layout-mode="banner"][data-route-home="true"]
-      #sidebar[data-scrollable="false"]
-  ),
-  :global(body[data-layout-mode="none"] #sidebar[data-scrollable="false"]),
-  :global(
-    body[data-layout-mode="collapsed"] #sidebar[data-scrollable="false"]
-  ) {
-    overflow-y: hidden;
-  }
-
-  :global(
-    body[data-layout-mode="banner"][data-route-home="true"]
-      #sidebar
-      #sidebar-sticky
-  ),
-  :global(body[data-layout-mode="none"] #sidebar #sidebar-sticky),
-  :global(body[data-layout-mode="none"] #right-sidebar #right-sidebar-sticky),
-  :global(body[data-layout-mode="collapsed"] #sidebar #sidebar-sticky),
-  :global(
-    body[data-layout-mode="collapsed"] #right-sidebar #right-sidebar-sticky
-  ) {
-    position: relative;
-    top: auto;
-  }
-</style>

@@ -217,6 +217,30 @@ const renderOne = async (
     }
 };
 
+type FilteredElements = {
+    elements: HTMLElement[];
+    hasDeferredElements: boolean;
+};
+
+const filterReadyElements = (rawElements: HTMLElement[]): FilteredElements => {
+    const elements: HTMLElement[] = [];
+    let hasDeferredElements = false;
+    for (const element of rawElements) {
+        if (isElementLayoutReady(element)) {
+            elements.push(element);
+            element.removeAttribute(MERMAID_DEFER_COUNT_ATTR);
+            continue;
+        }
+
+        const deferredCount = getDeferredRenderCount(element) + 1;
+        element.setAttribute(MERMAID_DEFER_COUNT_ATTR, String(deferredCount));
+        if (deferredCount < MAX_DEFERRED_RENDER_ATTEMPTS) {
+            hasDeferredElements = true;
+        }
+    }
+    return { elements, hasDeferredElements };
+};
+
 const renderMermaidDiagrams = async (force = false): Promise<void> => {
     if (isRendering) {
         renderQueued = true;
@@ -236,21 +260,7 @@ const renderMermaidDiagrams = async (force = false): Promise<void> => {
         return;
     }
 
-    const elements: HTMLElement[] = [];
-    let hasDeferredElements = false;
-    for (const element of rawElements) {
-        if (isElementLayoutReady(element)) {
-            elements.push(element);
-            element.removeAttribute(MERMAID_DEFER_COUNT_ATTR);
-            continue;
-        }
-
-        const deferredCount = getDeferredRenderCount(element) + 1;
-        element.setAttribute(MERMAID_DEFER_COUNT_ATTR, String(deferredCount));
-        if (deferredCount < MAX_DEFERRED_RENDER_ATTEMPTS) {
-            hasDeferredElements = true;
-        }
-    }
+    const { elements, hasDeferredElements } = filterReadyElements(rawElements);
 
     if (elements.length === 0) {
         if (hasDeferredElements) {

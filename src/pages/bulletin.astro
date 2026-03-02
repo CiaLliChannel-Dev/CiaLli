@@ -12,7 +12,7 @@ const resolvedSiteSettings =
   Astro.locals.siteSettings ?? (await getResolvedSiteSettings());
 const announcement = resolvedSiteSettings.settings.announcement;
 const pageTitle =
-  String(announcement.title || "").trim() || i18n(I18nKey.announcement);
+  String(announcement.title || "").trim() || i18n(I18nKey.coreAnnouncement);
 const summary = String(announcement.summary || "").trim();
 
 let bodyHtml = "";

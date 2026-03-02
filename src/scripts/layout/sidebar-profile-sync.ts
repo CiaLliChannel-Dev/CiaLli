@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- 文件行数较长，按页面驱动与模块边界保留当前结构 */
 import { SOCIAL_PLATFORM_META } from "@constants/social-platforms";
 
 type SidebarSocialMode = "single" | "multi";
@@ -92,60 +93,59 @@ function createSocialLink(
     };
 }
 
-function cloneSafeSocialNode(node: Node): Node | null {
-    if (node.nodeType === Node.TEXT_NODE) {
-        return document.createTextNode(node.textContent || "");
+function isHrefAttributeSafe(lower: string, value: string): boolean {
+    if (lower !== "href" && lower !== "xlink:href") {
+        return true;
     }
+    const href = clean(value);
+    return (
+        href.startsWith("#") ||
+        href.startsWith("data:image/") ||
+        SAFE_SOCIAL_URL_RE.test(href)
+    );
+}
 
-    if (!(node instanceof Element)) {
-        return null;
-    }
-
-    const tagName = node.tagName.toLowerCase();
-    if (!SOCIAL_ICON_TAG_ALLOWLIST.has(tagName)) {
-        return null;
-    }
-
-    const namespace = node.namespaceURI || undefined;
-    const cloned = namespace
-        ? document.createElementNS(namespace, node.tagName)
-        : document.createElement(node.tagName);
-
-    for (const { name, value } of Array.from(node.attributes)) {
+function cloneElementAttributes(source: Element, target: Element): void {
+    for (const { name, value } of Array.from(source.attributes)) {
         const lower = name.toLowerCase();
         if (lower.startsWith("on") || lower === "style") {
             continue;
         }
-        if (lower === "href" || lower === "xlink:href") {
-            const normalizedHref = clean(value);
-            const safeRef =
-                normalizedHref.startsWith("#") ||
-                normalizedHref.startsWith("data:image/") ||
-                SAFE_SOCIAL_URL_RE.test(normalizedHref);
-            if (!safeRef) {
-                continue;
-            }
+        if (isHrefAttributeSafe(lower, value)) {
+            target.setAttribute(name, value);
         }
-        cloned.setAttribute(name, value);
     }
+}
 
+function cloneSafeSocialNode(node: Node): Node | null {
+    if (node.nodeType === Node.TEXT_NODE) {
+        return document.createTextNode(node.textContent ?? "");
+    }
+    if (!(node instanceof Element)) {
+        return null;
+    }
+    const tagName = node.tagName.toLowerCase();
+    if (!SOCIAL_ICON_TAG_ALLOWLIST.has(tagName)) {
+        return null;
+    }
+    const namespace = node.namespaceURI ?? undefined;
+    const cloned = namespace
+        ? document.createElementNS(namespace, node.tagName)
+        : document.createElement(node.tagName);
+    cloneElementAttributes(node, cloned);
     for (const child of Array.from(node.childNodes)) {
         const safeChild = cloneSafeSocialNode(child);
-        if (!safeChild) {
-            continue;
+        if (safeChild) {
+            cloned.appendChild(safeChild);
         }
-        cloned.appendChild(safeChild);
     }
-
     return cloned;
 }
 
 function extractSocialIconNodes(anchor: HTMLAnchorElement): Node[] {
-    const iconNodes = Array.from(anchor.children)
+    return Array.from(anchor.children)
         .map((child) => cloneSafeSocialNode(child))
         .filter((node): node is Node => node !== null);
-
-    return iconNodes;
 }
 
 function dedupeSocialLinks(links: SidebarSocialLink[]): SidebarSocialLink[] {
@@ -307,15 +307,12 @@ function renderSocialLinks(
     mode: SidebarSocialMode,
 ): void {
     social.replaceChildren();
-
     if (links.length === 0) {
         return;
     }
-
     const socialMode: SidebarSocialMode =
         mode === "single" && links.length === 1 ? "single" : "multi";
-    const renderLinks = socialMode === "single" ? [links[0]] : links;
-
+    const renderLinks = socialMode === "single" ? links.slice(0, 1) : links;
     for (const link of renderLinks) {
         social.appendChild(createSocialAnchor(link, socialMode));
     }

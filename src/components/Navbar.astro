@@ -104,7 +104,7 @@ const links: NavBarLink[] = navBarConfig.links
     <a
       id="navbar-logo"
       href={url("/")}
-      class="btn-plain scale-animation rounded-lg h-[3.25rem] in-[.enable-banner]:!h-[2.5rem] in-[.enable-banner]:group-[.scrolled]:!h-[3.25rem] px-5 font-bold active:scale-95 min-w-0 max-w-none transition-all duration-920"
+      class="btn-plain scale-animation rounded-lg h-[3.25rem] in-[.enable-banner]:h-[2.5rem]! in-[.enable-banner]:group-[.scrolled]:h-[3.25rem]! px-5 font-bold active:scale-95 min-w-0 max-w-none transition-all duration-920"
     >
       <div class="flex flex-row items-center min-w-0 text-md">
         {
@@ -114,7 +114,7 @@ const links: NavBarLink[] = navBarConfig.links
                 <Image
                   src={defaultNavLogoImage}
                   alt={siteSettings.navbarTitle.text}
-                  class="h-[3.25rem] w-auto in-[.enable-banner]:!h-[2.5rem] in-[.enable-banner]:group-[.scrolled]:!h-[3.25rem] max-w-full object-contain transition-all duration-920"
+                  class="h-[3.25rem] w-auto in-[.enable-banner]:h-[2.5rem]! in-[.enable-banner]:group-[.scrolled]:h-[3.25rem]! max-w-full object-contain transition-all duration-920"
                   loading="lazy"
                   width={320}
                   height={160}
@@ -125,7 +125,7 @@ const links: NavBarLink[] = navBarConfig.links
                 <img
                   src={resolvedNavbarLogoSrc}
                   alt={siteSettings.navbarTitle.text}
-                  class="h-[3.25rem] w-auto in-[.enable-banner]:!h-[2.5rem] in-[.enable-banner]:group-[.scrolled]:!h-[3.25rem] max-w-full object-contain transition-all duration-920"
+                  class="h-[3.25rem] w-auto in-[.enable-banner]:h-[2.5rem]! in-[.enable-banner]:group-[.scrolled]:h-[3.25rem]! max-w-full object-contain transition-all duration-920"
                   loading="lazy"
                 />
               )
@@ -262,6 +262,140 @@ const links: NavBarLink[] = navBarConfig.links
     anchor.removeAttribute(AUTH_PROTECTED_TARGET_ATTR);
   };
 
+  const resolveUserSegmentPath = (
+    pathname: string,
+    cleanUsername: string,
+  ): string => {
+    const segments = pathname.split("/").filter(Boolean);
+    const resolved = segments
+      .map((segment) => (segment === "__user__" ? cleanUsername : segment))
+      .join("/");
+    return `/${resolved}`;
+  };
+
+  const updatePublishLink = (
+    anchor: HTMLAnchorElement,
+    pathname: string,
+    search: string,
+    hash: string,
+    isLoggedIn: boolean,
+  ): void => {
+    const publishHref = `${pathname}${search}${hash}`;
+    if (isLoggedIn) {
+      clearAuthProtectedLink(anchor, publishHref);
+    } else {
+      setAuthProtectedLink(anchor, publishHref);
+    }
+  };
+
+  const updateUserPlaceholderLink = (
+    anchor: HTMLAnchorElement,
+    pathname: string,
+    search: string,
+    hash: string,
+    cleanUsername: string,
+    isLoggedIn: boolean,
+  ): void => {
+    if (cleanUsername) {
+      const resolvedPath = resolveUserSegmentPath(pathname, cleanUsername);
+      clearAuthProtectedLink(anchor, `${resolvedPath}${search}${hash}`);
+    } else if (!isLoggedIn) {
+      setAuthProtectedLink(anchor, `${pathname}${search}${hash}`);
+    } else {
+      clearAuthProtectedLink(anchor, "/me");
+    }
+  };
+
+  const updateMeHashLink = (
+    anchor: HTMLAnchorElement,
+    pathname: string,
+    search: string,
+    hash: string,
+    hashLower: string,
+    cleanUsername: string,
+    isLoggedIn: boolean,
+  ): void => {
+    const meHashTargets = ["bangumi", "diary", "albums"];
+    if (!meHashTargets.includes(hashLower)) return;
+    if (cleanUsername) {
+      clearAuthProtectedLink(anchor, `/${cleanUsername}/${hashLower}`);
+    } else if (!isLoggedIn) {
+      setAuthProtectedLink(anchor, `${pathname}${search}${hash}`);
+    } else {
+      clearAuthProtectedLink(anchor, "/me");
+    }
+  };
+
+  const updateLegacyLink = (
+    anchor: HTMLAnchorElement,
+    pathname: string,
+    cleanUsername: string,
+    isLoggedIn: boolean,
+  ): void => {
+    const target = pathname.replace(/^\//, "");
+    if (cleanUsername) {
+      clearAuthProtectedLink(anchor, `/${cleanUsername}/${target}`);
+    } else if (!isLoggedIn) {
+      setAuthProtectedLink(anchor, `/${target}`);
+    } else {
+      clearAuthProtectedLink(anchor, "/me");
+    }
+  };
+
+  const updateAnchorForAuth = (
+    anchor: HTMLAnchorElement,
+    cleanUsername: string,
+    isLoggedIn: boolean,
+  ): void => {
+    const rawHref = anchor.getAttribute("href") || "";
+    const targetHref =
+      anchor.getAttribute(AUTH_PROTECTED_TARGET_ATTR) || rawHref;
+    const parsedTarget = parseInternalTarget(targetHref);
+    if (!parsedTarget) return;
+
+    const { pathname, search, hash } = parsedTarget;
+
+    if (isPublishPathname(pathname)) {
+      updatePublishLink(anchor, pathname, search, hash, isLoggedIn);
+      return;
+    }
+
+    const hasUserPlaceholder = pathname
+      .split("/")
+      .filter(Boolean)
+      .includes("__user__");
+
+    if (hasUserPlaceholder) {
+      updateUserPlaceholderLink(
+        anchor,
+        pathname,
+        search,
+        hash,
+        cleanUsername,
+        isLoggedIn,
+      );
+      return;
+    }
+
+    const hashLower = hash.replace(/^#/, "").trim().toLowerCase();
+    if (pathname === "/me") {
+      updateMeHashLink(
+        anchor,
+        pathname,
+        search,
+        hash,
+        hashLower,
+        cleanUsername,
+        isLoggedIn,
+      );
+      return;
+    }
+
+    const legacyTarget = ["/bangumi", "/diary", "/albums"];
+    if (!legacyTarget.includes(pathname)) return;
+    updateLegacyLink(anchor, pathname, cleanUsername, isLoggedIn);
+  };
+
   const updateUserRouteLinks = (
     username: string,
     isLoggedIn: boolean,
@@ -271,75 +405,7 @@ const links: NavBarLink[] = navBarConfig.links
       document.querySelectorAll<HTMLAnchorElement>("a[href]"),
     );
     anchors.forEach((anchor) => {
-      const rawHref = anchor.getAttribute("href") || "";
-      const targetHref =
-        anchor.getAttribute(AUTH_PROTECTED_TARGET_ATTR) || rawHref;
-      const parsedTarget = parseInternalTarget(targetHref);
-      if (!parsedTarget) return;
-
-      const pathname = parsedTarget.pathname;
-      const search = parsedTarget.search;
-      const hash = parsedTarget.hash;
-
-      if (isPublishPathname(pathname)) {
-        const publishHref = `${pathname}${search}${hash}`;
-        if (isLoggedIn) {
-          clearAuthProtectedLink(anchor, publishHref);
-        } else {
-          setAuthProtectedLink(anchor, publishHref);
-        }
-        return;
-      }
-
-      const hasUserPlaceholder = pathname
-        .split("/")
-        .filter(Boolean)
-        .includes("__user__");
-
-      if (hasUserPlaceholder) {
-        if (cleanUsername) {
-          const resolvedPath = `/${pathname
-            .split("/")
-            .filter(Boolean)
-            .map((segment) =>
-              segment === "__user__" ? cleanUsername : segment,
-            )
-            .join("/")}`;
-          clearAuthProtectedLink(anchor, `${resolvedPath}${search}${hash}`);
-        } else if (!isLoggedIn) {
-          setAuthProtectedLink(anchor, `${pathname}${search}${hash}`);
-        } else {
-          clearAuthProtectedLink(anchor, "/me");
-        }
-        return;
-      }
-      const hashLower = hash.replace(/^#/, "").trim().toLowerCase();
-      if (pathname === "/me") {
-        if (
-          hashLower === "bangumi" ||
-          hashLower === "diary" ||
-          hashLower === "albums"
-        ) {
-          if (cleanUsername) {
-            clearAuthProtectedLink(anchor, `/${cleanUsername}/${hashLower}`);
-          } else if (!isLoggedIn) {
-            setAuthProtectedLink(anchor, `${pathname}${search}${hash}`);
-          } else {
-            clearAuthProtectedLink(anchor, "/me");
-          }
-        }
-        return;
-      }
-      const legacyTarget = ["/bangumi", "/diary", "/albums"];
-      if (!legacyTarget.includes(pathname)) return;
-      const target = pathname.replace(/^\//, "");
-      if (cleanUsername) {
-        clearAuthProtectedLink(anchor, `/${cleanUsername}/${target}`);
-      } else if (!isLoggedIn) {
-        setAuthProtectedLink(anchor, `/${target}`);
-      } else {
-        clearAuthProtectedLink(anchor, "/me");
-      }
+      updateAnchorForAuth(anchor, cleanUsername, isLoggedIn);
     });
   };
 
@@ -402,59 +468,69 @@ const links: NavBarLink[] = navBarConfig.links
     applyAuthRouting(getAuthState());
   });
 
-  document.addEventListener(
-    "click",
-    (e) => {
-      const target = e.target;
-      if (!(target instanceof Element)) {
-        return;
-      }
-      const anchor = target.closest<HTMLAnchorElement>("a[href]");
-      if (!anchor) {
-        return;
-      }
-      if (
-        e.defaultPrevented ||
-        e.button !== 0 ||
-        e.metaKey ||
-        e.ctrlKey ||
-        e.shiftKey ||
-        e.altKey
-      ) {
-        return;
-      }
+  const isModifiedClick = (e: MouseEvent): boolean => {
+    return (
+      e.defaultPrevented ||
+      e.button !== 0 ||
+      e.metaKey ||
+      e.ctrlKey ||
+      e.shiftKey ||
+      e.altKey
+    );
+  };
 
-      const rawHref = anchor.getAttribute("href") || "";
-      const needsLogin = anchor.hasAttribute("data-needs-login");
-      const authTargetHref =
-        anchor.getAttribute(AUTH_PROTECTED_TARGET_ATTR) || rawHref;
-      const parsedTarget = parseInternalTarget(authTargetHref);
-      const isPublishTarget = Boolean(
-        parsedTarget && isPublishPathname(parsedTarget.pathname),
-      );
-      const isLoggedIn = getAuthState().isLoggedIn;
+  const handlePublishTargetClick = (
+    e: MouseEvent,
+    anchor: HTMLAnchorElement,
+    parsedTarget: InternalTarget,
+    isLoggedIn: boolean,
+  ): void => {
+    if (!isLoggedIn) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      showAuthRequiredDialog();
+      return;
+    }
+    const publishHref = `${parsedTarget.pathname}${parsedTarget.search}${parsedTarget.hash}`;
+    clearAuthProtectedLink(anchor, publishHref);
+  };
 
-      if (isPublishTarget && !isLoggedIn) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        showAuthRequiredDialog();
-        return;
-      }
+  const handleNavClick = (e: MouseEvent): void => {
+    const target = e.target;
+    if (!(target instanceof Element)) {
+      return;
+    }
+    const anchor = target.closest<HTMLAnchorElement>("a[href]");
+    if (!anchor) {
+      return;
+    }
+    if (isModifiedClick(e)) {
+      return;
+    }
 
-      if (isPublishTarget && isLoggedIn && parsedTarget) {
-        const publishHref = `${parsedTarget.pathname}${parsedTarget.search}${parsedTarget.hash}`;
-        clearAuthProtectedLink(anchor, publishHref);
-        return;
-      }
+    const rawHref = anchor.getAttribute("href") || "";
+    const needsLogin = anchor.hasAttribute("data-needs-login");
+    const authTargetHref =
+      anchor.getAttribute(AUTH_PROTECTED_TARGET_ATTR) || rawHref;
+    const parsedTarget = parseInternalTarget(authTargetHref);
+    const isPublishTarget = Boolean(
+      parsedTarget && isPublishPathname(parsedTarget.pathname),
+    );
+    const isLoggedIn = getAuthState().isLoggedIn;
 
-      if (needsLogin) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        showAuthRequiredDialog();
-      }
-    },
-    true,
-  );
+    if (isPublishTarget && parsedTarget) {
+      handlePublishTargetClick(e, anchor, parsedTarget, isLoggedIn);
+      return;
+    }
+
+    if (needsLogin) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      showAuthRequiredDialog();
+    }
+  };
+
+  document.addEventListener("click", handleNavClick, true);
 
   if (navbarLinksContainer) {
     navbarLinksContainer.style.opacity = "1";

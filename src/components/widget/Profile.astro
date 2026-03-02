@@ -185,7 +185,7 @@ const socialLinkPayload = enabledLinks.map((link: SocialLink) => ({
               class="inline-block mr-1 text-gray-400 dark:text-gray-500 text-sm align-middle"
             />
             <span class="site-stats-display">
-              {i18n(I18nKey.profileStatsLoading)}
+              {i18n(I18nKey.coreProfileStatsLoading)}
             </span>
           </div>
         </>
@@ -202,9 +202,9 @@ const socialLinkPayload = enabledLinks.map((link: SocialLink) => ({
     umamiApiKey,
     umamiWebsiteId,
     umamiEnabled,
-    profileStatsPageViews: i18n(I18nKey.profileStatsPageViews),
-    profileStatsVisits: i18n(I18nKey.profileStatsVisits),
-    profileStatsUnavailable: i18n(I18nKey.profileStatsUnavailable),
+    profileStatsPageViews: i18n(I18nKey.coreProfileStatsPageViews),
+    profileStatsVisits: i18n(I18nKey.coreProfileStatsVisits),
+    profileStatsUnavailable: i18n(I18nKey.coreProfileStatsUnavailable),
   }}
 >
   // 客户端统计文案生成函数

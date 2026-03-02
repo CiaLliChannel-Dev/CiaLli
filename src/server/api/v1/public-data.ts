@@ -1,24 +1,16 @@
 import type {
     AppAlbum,
     AppAlbumPhoto,
-    AppArticle,
     AppDiary,
     AppDiaryImage,
     AppProfile,
-    SidebarProfileData,
 } from "@/types/app";
 import type { JsonObject } from "@/types/json";
 import type {
     BangumiCollectionItem,
     BangumiCollectionStatus,
-    BangumiListResult,
 } from "@/server/bangumi/types";
-import { cacheManager } from "@/server/cache/manager";
-import { loadBangumiCollections } from "@/server/bangumi/service";
-import { decryptBangumiAccessToken } from "@/server/bangumi/token";
-import { normalizeBangumiId } from "@/server/bangumi/username";
 import { countItems, readMany } from "@/server/directus/client";
-import { buildPublicAssetUrl } from "@/server/directus-auth";
 import { isShortId } from "@/server/utils/short-id";
 
 import type { AuthorBundleItem } from "./shared/author-cache";
@@ -26,48 +18,39 @@ import { getAuthorBundle } from "./shared/author-cache";
 import {
     DIARY_FIELDS,
     DEFAULT_LIST_LIMIT,
-    excludeSpecialArticleSlugFilter,
-    filterPublicStatus,
-    loadPublicAlbumByShortId,
     loadPublicDiaryByShortId,
-    safeCsv,
 } from "./shared";
+import {
+    buildOwnerData,
+    diaryFilters,
+    fetchDiaryCommentCountMap,
+    fetchDiaryLikeCountMap,
+    loadBangumiListForProfile,
+    loadHomeDataInParallel,
+    loadUserAlbumDetailHelper,
+    loadUserAlbumListHelper,
+    parsePaginationParams,
+    safeCsv,
+    type ContentLoadResult,
+    type ViewerOptions,
+} from "./public-data-helpers";
 
 // ---------------------------------------------------------------------------
-// ContentLoadResult：区分「资源不存在」与「无权限访问」
+// Re-exports：保持向后兼容的导出接口
 // ---------------------------------------------------------------------------
 
-export type ContentLoadResult<T> =
-    | { status: "ok"; data: T }
-    | { status: "not_found" }
-    | { status: "permission_denied"; reason: string };
+export {
+    invalidateOfficialSidebarCache,
+    loadOfficialSidebarProfile,
+    loadProfileForViewerByUserId,
+    loadPublicProfileByUserId,
+    profileToSidebarData,
+} from "./public-data-helpers";
 
-// ---------------------------------------------------------------------------
-// ViewerOptions：传入当前访问者，用于 owner 隐私绕过判定
-// ---------------------------------------------------------------------------
-
-export type ViewerOptions = { viewerId?: string | null };
+// Re-export types for backward compatibility
+export type { ContentLoadResult, ViewerOptions } from "./public-data-helpers";
 
 type PublicProfile = Omit<AppProfile, "bangumi_access_token_encrypted">;
-
-/** 文章过滤：非 owner 仅按公开状态过滤（文章不再有 show_on_profile） */
-function articleFilters(isOwner: boolean): JsonObject[] {
-    return isOwner
-        ? [excludeSpecialArticleSlugFilter()]
-        : [filterPublicStatus(), excludeSpecialArticleSlugFilter()];
-}
-
-/** 日记过滤：非 owner 仅按发布且非私有过滤 */
-function diaryFilters(isOwner: boolean): JsonObject[] {
-    return isOwner
-        ? []
-        : [{ status: { _eq: "published" } }, { praviate: { _eq: true } }];
-}
-
-/** 相册过滤：非 owner 仅按公开条件过滤，不再依赖 show_on_profile */
-function albumFilters(isOwner: boolean): JsonObject[] {
-    return isOwner ? [] : [filterPublicStatus()];
-}
 
 // ---------------------------------------------------------------------------
 // 内部工具：按用户名读取资料，不附带 profile_public 限制
@@ -143,7 +126,7 @@ export type UserHomeData = {
         avatar_url?: string;
         header_url?: string;
     };
-    articles: Array<AppArticle & { tags: string[] }>;
+    articles: Array<import("@/types/app").AppArticle & { tags: string[] }>;
     diaries: AppDiary[];
     bangumi: BangumiCollectionItem[];
     albums: Array<AppAlbum & { tags: string[] }>;
@@ -154,34 +137,14 @@ function toPublicProfile(profile: AppProfile): PublicProfile {
     return rest;
 }
 
-async function loadBangumiListForProfile(
+function checkProfileAccess(
     profile: AppProfile,
-    options?: {
-        limit?: number;
-        page?: number;
-        status?: BangumiCollectionStatus;
-    },
-): Promise<BangumiListResult> {
-    const bangumiId = normalizeBangumiId(profile.bangumi_username);
-    if (!bangumiId) {
-        return {
-            items: [],
-            page: options?.page ?? 1,
-            limit: options?.limit ?? 20,
-            total: 0,
-        };
+    isOwnerViewing: boolean,
+): { status: "permission_denied"; reason: string } | null {
+    if (!isOwnerViewing && !profile.profile_public) {
+        return { status: "permission_denied", reason: "profile_not_public" };
     }
-
-    return await loadBangumiCollections({
-        username: bangumiId,
-        page: options?.page ?? 1,
-        limit: options?.limit ?? 20,
-        status: options?.status,
-        includePrivate: Boolean(profile.bangumi_include_private),
-        accessToken: decryptBangumiAccessToken(
-            profile.bangumi_access_token_encrypted,
-        ),
-    });
+    return null;
 }
 
 export async function loadUserHomeData(
@@ -194,79 +157,22 @@ export async function loadUserHomeData(
     }
     const isOwnerViewing =
         Boolean(options?.viewerId) && options?.viewerId === profile.user_id;
-    if (!isOwnerViewing && !profile.profile_public) {
-        return { status: "permission_denied", reason: "profile_not_public" };
+
+    const accessError = checkProfileAccess(profile, isOwnerViewing);
+    if (accessError) {
+        return accessError;
     }
 
     const targetUserId = profile.user_id;
-    const [authorMap, articles, diaries, bangumi, albums] = await Promise.all([
-        getAuthorBundle([targetUserId]),
-        isOwnerViewing || profile.show_articles_on_profile
-            ? readMany("app_articles", {
-                  filter: {
-                      _and: [
-                          { author_id: { _eq: targetUserId } },
-                          ...articleFilters(isOwnerViewing),
-                      ],
-                  } as JsonObject,
-                  sort: ["-published_at", "-date_created"],
-                  limit: 5,
-              })
-            : Promise.resolve([] as AppArticle[]),
-        isOwnerViewing || profile.show_diaries_on_profile
-            ? readMany("app_diaries", {
-                  filter: {
-                      _and: [
-                          { author_id: { _eq: targetUserId } },
-                          ...diaryFilters(isOwnerViewing),
-                      ],
-                  } as JsonObject,
-                  fields: [...DIARY_FIELDS],
-                  sort: ["-date_created"],
-                  limit: 5,
-              })
-            : Promise.resolve([] as AppDiary[]),
-        isOwnerViewing || profile.show_bangumi_on_profile
-            ? loadBangumiListForProfile(profile, { limit: 20 }).then(
-                  (result) => result.items,
-              )
-            : Promise.resolve([] as BangumiCollectionItem[]),
-        isOwnerViewing || profile.show_albums_on_profile
-            ? readMany("app_albums", {
-                  filter: {
-                      _and: [
-                          { author_id: { _eq: targetUserId } },
-                          ...albumFilters(isOwnerViewing),
-                      ],
-                  } as JsonObject,
-                  sort: ["-date", "-date_created"],
-                  limit: 5,
-              })
-            : Promise.resolve([] as AppAlbum[]),
-    ]);
+    const { authorMap, articles, diaries, bangumi, albums } =
+        await loadHomeDataInParallel({
+            targetUserId,
+            profile,
+            isOwnerViewing,
+        });
 
     const owner = readAuthor(authorMap, targetUserId);
-    const ownerData = {
-        id: targetUserId,
-        name: profile.display_name || profile.username || owner.name || "user",
-        username: profile.username || owner.username,
-        avatar_url:
-            profile.avatar_url ||
-            (profile.avatar_file
-                ? buildPublicAssetUrl(profile.avatar_file, {
-                      width: 128,
-                      height: 128,
-                      fit: "cover",
-                  })
-                : owner.avatar_url),
-        header_url: profile.header_file
-            ? buildPublicAssetUrl(profile.header_file, {
-                  width: 1200,
-                  height: 400,
-                  fit: "cover",
-              })
-            : undefined,
-    };
+    const ownerData = buildOwnerData({ targetUserId, profile, author: owner });
 
     return {
         status: "ok",
@@ -321,12 +227,11 @@ export async function loadUserBangumiList(
         return { status: "permission_denied", reason: "bangumi_not_public" };
     }
 
-    const page =
-        options.page && options.page > 0 ? Math.floor(options.page) : 1;
-    const limit =
-        options.limit && options.limit > 0
-            ? Math.min(200, Math.floor(options.limit))
-            : 20;
+    const { page, limit } = parsePaginationParams(
+        options.page,
+        options.limit,
+        200,
+    );
     const [result, authorMap] = await Promise.all([
         loadBangumiListForProfile(profile, {
             page,
@@ -344,69 +249,31 @@ export async function loadUserBangumiList(
     return { status: "ok", data: { items, page, limit, total: result.total } };
 }
 
-async function fetchDiaryCommentCountMap(
-    diaryIds: string[],
-): Promise<Map<string, number>> {
-    if (diaryIds.length === 0) {
-        return new Map();
-    }
-    const map = new Map<string, number>();
-    await Promise.all(
-        diaryIds.map(async (diaryId) => {
-            try {
-                const count = await countItems("app_diary_comments", {
-                    _and: [
-                        { diary_id: { _eq: diaryId } },
-                        { status: { _eq: "published" } },
-                        { is_public: { _eq: true } },
-                    ],
-                } as JsonObject);
-                map.set(diaryId, count);
-            } catch (error) {
-                console.warn(
-                    `[public-data] failed to load diary comment count: ${diaryId}`,
-                    error,
-                );
-                map.set(diaryId, 0);
-            }
-        }),
-    );
-    return map;
-}
-
-async function fetchDiaryLikeCountMap(
-    diaryIds: string[],
-): Promise<Map<string, number>> {
-    if (diaryIds.length === 0) {
-        return new Map();
-    }
-    const map = new Map<string, number>();
-    await Promise.all(
-        diaryIds.map(async (diaryId) => {
-            try {
-                const count = await countItems("app_diary_likes", {
-                    _and: [
-                        { diary_id: { _eq: diaryId } },
-                        { status: { _eq: "published" } },
-                    ],
-                } as JsonObject);
-                map.set(diaryId, count);
-            } catch (error) {
-                console.warn(
-                    `[public-data] failed to load diary like count: ${diaryId}`,
-                    error,
-                );
-                map.set(diaryId, 0);
-            }
-        }),
-    );
-    return map;
-}
-
 export type UserDiaryListOptions = {
     page?: number;
     limit?: number;
 };
+
+async function loadDiaryImages(
+    diaryIds: string[],
+    isOwnerViewing: boolean,
+): Promise<AppDiaryImage[]> {
+    const diaryImageFilters: JsonObject[] = [{ diary_id: { _in: diaryIds } }];
+    if (!isOwnerViewing) {
+        diaryImageFilters.push(
+            { status: { _eq: "published" } },
+            { is_public: { _eq: true } },
+        );
+    }
+    return readMany("app_diary_images", {
+        filter:
+            diaryIds.length > 0
+                ? ({ _and: diaryImageFilters } as JsonObject)
+                : ({ id: { _null: true } } as JsonObject),
+        sort: ["sort", "-date_created"],
+        limit: Math.max(diaryIds.length * 6, DEFAULT_LIST_LIMIT),
+    }) as Promise<AppDiaryImage[]>;
+}
 
 export async function loadUserDiaryList(
     username: string,
@@ -437,13 +304,11 @@ export async function loadUserDiaryList(
     }
     const userId = profile.user_id;
 
-    const page =
-        options.page && options.page > 0 ? Math.floor(options.page) : 1;
-    const limit =
-        options.limit && options.limit > 0
-            ? Math.min(100, Math.floor(options.limit))
-            : 20;
-    const offset = (page - 1) * limit;
+    const { page, limit, offset } = parsePaginationParams(
+        options.page,
+        options.limit,
+        100,
+    );
 
     const diaryFilter = {
         _and: [...diaryFilters(isOwnerViewing), { author_id: { _eq: userId } }],
@@ -461,23 +326,9 @@ export async function loadUserDiaryList(
     ]);
 
     const diaryIds = rows.map((row) => row.id);
-    const diaryImageFilters: JsonObject[] = [{ diary_id: { _in: diaryIds } }];
-    if (!isOwnerViewing) {
-        diaryImageFilters.push(
-            { status: { _eq: "published" } },
-            { is_public: { _eq: true } },
-        );
-    }
     const [images, authorMap, commentCountMap, likeCountMap] =
         await Promise.all([
-            readMany("app_diary_images", {
-                filter:
-                    diaryIds.length > 0
-                        ? ({ _and: diaryImageFilters } as JsonObject)
-                        : ({ id: { _null: true } } as JsonObject),
-                sort: ["sort", "-date_created"],
-                limit: Math.max(diaryIds.length * 6, DEFAULT_LIST_LIMIT),
-            }),
+            loadDiaryImages(diaryIds, isOwnerViewing),
             getAuthorBundle([userId]),
             fetchDiaryCommentCountMap(diaryIds),
             fetchDiaryLikeCountMap(diaryIds),
@@ -583,50 +434,7 @@ export async function loadUserAlbumList(
         PaginatedResult<AppAlbum & { tags: string[]; author: AuthorBundleItem }>
     >
 > {
-    const profile = await loadProfileByUsername(username);
-    if (!profile) {
-        return { status: "not_found" };
-    }
-    const isOwnerViewing =
-        Boolean(options.viewerId) && options.viewerId === profile.user_id;
-    if (!isOwnerViewing && !profile.profile_public) {
-        return { status: "permission_denied", reason: "profile_not_public" };
-    }
-    if (!isOwnerViewing && !profile.show_albums_on_profile) {
-        return { status: "permission_denied", reason: "albums_not_public" };
-    }
-    const userId = profile.user_id;
-
-    const page =
-        options.page && options.page > 0 ? Math.floor(options.page) : 1;
-    const limit =
-        options.limit && options.limit > 0
-            ? Math.min(100, Math.floor(options.limit))
-            : 20;
-    const offset = (page - 1) * limit;
-
-    const albumFilter = {
-        _and: [...albumFilters(isOwnerViewing), { author_id: { _eq: userId } }],
-    } as JsonObject;
-
-    const [rows, total, authorMap] = await Promise.all([
-        readMany("app_albums", {
-            filter: albumFilter,
-            sort: ["-date", "-date_created"],
-            limit,
-            offset,
-        }),
-        countItems("app_albums", albumFilter),
-        getAuthorBundle([userId]),
-    ]);
-
-    const items = rows.map((row) => ({
-        ...row,
-        tags: safeCsv(row.tags),
-        author: readAuthor(authorMap, row.author_id),
-    }));
-
-    return { status: "ok", data: { items, page, limit, total } };
+    return loadUserAlbumListHelper(username, options, readAuthor);
 }
 
 export type AlbumDetail = AppAlbum & {
@@ -640,200 +448,5 @@ export async function loadUserAlbumDetail(
     albumId: string,
     options?: ViewerOptions,
 ): Promise<ContentLoadResult<AlbumDetail>> {
-    const profile = await loadProfileByUsername(username);
-    if (!profile) {
-        return { status: "not_found" };
-    }
-    const isOwnerViewing =
-        Boolean(options?.viewerId) && options?.viewerId === profile.user_id;
-    if (!isOwnerViewing && !profile.profile_public) {
-        return { status: "permission_denied", reason: "profile_not_public" };
-    }
-    if (!isOwnerViewing && !profile.show_albums_on_profile) {
-        return { status: "permission_denied", reason: "albums_not_public" };
-    }
-    const userId = profile.user_id;
-
-    if (!isShortId(albumId)) {
-        return { status: "not_found" };
-    }
-
-    let album: AppAlbum | null;
-    if (isOwnerViewing) {
-        // owner 视角：读取时不附带 status/is_public 过滤
-        const rows = await readMany("app_albums", {
-            filter: { short_id: { _eq: albumId } } as JsonObject,
-            limit: 1,
-        });
-        album = (rows[0] as AppAlbum | undefined) ?? null;
-    } else {
-        album = await loadPublicAlbumByShortId(albumId);
-    }
-    if (!album || album.author_id !== userId) {
-        return { status: "not_found" };
-    }
-    const photoFilters: JsonObject[] = [{ album_id: { _eq: album.id } }];
-    if (!isOwnerViewing) {
-        photoFilters.push(
-            { status: { _eq: "published" } },
-            { is_public: { _eq: true } },
-        );
-    }
-    const [photos, authorMap] = await Promise.all([
-        readMany("app_album_photos", {
-            filter: { _and: photoFilters } as JsonObject,
-            sort: ["sort", "-date_created"],
-            limit: 200,
-        }) as Promise<AppAlbumPhoto[]>,
-        getAuthorBundle([userId]),
-    ]);
-
-    return {
-        status: "ok",
-        data: {
-            ...album,
-            tags: safeCsv(album.tags),
-            author: readAuthor(authorMap, album.author_id),
-            photos: photos.map((photo) => ({
-                ...photo,
-                tags: safeCsv(photo.tags),
-            })),
-        },
-    };
-}
-
-export function profileToSidebarData(profile: AppProfile): SidebarProfileData {
-    const avatarUrl = profile.avatar_file
-        ? buildPublicAssetUrl(profile.avatar_file)
-        : profile.avatar_url || null;
-
-    return {
-        display_name: profile.display_name || profile.username || "user",
-        bio: profile.bio ?? null,
-        bio_typewriter_enable: profile.bio_typewriter_enable ?? true,
-        bio_typewriter_speed: Math.max(
-            10,
-            Math.min(
-                500,
-                Math.floor(Number(profile.bio_typewriter_speed) || 80),
-            ),
-        ),
-        avatar_url: avatarUrl,
-        username: profile.username || null,
-        social_links: profile.social_links ?? null,
-        is_official: profile.is_official ?? false,
-    };
-}
-
-export async function loadPublicProfileByUserId(
-    userId: string,
-): Promise<AppProfile | null> {
-    const normalizedUserId = String(userId || "").trim();
-    if (!normalizedUserId) {
-        return null;
-    }
-    const cacheKey = `public:${normalizedUserId}`;
-    const cached = await cacheManager.get<{
-        exists: boolean;
-        profile: AppProfile | null;
-    }>("profile-viewer", cacheKey);
-    if (cached) {
-        return cached.profile;
-    }
-
-    const rows = await readMany("app_user_profiles", {
-        filter: {
-            _and: [
-                { user_id: { _eq: normalizedUserId } },
-                { profile_public: { _eq: true } },
-            ],
-        } as JsonObject,
-        limit: 1,
-    });
-    const profile = rows[0] || null;
-    void cacheManager.set("profile-viewer", cacheKey, {
-        exists: true,
-        profile,
-    });
-    return profile;
-}
-
-/**
- * 按 userId 为指定访问者加载资料。
- * owner 始终可见；非 owner 仅在 profile_public=true 时可见。
- */
-export async function loadProfileForViewerByUserId(
-    userId: string,
-    viewerId?: string | null,
-): Promise<AppProfile | null> {
-    const normalizedUserId = String(userId || "").trim();
-    if (!normalizedUserId) {
-        return null;
-    }
-    const normalizedViewerId = String(viewerId || "").trim();
-    const isOwner =
-        Boolean(normalizedViewerId) && normalizedViewerId === normalizedUserId;
-    if (isOwner) {
-        const cacheKey = `owner:${normalizedUserId}`;
-        const cached = await cacheManager.get<{
-            exists: boolean;
-            profile: AppProfile | null;
-        }>("profile-viewer", cacheKey);
-        if (cached) {
-            return cached.profile;
-        }
-        const rows = await readMany("app_user_profiles", {
-            filter: { user_id: { _eq: normalizedUserId } } as JsonObject,
-            limit: 1,
-        });
-        const profile = (rows[0] as AppProfile | undefined) ?? null;
-        void cacheManager.set("profile-viewer", cacheKey, {
-            exists: true,
-            profile,
-        });
-        return profile;
-    }
-    return loadPublicProfileByUserId(normalizedUserId);
-}
-
-export function invalidateOfficialSidebarCache(): void {
-    void cacheManager.invalidate("sidebar", "official");
-}
-
-export async function loadOfficialSidebarProfile(): Promise<SidebarProfileData> {
-    const cached = await cacheManager.get<SidebarProfileData>(
-        "sidebar",
-        "official",
-    );
-    if (cached) {
-        return cached;
-    }
-
-    const rows = await readMany("app_user_profiles", {
-        filter: {
-            _and: [
-                { is_official: { _eq: true } },
-                { profile_public: { _eq: true } },
-            ],
-        } as JsonObject,
-        limit: 1,
-    });
-
-    const profile = rows[0] as AppProfile | undefined;
-    if (!profile) {
-        return {
-            display_name: "CiaLli",
-            bio: null,
-            bio_typewriter_enable: true,
-            bio_typewriter_speed: 80,
-            avatar_url: null,
-            username: null,
-            social_links: null,
-            is_official: true,
-        };
-    }
-
-    const data = profileToSidebarData(profile);
-    void cacheManager.set("sidebar", "official", data);
-    return data;
+    return loadUserAlbumDetailHelper(username, albumId, options, readAuthor);
 }

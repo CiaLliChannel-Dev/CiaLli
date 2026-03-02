@@ -30,8 +30,8 @@ Astro.locals.sidebarProfile = profileToSidebarData(profile);
 ---
 
 <MainGridLayout
-  title={i18n(I18nKey.diaryCreateTitle)}
-  description={i18n(I18nKey.diaryCreateDescription)}
+  title={i18n(I18nKey.contentDiaryCreateTitle)}
+  description={i18n(I18nKey.contentDiaryCreateDescription)}
 >
   <div
     id="diary-editor-root"
@@ -46,18 +46,18 @@ Astro.locals.sidebarProfile = profileToSidebarData(profile);
         href={`/${username}/diary`}
         class="text-sm text-(--primary) hover:underline"
       >
-        {i18n(I18nKey.diaryCreateBackToList)}
+        {i18n(I18nKey.contentDiaryCreateBackToList)}
       </a>
       <h1 class="text-3xl font-bold text-black/90 dark:text-white/90">
-        {i18n(I18nKey.diaryCreateHeading)}
+        {i18n(I18nKey.contentDiaryCreateHeading)}
       </h1>
-      <p class="text-75">{i18n(I18nKey.diaryCreateHint)}</p>
+      <p class="text-75">{i18n(I18nKey.contentDiaryCreateHint)}</p>
     </section>
 
     <section class="card-base p-6 rounded-(--radius-large) space-y-5">
       <div class="space-y-1.5">
         <span class="text-sm text-60"
-          >{i18n(I18nKey.diaryContentLabel)}
+          >{i18n(I18nKey.contentDiaryContentLabel)}
           <span class="text-red-500">*</span></span
         >
       </div>
@@ -66,7 +66,7 @@ Astro.locals.sidebarProfile = profileToSidebarData(profile);
         <textarea
           id="diary-editor-content"
           rows="18"
-          placeholder={i18n(I18nKey.diaryContentPlaceholder)}
+          placeholder={i18n(I18nKey.contentDiaryContentPlaceholder)}
           class="w-full h-[18rem] overflow-y-auto rounded-xl border border-(--line-divider) bg-transparent px-4 py-3 text-90 font-mono focus:outline-none focus:border-(--primary) resize-none"
         ></textarea>
       </label>
@@ -84,7 +84,7 @@ Astro.locals.sidebarProfile = profileToSidebarData(profile);
             type="button"
             class="px-4 py-2 rounded-lg border border-(--line-divider) text-sm text-75 hover:bg-(--btn-plain-bg-hover) transition"
           >
-            {i18n(I18nKey.commonUploadImage)}
+            {i18n(I18nKey.interactionCommonUploadImage)}
           </button>
           <span id="diary-editor-upload-msg" class="text-xs text-60"></span>
         </div>
@@ -100,7 +100,7 @@ Astro.locals.sidebarProfile = profileToSidebarData(profile);
               checked
             />
             <span class="toggle-track"><span class="toggle-knob"></span></span>
-            {i18n(I18nKey.commonAllowComments)}
+            {i18n(I18nKey.interactionCommonAllowComments)}
           </label>
           <label
             class="flex items-center gap-3 text-sm text-75 cursor-pointer select-none"
@@ -112,15 +112,17 @@ Astro.locals.sidebarProfile = profileToSidebarData(profile);
               checked
             />
             <span class="toggle-track"><span class="toggle-knob"></span></span>
-            {i18n(I18nKey.commonPublicVisible)}
+            {i18n(I18nKey.interactionCommonPublicVisible)}
           </label>
         </div>
       </div>
 
       <section class="space-y-2 w-[60%]">
-        <h2 class="text-sm text-60">{i18n(I18nKey.commonImageOrder)}</h2>
+        <h2 class="text-sm text-60">
+          {i18n(I18nKey.interactionCommonImageOrder)}
+        </h2>
         <p id="diary-editor-image-order-empty" class="text-xs text-60">
-          {i18n(I18nKey.commonNoImages)}
+          {i18n(I18nKey.interactionCommonNoImages)}
         </p>
         <div id="diary-editor-image-order-list" class="space-y-2"></div>
       </section>
@@ -133,7 +135,7 @@ Astro.locals.sidebarProfile = profileToSidebarData(profile);
             type="button"
             class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
           >
-            {i18n(I18nKey.diaryCreateSubmit)}
+            {i18n(I18nKey.contentDiaryCreateSubmit)}
           </button>
         </div>
       </div>
