@@ -299,8 +299,31 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
 <script>
   import { initComments } from "@/scripts/comments-init";
 
-  initComments();
-  document.addEventListener("astro:after-swap", initComments);
+  type CommentInitRuntimeWindow = Window &
+    typeof globalThis & {
+      __commentSettledInitBound?: boolean;
+    };
+
+  const runtimeWindow = window as CommentInitRuntimeWindow;
+  const NAVIGATION_SETTLED_EVENT = "cialli:navigation:settled";
+
+  const runCommentInit = () => {
+    initComments();
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", runCommentInit, {
+      once: true,
+    });
+  } else {
+    runCommentInit();
+  }
+
+  if (!runtimeWindow.__commentSettledInitBound) {
+    runtimeWindow.__commentSettledInitBound = true;
+    // 等待布局过渡与骨架揭幕后再初始化评论，避免出现“二次加载”体感。
+    document.addEventListener(NAVIGATION_SETTLED_EVENT, runCommentInit);
+  }
 </script>
 
 <style is:global>

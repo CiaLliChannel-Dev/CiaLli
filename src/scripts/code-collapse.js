@@ -39,8 +39,8 @@ class CodeBlockCollapser {
             this.syncWithThemeOptimizer();
         });
 
-        // 监听 Astro 页面切换事件，确保同步
-        document.addEventListener("astro:page-load", () => {
+        // 仅在 after-swap 触发，避免与 page-load 重复执行造成二次抖动
+        document.addEventListener("astro:after-swap", () => {
             // 延迟同步，确保主题优化器已经处理完代码块
             setTimeout(() => {
                 this.syncWithThemeOptimizer();
@@ -321,16 +321,9 @@ window.CodeBlockCollapser = CodeBlockCollapser;
 window.codeBlockCollapser = codeBlockCollapser;
 
 // Astro View Transitions 页面切换钩子
-document.addEventListener("astro:page-load", () => {
-    codeBlockCollapser.processedBlocks = new WeakSet();
-    setTimeout(() => {
-        codeBlockCollapser.setupCodeBlocks();
-    }, 100);
-});
-
 document.addEventListener("astro:after-swap", () => {
     codeBlockCollapser.processedBlocks = new WeakSet();
     setTimeout(() => {
         codeBlockCollapser.setupCodeBlocks();
-    }, 50);
+    }, 80);
 });

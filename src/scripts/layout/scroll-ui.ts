@@ -8,12 +8,19 @@ type ScrollIntentSourceOptions = {
     bannerHeightExtend: number;
 };
 
-function isBannerToSpecTransitionRunning(): boolean {
+const LAYOUT_TRANSITION_FREEZE_CLASSES = [
+    "layout-banner-to-spec-transition",
+    "layout-banner-to-spec-transition-preparing",
+    "layout-banner-to-spec-transition-active",
+    "layout-spec-to-banner-transition",
+    "layout-banner-to-spec-navbar-commit-freeze",
+] as const;
+
+function isLayoutTransitionRunning(): boolean {
     const root = document.documentElement;
-    return (
-        root.classList.contains("layout-banner-to-spec-transition") ||
-        root.classList.contains("layout-banner-to-spec-transition-preparing") ||
-        root.classList.contains("layout-banner-to-spec-transition-active")
+    // 过渡窗口期冻结滚动意图，避免 SCROLL_UPDATE 与路由提交阶段互相抢写
+    return LAYOUT_TRANSITION_FREEZE_CLASSES.some((className) =>
+        root.classList.contains(className),
     );
 }
 
@@ -103,7 +110,7 @@ export function setupScrollIntentSource(
     const handleScroll = () => {
         const scrollTop = document.documentElement.scrollTop;
         const viewportWidth = window.innerWidth;
-        const shouldFreezeCollapseIntent = isBannerToSpecTransitionRunning();
+        const shouldFreezeCollapseIntent = isLayoutTransitionRunning();
         const currentState = shouldFreezeCollapseIntent
             ? options.controller.getState()
             : options.controller.dispatch({

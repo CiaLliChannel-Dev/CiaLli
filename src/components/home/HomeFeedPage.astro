@@ -106,20 +106,7 @@ const hasRightSidebars =
   #post-list-container > :global(*) {
     content-visibility: auto;
     contain-intrinsic-size: 200px;
-    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    opacity: 0;
-    animation: fadeInSlide 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-    animation-delay: calc(var(--content-delay) + var(--i) * var(--interval));
-  }
-
-  @keyframes fadeInSlide {
-    from {
-      opacity: 0;
-      transform: translateX(-10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateX(0);
-    }
+    opacity: 1;
+    transform: none;
   }
 </style>

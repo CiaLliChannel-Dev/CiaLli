@@ -104,7 +104,7 @@ const links: NavBarLink[] = navBarConfig.links
     <a
       id="navbar-logo"
       href={url("/")}
-      class="btn-plain scale-animation rounded-lg h-[3.25rem] in-[.enable-banner]:h-[2.5rem]! in-[.enable-banner]:group-[.scrolled]:h-[3.25rem]! px-5 font-bold active:scale-95 min-w-0 max-w-none transition-all duration-920"
+      class="btn-plain scale-animation rounded-lg h-[3.25rem] in-[.enable-banner]:h-[2.5rem]! in-[.enable-banner]:group-[.scrolled]:h-[3.25rem]! px-5 font-bold active:scale-95 min-w-0 max-w-none transition-[height,padding-left,padding-right] duration-920"
     >
       <div class="flex flex-row items-center min-w-0 text-md">
         {
@@ -114,7 +114,7 @@ const links: NavBarLink[] = navBarConfig.links
                 <Image
                   src={defaultNavLogoImage}
                   alt={siteSettings.navbarTitle.text}
-                  class="h-[3.25rem] w-auto in-[.enable-banner]:h-[2.5rem]! in-[.enable-banner]:group-[.scrolled]:h-[3.25rem]! max-w-full object-contain transition-all duration-920"
+                  class="h-[3.25rem] w-auto in-[.enable-banner]:h-[2.5rem]! in-[.enable-banner]:group-[.scrolled]:h-[3.25rem]! max-w-full object-contain transition-[height] duration-920"
                   loading="lazy"
                   width={320}
                   height={160}
@@ -125,7 +125,7 @@ const links: NavBarLink[] = navBarConfig.links
                 <img
                   src={resolvedNavbarLogoSrc}
                   alt={siteSettings.navbarTitle.text}
-                  class="h-[3.25rem] w-auto in-[.enable-banner]:h-[2.5rem]! in-[.enable-banner]:group-[.scrolled]:h-[3.25rem]! max-w-full object-contain transition-all duration-920"
+                  class="h-[3.25rem] w-auto in-[.enable-banner]:h-[2.5rem]! in-[.enable-banner]:group-[.scrolled]:h-[3.25rem]! max-w-full object-contain transition-[height] duration-920"
                   loading="lazy"
                 />
               )

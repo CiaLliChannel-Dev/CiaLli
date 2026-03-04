@@ -37,6 +37,7 @@ export const ROOT_RUNTIME_CLASSES_TO_PRESERVE = [
     "dark",
     "is-theme-transitioning",
     "use-view-transition",
+    "enter-skeleton-active",
     ENTER_SKELETON_AWAITING_REPLACE_CLASS,
     BANNER_TO_SPEC_TRANSITION_CLASS,
     BANNER_TO_SPEC_TRANSITION_PREPARING_CLASS,
@@ -57,6 +58,8 @@ export const ROOT_RUNTIME_STYLE_PROPERTIES_TO_PRESERVE = [
 export const ROOT_RUNTIME_DATA_ATTRIBUTES_TO_PRESERVE = [
     "data-desktop-unsupported",
     "data-desktop-force-browse",
+    "data-enter-skeleton-mode",
+    "data-nav-phase",
 ] as const;
 
 // ===== Navigation target / pathname utils =====
@@ -219,8 +222,13 @@ export function clearBannerToSpecViewTransitionNames(scope: ParentNode): void {
     }
 }
 
-export function freezeSpecLayoutStateForHomeDocument(): void {
-    const body = document.body;
+export function freezeSpecLayoutStateForHomeDocument(
+    targetDocument: Document = document,
+): void {
+    const body = targetDocument.body;
+    if (!(body instanceof HTMLElement)) {
+        return;
+    }
     body.dataset.layoutMode = "none";
     body.dataset.routeHome = "false";
     body.classList.remove("lg:is-home");
@@ -409,6 +417,8 @@ export type TransitionState = {
     didForceNavbarScrolledForBannerToSpec: boolean;
     pendingSpecToBannerFreeze: boolean;
     navigationInProgress: boolean;
+    navigationToken: number;
+    lastFinalizedNavigationToken: number | null;
 };
 
 export function clearDelayedPageViewTimer(state: TransitionState): void {
@@ -512,10 +522,14 @@ export function dispatchRouteChangeWithNavbarCommitFreeze(
         return false;
     }
     const root = document.documentElement;
+    const currentNavigationToken = state.navigationToken;
     root.classList.add(BANNER_TO_SPEC_NAVBAR_COMMIT_FREEZE_CLASS);
     commitRouteChange();
     requestAnimationFrame(() => {
         requestAnimationFrame(() => {
+            if (state.navigationToken !== currentNavigationToken) {
+                return;
+            }
             root.classList.remove(BANNER_TO_SPEC_NAVBAR_COMMIT_FREEZE_CLASS);
         });
     });

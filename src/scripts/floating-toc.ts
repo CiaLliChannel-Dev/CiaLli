@@ -418,16 +418,6 @@ function ensureFloatingTOC(): void {
 
 runtimeWindow.floatingTOCInit = ensureFloatingTOC;
 
-if (!runtimeWindow.__floatingTocLifecycleBound) {
-    document.addEventListener("astro:page-load", () => {
-        window.setTimeout(() => ensureFloatingTOC(), 120);
-    });
-    document.addEventListener("astro:after-swap", () => {
-        window.setTimeout(() => ensureFloatingTOC(), 120);
-    });
-    runtimeWindow.__floatingTocLifecycleBound = true;
-}
-
 if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", ensureFloatingTOC, {
         once: true,

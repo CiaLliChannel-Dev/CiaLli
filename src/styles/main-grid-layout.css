@@ -77,8 +77,12 @@ html.layout-banner-to-spec-transition .transition-fade {
   transition-duration: 280ms !important;
 }
 
-html.layout-banner-to-spec-transition #content-wrapper {
+html.layout-banner-to-spec-transition:not(.enter-skeleton-active) #content-wrapper {
   transition: opacity 240ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+html.layout-banner-to-spec-transition.enter-skeleton-active #content-wrapper {
+  transition: none !important;
 }
 
 html.layout-banner-to-spec-transition.layout-banner-to-spec-transition-active.layout-banner-to-spec-navbar-sync #navbar > div {
@@ -97,9 +101,23 @@ html.layout-banner-to-spec-transition.layout-banner-to-spec-transition-active.la
   transition-timing-function: var(--layout-banner-route-transition-easing, cubic-bezier(0.22, 1, 0.36, 1)) !important;
 }
 
-html.layout-banner-to-spec-transition.layout-banner-to-spec-navbar-commit-freeze #navbar > div,
-html.layout-banner-to-spec-transition.layout-banner-to-spec-navbar-commit-freeze #navbar-logo,
-html.layout-banner-to-spec-transition.layout-banner-to-spec-navbar-commit-freeze #navbar-logo img {
+html.layout-spec-to-banner-transition #navbar > div {
+  transition-property: border-radius, background-color, box-shadow, backdrop-filter !important;
+  transition-duration: var(--layout-banner-route-transition-duration, 920ms) !important;
+  transition-timing-function: var(--layout-banner-route-transition-easing, cubic-bezier(0.22, 1, 0.36, 1)) !important;
+}
+
+html.layout-spec-to-banner-transition #navbar .navbar-bg-strip,
+html.layout-spec-to-banner-transition #navbar-logo,
+html.layout-spec-to-banner-transition #navbar-logo img {
+  transition-duration: var(--layout-banner-route-transition-duration, 920ms) !important;
+  transition-timing-function: var(--layout-banner-route-transition-easing, cubic-bezier(0.22, 1, 0.36, 1)) !important;
+}
+
+html.layout-banner-to-spec-navbar-commit-freeze #navbar > div,
+html.layout-banner-to-spec-navbar-commit-freeze #navbar .navbar-bg-strip,
+html.layout-banner-to-spec-navbar-commit-freeze #navbar-logo,
+html.layout-banner-to-spec-navbar-commit-freeze #navbar-logo img {
   transition: none !important;
 }
 

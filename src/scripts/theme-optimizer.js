@@ -61,20 +61,13 @@ class ThemeOptimizer {
     // ==================== Astro View Transitions 钩子设置 ====================
 
     setupTransitionHooks() {
-        // Astro View Transitions 页面切换钩子
-        document.addEventListener("astro:page-load", () => {
+        // 避免 after-swap / page-load 双监听导致同一次导航重复初始化
+        document.addEventListener("astro:after-swap", () => {
             setTimeout(() => {
                 this.observeCodeBlocks();
                 this.applyCodeBlockTransitionBehavior();
                 this.forceApplyThemeTransitionStyles();
-            }, 100);
-        });
-
-        document.addEventListener("astro:after-swap", () => {
-            setTimeout(() => {
-                this.applyCodeBlockTransitionBehavior();
-                this.forceApplyThemeTransitionStyles();
-            }, 50);
+            }, 80);
         });
     }
 

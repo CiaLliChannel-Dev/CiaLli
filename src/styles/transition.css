@@ -43,6 +43,23 @@
   animation: fade-in-up 300ms ease-out forwards;
 }
 
+/* 高风险容器在首屏与切页都不播放 onload 位移动画，避免侧栏/TOC 二次揭幕 */
+#sidebar.onload-animation,
+#right-sidebar-slot.onload-animation,
+#toc-wrapper.onload-animation {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: translateY(0) translateX(0) scale(1) !important;
+}
+
+/* 客户端导航过渡窗口期不再播放 onload 位移动画，避免切页抖动抽动 */
+html[data-astro-transition] .onload-animation,
+html.enter-skeleton-active .onload-animation {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: translateY(0) translateX(0) scale(1) !important;
+}
+
 .onload-animation-fade-in {
   opacity: 0;
   animation: fade-in 300ms ease-in forwards;

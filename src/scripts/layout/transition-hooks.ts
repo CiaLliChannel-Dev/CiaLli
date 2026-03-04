@@ -7,6 +7,8 @@ import {
     activateEnterSkeleton,
     deactivateEnterSkeleton,
     forceResetEnterSkeleton,
+    isEnterSkeletonActive,
+    syncEnterSkeletonStateToIncomingDocument,
 } from "./enter-skeleton";
 import { scrollToHashBelowTocBaseline } from "@/utils/hash-scroll";
 import {
@@ -69,6 +71,48 @@ type RuntimeWindowWithTOC = Window &
         __cialliUnsavedNavigationCanceledAt?: number;
     };
 
+type NavigationPhase = "idle" | "preparing" | "swapped" | "settling";
+
+const NAVIGATION_PHASE_ATTR = "data-nav-phase";
+const NAVIGATION_SETTLED_EVENT = "cialli:navigation:settled";
+const ONLOAD_STRIP_SCOPE_IDS = [
+    "top-row",
+    "content-wrapper",
+    "sidebar",
+    "right-sidebar-slot",
+    "toc-wrapper",
+] as const;
+
+function setNavigationPhase(
+    phase: NavigationPhase,
+    targetDocument: Document = document,
+): void {
+    targetDocument.documentElement.setAttribute(NAVIGATION_PHASE_ATTR, phase);
+}
+
+function stripOnloadAnimationsInDocument(targetDocument: Document): void {
+    // 客户端切页时只剥离高风险容器的 onload 关键帧，
+    // 避免骨架结束后再次触发“二次揭幕”造成抽动
+    for (const id of ONLOAD_STRIP_SCOPE_IDS) {
+        const scope = targetDocument.getElementById(id);
+        if (scope instanceof HTMLElement) {
+            stripOnloadAnimationClasses(scope);
+        }
+    }
+}
+
+function dispatchNavigationSettledEvent(navigationToken: number): void {
+    document.dispatchEvent(
+        new CustomEvent(NAVIGATION_SETTLED_EVENT, {
+            detail: {
+                token: navigationToken,
+                path: window.location.pathname,
+                timestamp: Date.now(),
+            },
+        }),
+    );
+}
+
 // ===== Before-preparation helpers =====
 
 function resetNavigationState(state: TransitionState): void {
@@ -129,20 +173,26 @@ function handleBeforePreparation(
     }
 
     if (isSameNavigationTarget(e.from, e.to)) {
+        setNavigationPhase("idle");
         state.navigationInProgress = false;
         state.didReplaceContentDuringVisit = false;
+        state.lastFinalizedNavigationToken = null;
         resetNavigationState(state);
         clearBannerToSpecTransitionVisualState(state);
         setAwaitingReplaceState(false);
         setPageHeightExtendVisible(false);
+        forceResetEnterSkeleton();
         return;
     }
 
     const targetPathname = normalizePathname(e.to.pathname);
+    state.navigationToken += 1;
     state.navigationInProgress = true;
     state.didReplaceContentDuringVisit = false;
+    state.lastFinalizedNavigationToken = null;
     forceResetEnterSkeleton();
     setAwaitingReplaceState(true);
+    setNavigationPhase("preparing");
     deps.cleanupFancybox();
     resetNavigationState(state);
     clearBannerToSpecTransitionVisualState(state);
@@ -187,16 +237,21 @@ function handleBeforeSwap(
 ): void {
     const newDocument = e.newDocument;
 
-    const topRow = document.getElementById("top-row");
-    if (topRow instanceof HTMLElement) {
-        stripOnloadAnimationClasses(topRow);
-    }
+    stripOnloadAnimationsInDocument(document);
 
     syncRootRuntimeStateToIncomingDocument(
         newDocument,
         deps.defaultTheme,
         deps.darkMode,
     );
+    syncEnterSkeletonStateToIncomingDocument(newDocument);
+    stripOnloadAnimationsInDocument(newDocument);
+    setNavigationPhase("swapped", newDocument);
+
+    // spec -> home：在交换前就冻结 incoming body 布局态，避免交换瞬间出现一帧 navbar 尺寸闪动
+    if (state.pendingSpecToBannerFreeze) {
+        freezeSpecLayoutStateForHomeDocument(newDocument);
+    }
 
     state.pendingSidebarProfilePatch = null;
     const currentSidebar = document.querySelector<HTMLElement>("#sidebar");
@@ -207,12 +262,6 @@ function handleBeforeSwap(
         const result = resolveSidebarPreservation(currentSidebar, newSidebar);
         shouldPreserveSidebar = result.shouldPreserveSidebar;
         state.pendingSidebarProfilePatch = result.patch;
-    }
-
-    const newMainGrid = newDocument.querySelector("#main-grid");
-    const currentMainGrid = document.getElementById("main-grid");
-    if (newMainGrid instanceof HTMLElement && currentMainGrid) {
-        currentMainGrid.className = newMainGrid.className;
     }
 
     if (
@@ -227,22 +276,18 @@ function handleBeforeSwap(
     const savedSidebar = shouldPreserveSidebar
         ? document.querySelector<HTMLElement>("#sidebar")
         : null;
-    const savedScrollY = window.scrollY;
-    const suppressScroll = Boolean(state.pendingBannerToSpecRoutePath);
     const capturedBannerPath = state.pendingBannerToSpecRoutePath;
     const capturedSpecFreeze = state.pendingSpecToBannerFreeze;
 
     const originalSwap = e.swap;
     e.swap = () => {
         originalSwap();
+        setNavigationPhase("swapped");
         if (savedSidebar) {
             const inDom = document.querySelector("#sidebar");
             if (inDom) {
                 inDom.replaceWith(savedSidebar);
             }
-        }
-        if (suppressScroll) {
-            window.scrollTo(0, savedScrollY);
         }
         if (capturedBannerPath) {
             setBannerToSpecViewTransitionNames(document);
@@ -255,37 +300,19 @@ function handleBeforeSwap(
 
 // ===== After-swap event handler =====
 
-function handleAfterSwap(
-    state: TransitionState,
-    deps: TransitionIntentSourceDependencies,
-    runtimeWindow: RuntimeWindowWithTOC,
-): void {
+function handleAfterSwap(state: TransitionState): void {
     state.didReplaceContentDuringVisit = true;
     setAwaitingReplaceState(false);
-    activateEnterSkeleton();
-    void deps.initFancybox();
-    deps.checkKatex();
-    deps.initKatexScrollbars();
+    setNavigationPhase("swapped");
+    if (!isEnterSkeletonActive()) {
+        activateEnterSkeleton();
+    }
 
     if (state.pendingSidebarProfilePatch) {
         applySidebarProfilePatch(state.pendingSidebarProfilePatch);
         state.pendingSidebarProfilePatch = null;
     }
     syncSidebarAvatarLoadingState(document);
-
-    const tocElement = document.querySelector("table-of-contents") as
-        | (HTMLElement & { init?: () => void })
-        | null;
-    const hasAnyTOCRuntime =
-        typeof tocElement?.init === "function" ||
-        typeof runtimeWindow.floatingTOCInit === "function";
-
-    if (hasAnyTOCRuntime) {
-        window.setTimeout(() => {
-            tocElement?.init?.();
-            runtimeWindow.floatingTOCInit?.();
-        }, 100);
-    }
 
     if (state.pendingBannerToSpecRoutePath) {
         startBannerToSpecMoveTransition(state);
@@ -294,7 +321,10 @@ function handleAfterSwap(
 
 // ===== Page-view finalization helpers =====
 
-function doVisitEndCleanup(state: TransitionState): void {
+function doVisitEndCleanup(
+    state: TransitionState,
+    navigationToken: number,
+): void {
     state.navigationInProgress = false;
     const shouldForceCleanup = !state.didReplaceContentDuringVisit;
     if (shouldForceCleanup) {
@@ -314,6 +344,9 @@ function doVisitEndCleanup(state: TransitionState): void {
     }
     const cleanupDelayMs = remainingMs > 0 ? Math.ceil(remainingMs) + 200 : 200;
     window.setTimeout(() => {
+        if (navigationToken !== state.navigationToken) {
+            return;
+        }
         setPageHeightExtendVisible(false);
         const toc = document.getElementById("toc-wrapper");
         if (toc) {
@@ -324,19 +357,33 @@ function doVisitEndCleanup(state: TransitionState): void {
 
 function finalizePageView(
     state: TransitionState,
-    deps: TransitionIntentDeps,
+    transitionDeps: TransitionIntentDeps,
+    sourceDeps: TransitionIntentSourceDependencies,
+    runtimeWindow: RuntimeWindowWithTOC,
+    navigationToken: number,
 ): void {
+    if (navigationToken !== state.navigationToken) {
+        return;
+    }
+    if (state.lastFinalizedNavigationToken === navigationToken) {
+        return;
+    }
+    state.lastFinalizedNavigationToken = navigationToken;
+    setNavigationPhase("settling");
     setAwaitingReplaceState(false);
     deactivateEnterSkeleton();
     const hash = window.location.hash?.slice(1);
     const didUseNavbarCommitFreeze = dispatchRouteChangeWithNavbarCommitFreeze(
         state,
-        deps,
+        transitionDeps,
     );
     clearBannerToSpecTransitionVisualState(state, {
         preserveNavbarCommitFreeze: didUseNavbarCommitFreeze,
     });
-    const isHomePage = deps.pathsEqual(window.location.pathname, deps.url("/"));
+    const isHomePage = transitionDeps.pathsEqual(
+        window.location.pathname,
+        transitionDeps.url("/"),
+    );
     const bannerTextOverlay = document.querySelector(".banner-text-overlay");
     if (bannerTextOverlay) {
         bannerTextOverlay.classList.toggle("hidden", !isHomePage);
@@ -350,8 +397,8 @@ function finalizePageView(
         window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
     }
     const expectedThemeState = resolveExpectedThemeState(
-        deps.defaultTheme,
-        deps.darkMode,
+        transitionDeps.defaultTheme,
+        transitionDeps.darkMode,
     );
     const currentRoot = document.documentElement;
     const currentCodeTheme = currentRoot.getAttribute("data-theme");
@@ -362,7 +409,38 @@ function finalizePageView(
     ) {
         applyThemeStateToRoot(currentRoot, expectedThemeState);
     }
+
+    // 过渡完成后再恢复重初始化任务，避免动画窗口内主线程抖动
+    requestAnimationFrame(() => {
+        if (navigationToken !== state.navigationToken) {
+            return;
+        }
+        void sourceDeps.initFancybox();
+        sourceDeps.checkKatex();
+        sourceDeps.initKatexScrollbars();
+
+        const tocElement = document.querySelector("table-of-contents") as
+            | (HTMLElement & { init?: () => void })
+            | null;
+        const hasAnyTOCRuntime =
+            typeof tocElement?.init === "function" ||
+            typeof runtimeWindow.floatingTOCInit === "function";
+
+        if (hasAnyTOCRuntime) {
+            window.setTimeout(() => {
+                if (navigationToken !== state.navigationToken) {
+                    return;
+                }
+                tocElement?.init?.();
+                runtimeWindow.floatingTOCInit?.();
+            }, 100);
+        }
+    });
+
     window.setTimeout(() => {
+        if (navigationToken !== state.navigationToken) {
+            return;
+        }
         if (document.getElementById("tcomment")) {
             document.dispatchEvent(
                 new CustomEvent("cialli:page:loaded", {
@@ -374,30 +452,53 @@ function finalizePageView(
             );
         }
     }, 300);
-    doVisitEndCleanup(state);
+    setNavigationPhase("idle");
+    dispatchNavigationSettledEvent(navigationToken);
+    doVisitEndCleanup(state, navigationToken);
 }
 
 // ===== Page-load event handler =====
 
 function handlePageLoad(
     state: TransitionState,
-    deps: TransitionIntentDeps,
+    transitionDeps: TransitionIntentDeps,
+    sourceDeps: TransitionIntentSourceDependencies,
+    runtimeWindow: RuntimeWindowWithTOC,
 ): void {
     if (!state.navigationInProgress) {
         return;
     }
+    const navigationToken = state.navigationToken;
 
     const remainingMs = getBannerToSpecRemainingMs(state);
     if (remainingMs > 0) {
         clearDelayedPageViewTimer(state);
         state.delayedPageViewTimerId = window.setTimeout(() => {
             state.delayedPageViewTimerId = null;
-            finalizePageView(state, deps);
+            if (
+                navigationToken !== state.navigationToken ||
+                !state.navigationInProgress
+            ) {
+                return;
+            }
+            finalizePageView(
+                state,
+                transitionDeps,
+                sourceDeps,
+                runtimeWindow,
+                navigationToken,
+            );
         }, Math.ceil(remainingMs));
         return;
     }
 
-    finalizePageView(state, deps);
+    finalizePageView(
+        state,
+        transitionDeps,
+        sourceDeps,
+        runtimeWindow,
+        navigationToken,
+    );
 }
 
 // ===== Main setup function =====
@@ -406,6 +507,7 @@ export function setupTransitionIntentSource(
     deps: TransitionIntentSourceDependencies,
 ): void {
     const runtimeWindow = window as RuntimeWindowWithTOC;
+    setNavigationPhase("idle");
 
     const state: TransitionState = {
         pendingBannerToSpecRoutePath: null,
@@ -416,6 +518,8 @@ export function setupTransitionIntentSource(
         didForceNavbarScrolledForBannerToSpec: false,
         pendingSpecToBannerFreeze: false,
         navigationInProgress: false,
+        navigationToken: 0,
+        lastFinalizedNavigationToken: null,
     };
 
     const transitionDeps: TransitionIntentDeps = {
@@ -445,11 +549,11 @@ export function setupTransitionIntentSource(
     });
 
     document.addEventListener("astro:after-swap", () => {
-        handleAfterSwap(state, deps, runtimeWindow);
+        handleAfterSwap(state);
     });
 
     document.addEventListener("astro:page-load", () => {
-        handlePageLoad(state, transitionDeps);
+        handlePageLoad(state, transitionDeps, deps, runtimeWindow);
     });
 
     document.addEventListener("cialli:unsaved-navigation-cancel", () => {

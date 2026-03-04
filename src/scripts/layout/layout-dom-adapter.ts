@@ -21,6 +21,8 @@ const BANNER_TO_SPEC_TRANSITION_PREPARING_CLASS =
     "layout-banner-to-spec-transition-preparing";
 const BANNER_TO_SPEC_TRANSITION_ACTIVE_CLASS =
     "layout-banner-to-spec-transition-active";
+const SPEC_TO_BANNER_TRANSITION_CLASS = "layout-spec-to-banner-transition";
+const NAVBAR_COMMIT_FREEZE_CLASS = "layout-banner-to-spec-navbar-commit-freeze";
 
 function syncBodyState(next: LayoutState): void {
     const body = document.body;
@@ -91,7 +93,9 @@ function syncNavbar(next: LayoutState): void {
     const shouldLockScrolledState =
         root.classList.contains(BANNER_TO_SPEC_TRANSITION_CLASS) ||
         root.classList.contains(BANNER_TO_SPEC_TRANSITION_PREPARING_CLASS) ||
-        root.classList.contains(BANNER_TO_SPEC_TRANSITION_ACTIVE_CLASS);
+        root.classList.contains(BANNER_TO_SPEC_TRANSITION_ACTIVE_CLASS) ||
+        root.classList.contains(SPEC_TO_BANNER_TRANSITION_CLASS) ||
+        root.classList.contains(NAVBAR_COMMIT_FREEZE_CLASS);
     if (shouldLockScrolledState) {
         // 过渡窗口期由 transition-hooks 统一控制 navbar.scrolled，避免中途抖动。
         return;

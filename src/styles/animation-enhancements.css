@@ -1,14 +1,10 @@
 /* 动画增强样式 - 参考 yukina 主题优化 */
 
-/* 页面切换状态类 */
-html.is-leaving .transition-leaving {
-  transform: translateY(-1rem);
-  opacity: 0;
-}
-
+/* 页面切换状态类（由骨架揭幕接管，避免 Astro entering/leaving 与骨架叠加产生抽动） */
+html.is-leaving .transition-leaving,
 html.is-entering .transition-main {
-  transform: translateY(1.5rem);
-  opacity: 0;
+  transform: none;
+  opacity: 1;
 }
 
 /* 离开动画类 */

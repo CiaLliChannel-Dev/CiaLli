@@ -132,25 +132,27 @@ const SKELETON_PAGE_RULES: SkeletonDetectRule[] = [
 
 function matchSkeletonRule(
     rules: SkeletonDetectRule[],
+    targetDocument: Document,
 ): EnterSkeletonMode | null {
     for (const rule of rules) {
-        if (document.querySelector(rule.selector)) {
+        if (targetDocument.querySelector(rule.selector)) {
             return rule.mode;
         }
     }
     return null;
 }
 
-function detectEnterSkeletonMode(): EnterSkeletonMode {
+function detectEnterSkeletonMode(
+    targetDocument: Document = document,
+): EnterSkeletonMode {
     return (
-        matchSkeletonRule(SKELETON_TARGET_RULES) ??
-        matchSkeletonRule(SKELETON_PAGE_RULES) ??
+        matchSkeletonRule(SKELETON_TARGET_RULES, targetDocument) ??
+        matchSkeletonRule(SKELETON_PAGE_RULES, targetDocument) ??
         "fallback"
     );
 }
 
-function applyMode(mode: EnterSkeletonMode): void {
-    const root = getRoot();
+function applyMode(mode: EnterSkeletonMode, root: HTMLElement | null): void {
     if (!root) {
         return;
     }
@@ -177,9 +179,9 @@ export function activateEnterSkeleton(): void {
     activationToken += 1;
     clearDeactivationTimer();
 
-    const mode = detectEnterSkeletonMode();
+    const mode = detectEnterSkeletonMode(document);
     activatedAt = performance.now();
-    applyMode(mode);
+    applyMode(mode, getRoot());
 }
 
 export function deactivateEnterSkeleton(): void {
@@ -217,4 +219,33 @@ export function forceResetEnterSkeleton(): void {
     clearDeactivationTimer();
     activatedAt = 0;
     clearMode();
+}
+
+export function isEnterSkeletonActive(): boolean {
+    const root = getRoot();
+    if (!root) {
+        return false;
+    }
+    return root.classList.contains(ACTIVE_CLASS);
+}
+
+export function syncEnterSkeletonStateToIncomingDocument(
+    newDocument: Document,
+): void {
+    const currentRoot = getRoot();
+    const incomingRoot = newDocument.documentElement;
+    if (!currentRoot || !(incomingRoot instanceof HTMLElement)) {
+        return;
+    }
+
+    const isActive = currentRoot.classList.contains(ACTIVE_CLASS);
+    incomingRoot.classList.toggle(ACTIVE_CLASS, isActive);
+    if (!isActive) {
+        incomingRoot.removeAttribute(MODE_ATTR);
+        return;
+    }
+
+    // 在 swap 前为 incoming 文档提前解析骨架模式，避免交换后再次激活造成“二次揭幕”
+    const incomingMode = detectEnterSkeletonMode(newDocument);
+    incomingRoot.setAttribute(MODE_ATTR, incomingMode);
 }

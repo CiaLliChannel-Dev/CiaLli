@@ -352,6 +352,14 @@ const {
     roots.forEach((rootEl) => bindDetailRoot(rootEl));
   }
 
+  type DetailActionRuntimeWindow = Window &
+    typeof globalThis & {
+      __detailActionSettledInitBound?: boolean;
+    };
+
+  const runtimeWindow = window as DetailActionRuntimeWindow;
+  const NAVIGATION_SETTLED_EVENT = "cialli:navigation:settled";
+
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", initDetailActionFloat, {
       once: true,
@@ -360,5 +368,9 @@ const {
     initDetailActionFloat();
   }
 
-  document.addEventListener("astro:after-swap", initDetailActionFloat);
+  if (!runtimeWindow.__detailActionSettledInitBound) {
+    runtimeWindow.__detailActionSettledInitBound = true;
+    // 统一在导航最终稳定后初始化，避免骨架阶段重复绑定引发二次动画体感
+    document.addEventListener(NAVIGATION_SETTLED_EVENT, initDetailActionFloat);
+  }
 </script>

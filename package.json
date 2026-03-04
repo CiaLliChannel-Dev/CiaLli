@@ -80,7 +80,7 @@
     "remark-rehype": "^11.1.2",
     "remark-sectionize": "^2.1.0",
     "sanitize-html": "^2.17.1",
-    "satori": "^0.19.3",
+    "satori": "^0.24.1",
     "sharp": "^0.34.5",
     "stylus": "^0.64.0",
     "svelte": "^5.53.7",
