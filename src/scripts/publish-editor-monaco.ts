@@ -192,38 +192,12 @@ async function ensureMonacoWorkers(): Promise<void> {
         return;
     }
 
-    const [
-        { default: EditorWorker },
-        { default: JsonWorker },
-        { default: CssWorker },
-        { default: HtmlWorker },
-        { default: TsWorker },
-    ] = await Promise.all([
-        import("monaco-editor/esm/vs/editor/editor.worker?worker"),
-        import("monaco-editor/esm/vs/language/json/json.worker?worker"),
-        import("monaco-editor/esm/vs/language/css/css.worker?worker"),
-        import("monaco-editor/esm/vs/language/html/html.worker?worker"),
-        import("monaco-editor/esm/vs/language/typescript/ts.worker?worker"),
-    ]);
+    const { default: EditorWorker } =
+        await import("monaco-editor/esm/vs/editor/editor.worker?worker");
 
     runtimeWindow.MonacoEnvironment = {
-        getWorker(_moduleId: string, label: string): Worker {
-            if (label === "json") {
-                return new JsonWorker();
-            }
-            if (label === "css" || label === "scss" || label === "less") {
-                return new CssWorker();
-            }
-            if (
-                label === "html" ||
-                label === "handlebars" ||
-                label === "razor"
-            ) {
-                return new HtmlWorker();
-            }
-            if (label === "typescript" || label === "javascript") {
-                return new TsWorker();
-            }
+        getWorker(_moduleId: string, _label: string): Worker {
+            // 发布编辑器仅使用 Markdown，不需要 JSON/CSS/HTML/TS 语言 worker。
             return new EditorWorker();
         },
     };
@@ -437,7 +411,11 @@ async function createMonacoAdapter(
     textareaEl: HTMLTextAreaElement,
 ): Promise<PublishEditorAdapter> {
     await ensureMonacoWorkers();
-    const monaco = await import("monaco-editor");
+    const [monacoModule] = await Promise.all([
+        import("monaco-editor/esm/vs/editor/editor.api"),
+        import("monaco-editor/esm/vs/basic-languages/markdown/markdown.contribution"),
+    ]);
+    const monaco = monacoModule as MonacoModule;
 
     const editor = monaco.editor.create(monacoHostEl, {
         value: textareaEl.value || "",
