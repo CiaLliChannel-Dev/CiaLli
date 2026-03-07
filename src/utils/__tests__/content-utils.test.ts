@@ -1,0 +1,65 @@
+import { describe, expect, it } from "vitest";
+
+import { mockArticle } from "@/__tests__/helpers/mock-data";
+import {
+    buildVisiblePostsFilter,
+    resolveArticleDisplayTitle,
+} from "@/utils/content-utils";
+import {
+    excludeSpecialArticleSlugFilter,
+    filterPublicStatus,
+} from "@/server/api/v1/shared";
+
+describe("content-utils article display", () => {
+    it("空标题草稿展示为新建文章", () => {
+        expect(
+            resolveArticleDisplayTitle(
+                mockArticle({
+                    status: "draft",
+                    title: "",
+                    slug: null,
+                }),
+            ),
+        ).toBe("新建文章");
+    });
+
+    it("已发布文章仍优先使用 slug 或 id 回退", () => {
+        expect(
+            resolveArticleDisplayTitle(
+                mockArticle({
+                    status: "published",
+                    title: "",
+                    slug: "published-slug",
+                }),
+            ),
+        ).toBe("published-slug");
+    });
+});
+
+describe("content-utils visible posts filter", () => {
+    it("游客仅返回公开已发布文章", () => {
+        expect(buildVisiblePostsFilter(null)).toEqual({
+            _and: [filterPublicStatus(), excludeSpecialArticleSlugFilter()],
+        });
+    });
+
+    it("owner 返回公开文章与自己的 draft", () => {
+        expect(buildVisiblePostsFilter("user-1")).toEqual({
+            _or: [
+                {
+                    _and: [
+                        filterPublicStatus(),
+                        excludeSpecialArticleSlugFilter(),
+                    ],
+                },
+                {
+                    _and: [
+                        { author_id: { _eq: "user-1" } },
+                        { status: { _eq: "draft" } },
+                        excludeSpecialArticleSlugFilter(),
+                    ],
+                },
+            ],
+        });
+    });
+});

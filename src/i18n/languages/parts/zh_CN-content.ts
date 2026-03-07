@@ -144,6 +144,11 @@ export const zhCNContent: Record<string, string> = {
     [Key.contentArticleLastEditedLabel]: "上次更改",
     [Key.contentArticleCreatedAtLabel]: "创建时间",
     [Key.contentArticleDeleteConfirm]: "确认删除这篇文章？删除后不可恢复。",
+    [Key.contentArticleOwnerDraftNotice]:
+        "这是一篇仅你可见的草稿，点赞和评论已在当前页面关闭。",
+    [Key.contentArticleOwnerPrivateNotice]:
+        "这篇文章当前仅你可见，点赞和评论已在当前页面关闭。",
+    [Key.contentArticleNewDraftTitle]: "新建文章",
     [Key.contentRss]: "RSS 订阅",
     [Key.contentRssDescription]: "订阅获取最新更新",
     [Key.contentRssSubtitle]: "通过 RSS 订阅，第一时间获取最新文章和动态",

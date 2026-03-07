@@ -62,7 +62,7 @@ const PICK_CONSTRAINTS: PickConstraint[] = [
     { enforceAuthorCooldown: false, enforceTypeStreak: false },
 ];
 
-const HOME_FEED_CANDIDATE_CACHE_VERSION = "home-feed-candidates-v1";
+const HOME_FEED_CANDIDATE_CACHE_VERSION = "home-feed-candidates-v2";
 const HOME_FEED_PROFILE_CACHE_VERSION = "home-feed-profile-v1";
 
 const ARTICLE_FEED_FIELDS = [
@@ -313,12 +313,10 @@ export async function buildHomeFeedCandidatePool(options: {
     now: Date;
 }): Promise<HomeFeedCandidatePoolCachePayload> {
     const articleFilters: JsonObject[] = [
+        { status: { _eq: "published" } },
         { is_public: { _eq: true } },
         excludeSpecialArticleSlugFilter(),
     ];
-    if (import.meta.env.PROD) {
-        articleFilters.push({ status: { _eq: "published" } });
-    }
 
     const [articleRows, diaryRows] = await Promise.all([
         readMany("app_articles", {

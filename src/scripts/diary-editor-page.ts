@@ -413,6 +413,7 @@ export function initDiaryEditorPage(options: InitOptions): boolean {
         setSubmitError,
         setUploadMessage,
         setSavingState,
+        markDraftSaved,
     };
 
     savePublishedBtn.addEventListener("click", () => {
@@ -471,6 +472,10 @@ export function initDiaryEditorPage(options: InitOptions): boolean {
         isDirty: hasUnsavedDraftChanges,
         getConfirmMessage: () =>
             t(I18nKey.interactionCommonUnsavedChangesLeaveConfirm),
+        saveBeforeLeave: () =>
+            executeSaveDiary(saveDiaryCtx, {
+                redirectOnSuccess: false,
+            }),
     });
     let disposed = false;
     const disposeDiaryEditorResources = (): void => {

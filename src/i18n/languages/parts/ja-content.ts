@@ -157,6 +157,11 @@ export const jaContent: Record<string, string> = {
     [Key.contentArticleCreatedAtLabel]: "作成日時",
     [Key.contentArticleDeleteConfirm]:
         "この記事を削除しますか？削除後は元に戻せません。",
+    [Key.contentArticleOwnerDraftNotice]:
+        "これはあなたにだけ見える下書きです。このページではいいねとコメントを無効にしています。",
+    [Key.contentArticleOwnerPrivateNotice]:
+        "この記事は現在あなたにだけ見えます。このページではいいねとコメントを無効にしています。",
+    [Key.contentArticleNewDraftTitle]: "新しい記事",
     [Key.contentRss]: "RSSフィード",
     [Key.contentRssDescription]: "最新情報を受け取るために購読する",
     [Key.contentRssSubtitle]:

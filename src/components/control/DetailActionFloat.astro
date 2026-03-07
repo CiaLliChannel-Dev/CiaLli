@@ -11,6 +11,8 @@ interface Props {
   commentCount?: number;
   likedByViewer?: boolean;
   dockToBackTop?: boolean;
+  showLikeAction?: boolean;
+  showCommentAction?: boolean;
   editHref?: string;
   deleteEndpoint?: string;
   adminDeleteEndpoint?: string;
@@ -28,6 +30,8 @@ const {
   commentCount = 0,
   likedByViewer = false,
   dockToBackTop = false,
+  showLikeAction = true,
+  showCommentAction = true,
   editHref = "",
   deleteEndpoint = "",
   adminDeleteEndpoint = "",
@@ -58,22 +62,32 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
   data-delete-success-href={deleteSuccessHref}
 >
   <div class="detail-action-bar card-base rounded-2xl">
-    <button
-      type="button"
-      class="detail-action-btn detail-like-btn"
-      aria-label="点赞"
-    >
-      <Icon name="material-symbols:thumb-up-rounded" class="detail-icon" />
-      <span class="detail-action-count" data-like-count-text>{likeCount}</span>
-    </button>
-    <button
-      type="button"
-      class="detail-action-btn detail-comment-btn"
-      aria-label="查看评论"
-    >
-      <Icon name="material-symbols:comment-rounded" class="detail-icon" />
-      <span class="detail-action-count">{commentCount}</span>
-    </button>
+    {
+      showLikeAction && (
+        <button
+          type="button"
+          class="detail-action-btn detail-like-btn"
+          aria-label="点赞"
+        >
+          <Icon name="material-symbols:thumb-up-rounded" class="detail-icon" />
+          <span class="detail-action-count" data-like-count-text>
+            {likeCount}
+          </span>
+        </button>
+      )
+    }
+    {
+      showCommentAction && (
+        <button
+          type="button"
+          class="detail-action-btn detail-comment-btn"
+          aria-label="查看评论"
+        >
+          <Icon name="material-symbols:comment-rounded" class="detail-icon" />
+          <span class="detail-action-count">{commentCount}</span>
+        </button>
+      )
+    }
     <button
       type="button"
       class="detail-action-btn detail-manage-toggle hidden"

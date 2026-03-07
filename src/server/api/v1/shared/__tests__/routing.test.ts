@@ -15,8 +15,8 @@ describe("isWriteMethod", () => {
     it("GET → false", () => {
         expect(isWriteMethod("GET")).toBe(false);
     });
-    it("PUT → false", () => {
-        expect(isWriteMethod("PUT")).toBe(false);
+    it("PUT → true", () => {
+        expect(isWriteMethod("PUT")).toBe(true);
     });
 });
 

@@ -1,3 +1,4 @@
+/* eslint-disable complexity, max-lines -- 发布页提交链路需要保持上传、加密与提交状态在同一文件内收敛。 */
 /**
  * 发布页面提交逻辑
  *
@@ -35,6 +36,7 @@ import type { PublishDomRefs } from "@/scripts/publish-page-dom";
 export type PublishState = {
     currentItemId: string;
     currentItemShortId: string;
+    currentStatus: "draft" | "published" | "archived" | "";
     currentCoverFileId: string;
     currentUsername: string;
     isLoggedIn: boolean;
@@ -60,6 +62,7 @@ export type UiHelpers = {
     updateEncryptPanel: () => void;
     updateTitleHint: () => void;
     updateEditorHeader: () => void;
+    updateSettingsActions: () => void;
     updateUrlState: () => void;
     updateCoverPreview: (pendingUploads: Map<string, PendingUpload>) => void;
 };
@@ -307,6 +310,7 @@ export function buildSubmitPayload(
     state: PublishState,
     nextBodyMarkdown: string,
     coverFileId: string | null,
+    targetStatus: "draft" | "published",
 ): Record<string, unknown> {
     const payload: Record<string, unknown> = {
         title: toStringValue(dom.articleTitleInput.value),
@@ -317,7 +321,7 @@ export function buildSubmitPayload(
         category: toNullableString(dom.articleCategoryInput.value),
         allow_comments: dom.articleAllowCommentsInput.checked,
         is_public: dom.articleIsPublicInput.checked,
-        status: "published",
+        status: targetStatus,
     };
 
     if (coverFileId) {
@@ -337,6 +341,7 @@ export function validateSubmitForm(
     dom: PublishDomRefs,
     state: PublishState,
     ui: UiHelpers,
+    targetStatus: "draft" | "published",
 ): { valid: boolean; canReuseEncryptedBody: boolean } {
     const title = toStringValue(dom.articleTitleInput.value);
     const bodyMarkdown = String(dom.articleBodyInput.value || "").trim();
@@ -359,12 +364,15 @@ export function validateSubmitForm(
         );
         return { valid: false, canReuseEncryptedBody };
     }
-    if (!title || (!bodyMarkdown && !canReuseEncryptedBody)) {
-        ui.setSubmitError(t(I18nKey.articleEditorTitleBodyRequired));
-        return { valid: false, canReuseEncryptedBody };
-    }
     if (weightedCharLength(title) > ARTICLE_TITLE_MAX) {
         ui.setSubmitError(TITLE_TOO_LONG_MESSAGE);
+        return { valid: false, canReuseEncryptedBody };
+    }
+    if (targetStatus !== "published") {
+        return { valid: true, canReuseEncryptedBody };
+    }
+    if (!title || (!bodyMarkdown && !canReuseEncryptedBody)) {
+        ui.setSubmitError(t(I18nKey.articleEditorTitleBodyRequired));
         return { valid: false, canReuseEncryptedBody };
     }
 
@@ -379,6 +387,7 @@ export async function handleSubmitApiResponse(
     fillForm: (item: Record<string, unknown>) => Promise<boolean>,
     ownerPasswordForStorage: string,
     data: Record<string, unknown> | null,
+    options: SubmitOptions = {},
 ): Promise<void> {
     const item = toRecord(data?.item);
     const nextId = toStringValue(item?.id) || state.currentItemId;
@@ -397,8 +406,21 @@ export async function handleSubmitApiResponse(
     }
     ui.updateEditorHeader();
     ui.updateUrlState();
-    ui.setSubmitMessage(t(I18nKey.articleEditorPublished));
+    ui.setSubmitMessage(
+        options.targetStatus === "draft"
+            ? t(I18nKey.articleEditorLocalDraftSaved)
+            : options.redirectOnSuccess === false
+              ? t(I18nKey.interactionCommonSaveSuccess)
+              : t(I18nKey.articleEditorPublished),
+    );
     ui.setSubmitError("");
+
+    if (
+        options.redirectOnSuccess === false ||
+        options.targetStatus === "draft"
+    ) {
+        return;
+    }
 
     if (item) {
         const slug = toStringValue(item.slug);
@@ -423,11 +445,15 @@ async function buildNextBodyMarkdown(
     state: PublishState,
     saveOverlay: SaveProgressOverlay,
     previewClient: MarkdownPreviewClient,
+    targetStatus: "draft" | "published",
 ): Promise<string> {
     if (canReuseEncryptedBody) {
         return state.loadedEncryptedBody;
     }
     if (!encryptEnabled) {
+        return uploads.body;
+    }
+    if (!String(uploads.body || "").trim() && targetStatus === "draft") {
         return uploads.body;
     }
     if (!inputPassword) {
@@ -450,7 +476,15 @@ export type SubmitDeps = {
     fillForm: (item: Record<string, unknown>) => Promise<boolean>;
 };
 
-export async function submit(deps: SubmitDeps): Promise<void> {
+export type SubmitOptions = {
+    redirectOnSuccess?: boolean;
+    targetStatus?: "draft" | "published";
+};
+
+export async function submit(
+    deps: SubmitDeps,
+    options: SubmitOptions = {},
+): Promise<boolean> {
     const {
         dom,
         state,
@@ -462,25 +496,37 @@ export async function submit(deps: SubmitDeps): Promise<void> {
     } = deps;
     if (!state.isLoggedIn) {
         showAuthRequiredDialog();
-        return;
+        return false;
     }
 
     ui.setSubmitError("");
     ui.setSubmitMessage("");
 
-    const { valid, canReuseEncryptedBody } = validateSubmitForm(dom, state, ui);
+    const targetStatus = options.targetStatus ?? "published";
+    const { valid, canReuseEncryptedBody } = validateSubmitForm(
+        dom,
+        state,
+        ui,
+        targetStatus,
+    );
     if (!valid) {
-        return;
+        return false;
     }
 
     const bodyMarkdown = String(dom.articleBodyInput.value || "").trim();
     const encryptEnabled = dom.articleEncryptEnabledInput.checked;
     const inputPassword = toStringValue(dom.articleEncryptPasswordInput.value);
 
+    const draftLabel =
+        dom.saveDraftBtn.textContent || t(I18nKey.interactionCommonSave);
     const publishLabel =
         dom.savePublishedBtn.textContent ||
         t(I18nKey.interactionCommonPublishNow);
+    const discardDraftLabel =
+        dom.discardDraftBtn.textContent || t(I18nKey.interactionCommonDelete);
+    dom.saveDraftBtn.disabled = true;
     dom.savePublishedBtn.disabled = true;
+    dom.discardDraftBtn.disabled = true;
     saveOverlay.show(t(I18nKey.articleEditorSavingTitle));
 
     try {
@@ -501,6 +547,7 @@ export async function submit(deps: SubmitDeps): Promise<void> {
             state,
             saveOverlay,
             previewClient,
+            targetStatus,
         );
 
         const ownerPasswordForStorage = encryptEnabled ? inputPassword : "";
@@ -509,13 +556,22 @@ export async function submit(deps: SubmitDeps): Promise<void> {
             state,
             nextBodyMarkdown,
             uploads.coverFileId,
+            targetStatus,
         );
 
         const isEditing = Boolean(state.currentItemId);
-        const endpoint = isEditing
-            ? `/api/v1/me/articles/${encodeURIComponent(state.currentItemId)}`
-            : "/api/v1/me/articles";
-        const method = isEditing ? "PATCH" : "POST";
+        const endpoint =
+            targetStatus === "draft" && !isEditing
+                ? "/api/v1/me/articles/working-draft"
+                : isEditing
+                  ? `/api/v1/me/articles/${encodeURIComponent(state.currentItemId)}`
+                  : "/api/v1/me/articles";
+        const method =
+            targetStatus === "draft" && !isEditing
+                ? "PUT"
+                : isEditing
+                  ? "PATCH"
+                  : "POST";
 
         const { response, data } = await api(endpoint, {
             method,
@@ -530,13 +586,13 @@ export async function submit(deps: SubmitDeps): Promise<void> {
                 username: "",
             });
             showAuthRequiredDialog();
-            return;
+            return false;
         }
         if (!response.ok || !data?.ok) {
             ui.setSubmitError(
                 getApiMessage(data, t(I18nKey.articleEditorSaveFailedRetry)),
             );
-            return;
+            return false;
         }
 
         saveOverlay.update(100, t(I18nKey.articleEditorSaveCompleted));
@@ -548,7 +604,12 @@ export async function submit(deps: SubmitDeps): Promise<void> {
             fillForm,
             ownerPasswordForStorage,
             data,
+            {
+                ...options,
+                targetStatus,
+            },
         );
+        return true;
     } catch (error) {
         console.error("[publish] submit failed:", error);
         const message =
@@ -556,10 +617,15 @@ export async function submit(deps: SubmitDeps): Promise<void> {
                 ? error.message
                 : t(I18nKey.articleEditorSaveFailedRetry);
         ui.setSubmitError(message);
+        return false;
     } finally {
         saveOverlay.hide();
+        dom.saveDraftBtn.disabled = false;
         dom.savePublishedBtn.disabled = false;
+        dom.discardDraftBtn.disabled = false;
+        dom.saveDraftBtn.textContent = draftLabel;
         dom.savePublishedBtn.textContent = publishLabel;
+        dom.discardDraftBtn.textContent = discardDraftLabel;
     }
 }
 

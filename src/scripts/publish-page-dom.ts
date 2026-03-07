@@ -8,6 +8,9 @@
 
 export type PublishDomRefs = {
     workspaceEl: HTMLElement;
+    settingsOverlayEl: HTMLElement | null;
+    openSettingsBtn: HTMLButtonElement | null;
+    cancelSettingsBtn: HTMLButtonElement | null;
     currentHintEl: HTMLElement | null;
     editorTitleEl: HTMLElement;
     previewErrorEl: HTMLElement | null;
@@ -16,7 +19,9 @@ export type PublishDomRefs = {
     toolbarEl: HTMLElement;
     submitMsgEl: HTMLElement;
     submitErrorEl: HTMLElement;
+    saveDraftBtn: HTMLButtonElement;
     savePublishedBtn: HTMLButtonElement;
+    discardDraftBtn: HTMLButtonElement;
     coverCropBtn: HTMLButtonElement | null;
     coverClearBtn: HTMLButtonElement | null;
     coverMsgEl: HTMLElement | null;
@@ -46,7 +51,9 @@ type RequiredDomNodes = {
     toolbarEl: HTMLElement;
     submitMsgEl: HTMLElement;
     submitErrorEl: HTMLElement;
+    saveDraftBtn: HTMLButtonElement;
     savePublishedBtn: HTMLButtonElement;
+    discardDraftBtn: HTMLButtonElement;
     articleTitleInput: HTMLInputElement;
     articleSummaryInput: HTMLTextAreaElement;
     articleBodyInput: HTMLTextAreaElement;
@@ -66,7 +73,9 @@ function getRequiredDomNodesCoreGroup(): {
     toolbarEl: HTMLElement | null;
     submitMsgEl: HTMLElement | null;
     submitErrorEl: HTMLElement | null;
+    saveDraftBtn: HTMLButtonElement | null;
     savePublishedBtn: HTMLButtonElement | null;
+    discardDraftBtn: HTMLButtonElement | null;
 } {
     return {
         workspaceEl: document.getElementById("publish-workspace"),
@@ -74,8 +83,14 @@ function getRequiredDomNodesCoreGroup(): {
         toolbarEl: document.getElementById("publish-toolbar"),
         submitMsgEl: document.getElementById("publish-submit-msg"),
         submitErrorEl: document.getElementById("publish-submit-error"),
+        saveDraftBtn: document.getElementById(
+            "publish-save-draft",
+        ) as HTMLButtonElement | null,
         savePublishedBtn: document.getElementById(
             "publish-save-published",
+        ) as HTMLButtonElement | null,
+        discardDraftBtn: document.getElementById(
+            "publish-discard-draft",
         ) as HTMLButtonElement | null,
     };
 }
@@ -138,7 +153,9 @@ function isCoreGroupComplete(
     toolbarEl: HTMLElement;
     submitMsgEl: HTMLElement;
     submitErrorEl: HTMLElement;
+    saveDraftBtn: HTMLButtonElement;
     savePublishedBtn: HTMLButtonElement;
+    discardDraftBtn: HTMLButtonElement;
 } {
     return Boolean(
         core.workspaceEl &&
@@ -146,7 +163,9 @@ function isCoreGroupComplete(
         core.toolbarEl &&
         core.submitMsgEl &&
         core.submitErrorEl &&
-        core.savePublishedBtn,
+        core.saveDraftBtn &&
+        core.savePublishedBtn &&
+        core.discardDraftBtn,
     );
 }
 
@@ -200,6 +219,13 @@ export function collectDomRefs(): PublishDomRefs | null {
 
     return {
         ...required,
+        settingsOverlayEl: document.getElementById("publish-settings-overlay"),
+        openSettingsBtn: document.getElementById(
+            "publish-open-settings",
+        ) as HTMLButtonElement | null,
+        cancelSettingsBtn: document.getElementById(
+            "publish-cancel-settings",
+        ) as HTMLButtonElement | null,
         editorMonacoEl: document.getElementById("publish-editor-monaco"),
         currentHintEl: document.getElementById("publish-current-hint"),
         previewErrorEl: document.getElementById("publish-preview-error"),

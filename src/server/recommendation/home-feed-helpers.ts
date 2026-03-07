@@ -1,9 +1,15 @@
 import { safeCsv } from "@/server/api/v1/shared";
 import { countItemsGroupedByField } from "@/server/directus/client";
-import { buildPublicAssetUrl } from "@/server/directus-auth";
+import {
+    buildDirectusAssetUrl,
+    buildPublicAssetUrl,
+} from "@/server/directus-auth";
 import type { JsonObject } from "@/types/json";
 import type { AppArticle, AppDiaryImage } from "@/types/app";
-import type { DirectusPostEntry } from "@/utils/content-utils";
+import {
+    resolveArticleDisplayTitle,
+    type DirectusPostEntry,
+} from "@/utils/content-utils";
 import type {
     HomeFeedCandidate,
     HomeFeedDiaryEntry,
@@ -254,18 +260,13 @@ export function resolveArticleUpdatedAt(article: AppArticle): Date {
 }
 
 export function resolveArticleTitle(article: AppArticle): string {
-    const title = normalizeIdentity(article.title);
-    if (title) {
-        return title;
-    }
-    const slug = normalizeIdentity(article.slug);
-    if (slug) {
-        return slug;
-    }
-    return normalizeIdentity(article.id) || "Untitled";
+    return resolveArticleDisplayTitle(article);
 }
 
-export function resolveArticleCover(article: AppArticle): string | undefined {
+export function resolveArticleCover(
+    article: AppArticle,
+    options?: { forceAuthenticatedCover?: boolean },
+): string | undefined {
     const coverUrl = normalizeIdentity(article.cover_url);
     if (coverUrl) {
         return coverUrl;
@@ -274,7 +275,11 @@ export function resolveArticleCover(article: AppArticle): string | undefined {
     if (!coverFile) {
         return undefined;
     }
-    return buildPublicAssetUrl(coverFile, {
+    return (
+        options?.forceAuthenticatedCover
+            ? buildDirectusAssetUrl
+            : buildPublicAssetUrl
+    )(coverFile, {
         width: 1200,
         height: 675,
         fit: "cover",
@@ -286,6 +291,7 @@ export function buildArticleFeedEntry(
     authorMap: HomeFeedAuthorMap,
     articleLikeCountMap: Map<string, number>,
     articleCommentCountMap: Map<string, number>,
+    options?: { forceAuthenticatedCover?: boolean },
 ): DirectusPostEntry | null {
     const articleId = normalizeIdentity(article.id);
     const authorId = normalizeIdentity(article.author_id);
@@ -310,7 +316,7 @@ export function buildArticleFeedEntry(
             author: readAuthorFromMap(authorMap, authorId),
             title: resolveArticleTitle(article),
             description: normalizeIdentity(article.summary) || undefined,
-            image: resolveArticleCover(article),
+            image: resolveArticleCover(article, options),
             tags: normalizeArticleTags(article.tags),
             category: normalizeIdentity(article.category) || undefined,
             comment_count: articleCommentCountMap.get(articleId) || 0,

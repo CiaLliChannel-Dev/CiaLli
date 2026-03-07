@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- 通用弹窗需要集中维护字段、内容与动作渲染，避免状态分散。 */
 export type OverlayDialogActionVariant = "primary" | "secondary" | "danger";
 export type OverlayDialogActionKind = "button" | "link";
 
@@ -77,9 +78,31 @@ let activeResolve: ((result: OverlayDialogResult) => void) | null = null;
 let activeDismissKey: string | null = null;
 let fieldControls: OverlayDialogControl[] = [];
 
+function resetDetachedDialogState(): void {
+    // Astro 客户端切页会替换 body，单例弹窗节点会变成悬空引用。
+    // 这里在重建前主动回收旧状态，避免后续 Promise 永远不 resolve。
+    document.removeEventListener("keydown", onKeyDown);
+    resolveActive({
+        actionKey: activeDismissKey || "dismiss",
+        values: {},
+    });
+    overlayEl = null;
+    messageEl = null;
+    contentEl = null;
+    fieldsEl = null;
+    errorEl = null;
+    actionsEl = null;
+    activeDismissKey = null;
+    fieldControls = [];
+    savedOverflow = "";
+}
+
 function ensureDOM(): void {
-    if (overlayEl) {
+    if (overlayEl?.isConnected) {
         return;
+    }
+    if (overlayEl && !overlayEl.isConnected) {
+        resetDetachedDialogState();
     }
 
     overlayEl = document.createElement("div");

@@ -28,6 +28,8 @@ type NoticeDialogOptions = {
     buttonText?: string;
 };
 
+export type UnsavedChangesDialogAction = "save" | "discard" | "cancel";
+
 type FormDialogFieldType = "text" | "textarea" | "select";
 
 type FormDialogFieldOption = {
@@ -226,6 +228,38 @@ export async function showNoticeDialog(
             },
         ],
     });
+}
+
+export async function showUnsavedChangesDialog(): Promise<UnsavedChangesDialogAction> {
+    const result = await showOverlayDialog({
+        ariaLabel: t(I18nKey.interactionDialogUnsavedChangesTitle),
+        message: t(I18nKey.interactionDialogUnsavedChangesMessage),
+        dismissKey: "cancel",
+        actions: [
+            {
+                key: "save",
+                label: t(I18nKey.interactionDialogUnsavedChangesSaveAndLeave),
+                variant: "primary",
+            },
+            {
+                key: "discard",
+                label: t(
+                    I18nKey.interactionDialogUnsavedChangesDiscardAndLeave,
+                ),
+                variant: "danger",
+            },
+            {
+                key: "cancel",
+                label: t(I18nKey.interactionCommonCancel),
+                variant: "secondary",
+            },
+        ],
+    });
+
+    if (result.actionKey === "save" || result.actionKey === "discard") {
+        return result.actionKey;
+    }
+    return "cancel";
 }
 
 export async function showFormDialog(

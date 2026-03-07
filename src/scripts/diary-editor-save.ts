@@ -40,6 +40,11 @@ export type SaveDiaryContext = {
     setSubmitError: (message: string) => void;
     setUploadMessage: (message: string, isError?: boolean) => void;
     setSavingState: (saving: boolean) => void;
+    markDraftSaved: () => void;
+};
+
+export type ExecuteSaveDiaryOptions = {
+    redirectOnSuccess?: boolean;
 };
 
 async function saveDiaryContent(
@@ -153,7 +158,8 @@ function handleSaveError(
 async function runSaveDiaryCore(
     sourceContent: string,
     ctx: SaveDiaryContext,
-): Promise<void> {
+    options: ExecuteSaveDiaryOptions,
+): Promise<boolean> {
     let content = sourceContent.trim();
     let materializedUploads: MaterializedDiaryUpload[] = [];
     let uploadStageFailed = false;
@@ -185,7 +191,7 @@ async function runSaveDiaryCore(
 
         const saveResult = await saveDiaryContent(content, ctx);
         if (!saveResult) {
-            return;
+            return false;
         }
 
         const { id, shortId } = saveResult;
@@ -193,11 +199,12 @@ async function runSaveDiaryCore(
         if (!targetId) {
             ctx.setSubmitError(t(I18nKey.diaryEditorSaveMissingDiaryId));
             ctx.setSubmitMessage("");
-            return;
+            return false;
         }
 
         ctx.setCurrentDiaryId(id);
         await syncImagesAfterSave(id, materializedUploads, ctx);
+        ctx.markDraftSaved();
 
         const finalHandle = ctx.getSaveTaskHandle();
         if (finalHandle !== null) {
@@ -208,17 +215,23 @@ async function runSaveDiaryCore(
             });
         }
 
-        ctx.setSubmitMessage(
-            ctx.editorMode === "edit"
-                ? t(I18nKey.diaryEditorSaveSuccessRedirecting)
-                : t(I18nKey.diaryEditorPublishSuccessRedirecting),
-        );
-        navigateToPage(
-            `/${ctx.username}/diary/${encodeURIComponent(targetId)}`,
-            { force: true },
-        );
+        if (options.redirectOnSuccess === false) {
+            ctx.setSubmitMessage(t(I18nKey.interactionCommonSaveSuccess));
+        } else {
+            ctx.setSubmitMessage(
+                ctx.editorMode === "edit"
+                    ? t(I18nKey.diaryEditorSaveSuccessRedirecting)
+                    : t(I18nKey.diaryEditorPublishSuccessRedirecting),
+            );
+            navigateToPage(
+                `/${ctx.username}/diary/${encodeURIComponent(targetId)}`,
+                { force: true },
+            );
+        }
+        return true;
     } catch (error) {
         handleSaveError(error, uploadStageFailed, ctx);
+        return false;
     } finally {
         ctx.setSavingState(false);
         const finalHandle = ctx.getSaveTaskHandle();
@@ -229,11 +242,14 @@ async function runSaveDiaryCore(
     }
 }
 
-export async function executeSaveDiary(ctx: SaveDiaryContext): Promise<void> {
+export async function executeSaveDiary(
+    ctx: SaveDiaryContext,
+    options: ExecuteSaveDiaryOptions = {},
+): Promise<boolean> {
     const sourceContent = String(ctx.contentInput.value || "");
     if (!sourceContent.trim()) {
         ctx.setSubmitError(t(I18nKey.diaryEditorContentRequired));
-        return;
+        return false;
     }
 
     const taskHandle = startSaveTask(ctx);
@@ -247,5 +263,5 @@ export async function executeSaveDiary(ctx: SaveDiaryContext): Promise<void> {
     );
     ctx.setSavingState(true);
 
-    await runSaveDiaryCore(sourceContent, ctx);
+    return runSaveDiaryCore(sourceContent, ctx, options);
 }

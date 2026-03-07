@@ -25,6 +25,8 @@ export const zhCNArticleEditor: Record<string, string> = {
     [Key.articleEditorGeneratingEncryptedContent]: "正在生成加密内容...",
     [Key.articleEditorLoadFailed]: "加载失败",
     [Key.articleEditorLoadFailedRetry]: "加载失败，请重试",
+    [Key.articleEditorLocalDraftRestored]: "已恢复当前工作草稿",
+    [Key.articleEditorLocalDraftSaved]: "工作草稿已保存",
     [Key.articleEditorLoginExpired]: "登录已过期，请重新登录",
     [Key.articleEditorPasswordRequired]: "请输入密码",
     [Key.articleEditorPreviewFailedRetry]: "预览失败，请重试",

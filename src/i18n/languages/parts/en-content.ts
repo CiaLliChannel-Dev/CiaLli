@@ -154,6 +154,11 @@ export const enContent: Record<string, string> = {
     [Key.contentArticleCreatedAtLabel]: "Created At",
     [Key.contentArticleDeleteConfirm]:
         "Are you sure you want to delete this article? This action cannot be undone.",
+    [Key.contentArticleOwnerDraftNotice]:
+        "This is a draft only visible to you. Likes and comments are disabled on this page.",
+    [Key.contentArticleOwnerPrivateNotice]:
+        "This article is currently only visible to you. Likes and comments are disabled on this page.",
+    [Key.contentArticleNewDraftTitle]: "New Article",
     [Key.contentRss]: "RSS Feed",
     [Key.contentRssDescription]: "Subscribe to get latest updates",
     [Key.contentRssSubtitle]:

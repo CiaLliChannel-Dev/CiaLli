@@ -33,6 +33,9 @@ export const enArticleEditor: Record<string, string> = {
         "Generating encrypted content...",
     [Key.articleEditorLoadFailed]: "Failed to load",
     [Key.articleEditorLoadFailedRetry]: "Load failed. Please try again",
+    [Key.articleEditorLocalDraftRestored]:
+        "Restored your current working draft",
+    [Key.articleEditorLocalDraftSaved]: "Working draft saved",
     [Key.articleEditorLoginExpired]: "Login expired. Please log in again",
     [Key.articleEditorPasswordRequired]: "Please enter password",
     [Key.articleEditorPreviewFailedRetry]: "Preview failed. Please try again",

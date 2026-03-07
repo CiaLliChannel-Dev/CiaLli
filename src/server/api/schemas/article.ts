@@ -5,15 +5,21 @@ import * as z from "zod";
 
 import { ARTICLE_TITLE_MAX, weightedCharLength } from "@/constants/text-limits";
 
-import { OptionalStringSchema, TagsSchema } from "./common";
+import { AppStatusSchema, OptionalStringSchema, TagsSchema } from "./common";
 
-const ArticleTitleSchema = z
+const ArticleTitleLengthSchema = z
     .string()
-    .min(1, "标题必填")
     .refine(
         (value) => weightedCharLength(value) <= ARTICLE_TITLE_MAX,
         `标题最多 ${ARTICLE_TITLE_MAX} 字符`,
     );
+
+const ArticleTitleSchema = z
+    .string()
+    .min(1, "标题必填")
+    .pipe(ArticleTitleLengthSchema);
+
+const DraftTagsSchema = z.array(z.string().max(100)).max(20).optional();
 
 // ── 创建文章 ──
 
@@ -37,21 +43,37 @@ export type CreateArticleInput = z.infer<typeof CreateArticleSchema>;
 
 export const UpdateArticleSchema = z
     .object({
-        title: ArticleTitleSchema,
+        title: ArticleTitleLengthSchema,
         slug: OptionalStringSchema,
         summary: OptionalStringSchema,
-        body_markdown: z.string().min(1),
+        body_markdown: z.string(),
         cover_file: OptionalStringSchema,
         cover_url: OptionalStringSchema,
         tags: TagsSchema,
         category: OptionalStringSchema,
         allow_comments: z.boolean(),
-        status: z.literal("published"),
+        status: AppStatusSchema,
         is_public: z.boolean(),
     })
     .partial();
 
 export type UpdateArticleInput = z.infer<typeof UpdateArticleSchema>;
+
+// ── 工作草稿（允许未完成字段） ──
+
+export const UpsertWorkingDraftSchema = z.object({
+    title: ArticleTitleLengthSchema.optional(),
+    summary: OptionalStringSchema,
+    body_markdown: z.string().optional(),
+    cover_file: OptionalStringSchema,
+    cover_url: OptionalStringSchema,
+    tags: DraftTagsSchema,
+    category: OptionalStringSchema,
+    allow_comments: z.boolean().optional(),
+    is_public: z.boolean().optional(),
+});
+
+export type UpsertWorkingDraftInput = z.infer<typeof UpsertWorkingDraftSchema>;
 
 // ── 预览 ──
 

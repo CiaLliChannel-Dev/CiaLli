@@ -144,6 +144,11 @@ export const zhTWContent: Record<string, string> = {
     [Key.contentArticleLastEditedLabel]: "上次更改",
     [Key.contentArticleCreatedAtLabel]: "建立時間",
     [Key.contentArticleDeleteConfirm]: "確認刪除這篇文章？刪除後無法復原。",
+    [Key.contentArticleOwnerDraftNotice]:
+        "這是一篇僅你可見的草稿，點讚與評論已在目前頁面關閉。",
+    [Key.contentArticleOwnerPrivateNotice]:
+        "這篇文章目前僅你可見，點讚與評論已在目前頁面關閉。",
+    [Key.contentArticleNewDraftTitle]: "新建文章",
     [Key.contentRss]: "RSS 訂閱",
     [Key.contentRssDescription]: "訂閱以接收最新更新",
     [Key.contentRssSubtitle]: "透過 RSS 訂閱，第一時間獲取最新文章與動態",

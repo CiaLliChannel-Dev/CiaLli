@@ -16,13 +16,18 @@ type NavigateOptions = {
     force?: boolean;
 };
 
+type UnsavedChangesNavigationRequest = {
+    replace?: boolean;
+    force?: boolean;
+    commit: () => void;
+    fallbackCommit: () => void;
+};
+
 type NavigationRuntimeWindow = Window &
     typeof globalThis & {
-        __cialliUnsavedChangesConfirm?: (
+        __cialliUnsavedChangesHandleNavigation?: (
             targetUrl: string,
-            options?: {
-                forcePromptForDirty?: boolean;
-            },
+            request: UnsavedChangesNavigationRequest,
         ) => boolean;
     };
 
@@ -34,13 +39,22 @@ function isExternalUrl(url: string): boolean {
     );
 }
 
-function shouldProceedByUnsavedGuard(url: string): boolean {
+function tryHandleByUnsavedGuard(
+    url: string,
+    options: NavigateOptions | undefined,
+): boolean {
     const runtimeWindow = window as NavigationRuntimeWindow;
-    const confirmLeave = runtimeWindow.__cialliUnsavedChangesConfirm;
-    if (typeof confirmLeave !== "function") {
-        return true;
+    const handleNavigation =
+        runtimeWindow.__cialliUnsavedChangesHandleNavigation;
+    if (typeof handleNavigation !== "function") {
+        return false;
     }
-    return confirmLeave(url);
+    return handleNavigation(url, {
+        replace: options?.replace,
+        force: options?.force,
+        commit: () => navigateWithAstro(url, options),
+        fallbackCommit: () => fallbackNavigation(url, options),
+    });
 }
 
 /**
@@ -115,7 +129,7 @@ export function navigateToPage(url: unknown, options?: NavigateOptions): void {
         return;
     }
 
-    if (!shouldProceedByUnsavedGuard(url)) {
+    if (tryHandleByUnsavedGuard(url, options)) {
         return;
     }
 

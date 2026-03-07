@@ -109,6 +109,7 @@ export function makeUiHelpers(
                     I18nKey.articleEditorEditorHintEdit,
                 );
             }
+            updateSettingsActions();
             return;
         }
         dom.editorTitleEl.textContent = t(
@@ -119,6 +120,33 @@ export function makeUiHelpers(
                 I18nKey.articleEditorEditorHintCreate,
             );
         }
+        updateSettingsActions();
+    };
+
+    const updateSettingsActions = (): void => {
+        const isPublishedEdit =
+            Boolean(state.currentItemId) && state.currentStatus === "published";
+        const isDraftEdit =
+            Boolean(state.currentItemId) && state.currentStatus === "draft";
+
+        if (dom.openSettingsBtn) {
+            dom.openSettingsBtn.textContent = t(
+                isPublishedEdit
+                    ? I18nKey.interactionCommonSaveChanges
+                    : I18nKey.interactionCommonPublishNow,
+            );
+        }
+        dom.saveDraftBtn.classList.toggle("hidden", isPublishedEdit);
+        dom.discardDraftBtn.classList.toggle("hidden", !isDraftEdit);
+        dom.saveDraftBtn.textContent = t(I18nKey.interactionCommonSaveDraft);
+        dom.discardDraftBtn.textContent = t(
+            I18nKey.interactionCommonDiscardDraft,
+        );
+        dom.savePublishedBtn.textContent = t(
+            isPublishedEdit
+                ? I18nKey.interactionCommonSaveChanges
+                : I18nKey.interactionCommonPublishNow,
+        );
     };
 
     const updateUrlState = (): void => {
@@ -167,6 +195,7 @@ export function makeUiHelpers(
         updateEncryptPanel,
         updateTitleHint,
         updateEditorHeader,
+        updateSettingsActions,
         updateUrlState,
         updateCoverPreview,
     };

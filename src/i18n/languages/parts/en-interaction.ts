@@ -12,6 +12,8 @@ export const enInteraction: Record<string, string> = {
     [Key.interactionCommonCreateInProgress]: "Creating...",
     [Key.interactionCommonPublishNow]: "Publish Now",
     [Key.interactionCommonSaveChanges]: "Save Changes",
+    [Key.interactionCommonSaveDraft]: "Save Draft",
+    [Key.interactionCommonDiscardDraft]: "Discard Draft",
     [Key.interactionCommonUploadImage]: "Upload Image",
     [Key.interactionCommonAllowComments]: "Allow Comments",
     [Key.interactionCommonPublicVisible]: "Publicly Visible",
@@ -70,6 +72,12 @@ export const enInteraction: Record<string, string> = {
     [Key.interactionDialogConfirmTitle]: "Confirm Action",
     [Key.interactionDialogNoticeTitle]: "Notice",
     [Key.interactionDialogFormTitle]: "Fill in Information",
+    [Key.interactionDialogUnsavedChangesTitle]: "Unsaved Changes",
+    [Key.interactionDialogUnsavedChangesMessage]:
+        "This draft has unsaved changes. You can save before leaving, or leave now and discard the current edits.",
+    [Key.interactionDialogUnsavedChangesSaveAndLeave]: "Save and Leave",
+    [Key.interactionDialogUnsavedChangesDiscardAndLeave]:
+        "Leave Without Saving",
     [Key.interactionDialogAcknowledge]: "Got it",
     [Key.interactionDialogManualConfirmLabel]: 'Type "',
     [Key.interactionDialogManualConfirmSuffix]: '" to confirm deletion',

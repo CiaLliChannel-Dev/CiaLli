@@ -12,6 +12,10 @@ export async function POST(context: APIContext): Promise<Response> {
     return await handleV1(context);
 }
 
+export async function PUT(context: APIContext): Promise<Response> {
+    return await handleV1(context);
+}
+
 export async function PATCH(context: APIContext): Promise<Response> {
     return await handleV1(context);
 }

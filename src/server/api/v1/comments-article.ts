@@ -87,6 +87,9 @@ async function handleArticleCommentPost(
     if (!article) {
         return fail("文章不存在", 404);
     }
+    if (!(article.status === "published" && article.is_public)) {
+        return fail("文章不存在或不可见", 404);
+    }
     if (!article.allow_comments) {
         return fail("该文章已关闭评论", 403);
     }

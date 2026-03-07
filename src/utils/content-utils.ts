@@ -6,8 +6,14 @@ import type {
 } from "@/types/app";
 import type { JsonObject } from "@/types/json";
 import { readMany } from "@/server/directus/client";
-import { buildPublicAssetUrl } from "@/server/directus-auth";
-import { excludeSpecialArticleSlugFilter } from "@/server/api/v1/shared";
+import {
+    buildDirectusAssetUrl,
+    buildPublicAssetUrl,
+} from "@/server/directus-auth";
+import {
+    excludeSpecialArticleSlugFilter,
+    filterPublicStatus,
+} from "@/server/api/v1/shared";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import { getCategoryUrl } from "@utils/url-utils";
@@ -48,6 +54,44 @@ export type DirectusPostEntry = {
     };
 };
 
+export function resolveArticleDisplayTitle(
+    article: Pick<AppArticle, "title" | "status" | "slug" | "id">,
+): string {
+    const title = String(article.title || "").trim();
+    if (title) {
+        return title;
+    }
+    if (article.status === "draft") {
+        return i18n(I18nKey.contentArticleNewDraftTitle);
+    }
+    const slug = String(article.slug || "").trim();
+    return (
+        slug || String(article.id || "").trim() || i18n(I18nKey.contentUntitled)
+    );
+}
+
+export function buildVisiblePostsFilter(viewerId?: string | null): JsonObject {
+    const publicBranch = {
+        _and: [filterPublicStatus(), excludeSpecialArticleSlugFilter()],
+    } satisfies JsonObject;
+    const normalizedViewerId = String(viewerId || "").trim();
+    if (!normalizedViewerId) {
+        return publicBranch;
+    }
+    return {
+        _or: [
+            publicBranch,
+            {
+                _and: [
+                    { author_id: { _eq: normalizedViewerId } },
+                    { status: { _eq: "draft" } },
+                    excludeSpecialArticleSlugFilter(),
+                ],
+            },
+        ],
+    } satisfies JsonObject;
+}
+
 function normalizeTags(tags: AppArticle["tags"]): string[] {
     if (!tags || !Array.isArray(tags)) return [];
     return tags.map((s) => String(s).trim()).filter(Boolean);
@@ -75,7 +119,10 @@ function buildPostUrl(shortId: string | null, articleId: string): string {
     return `/posts/${shortId || articleId}`;
 }
 
-function resolveCoverImage(post: AppArticle): string | undefined {
+function resolveCoverImageForViewer(
+    post: AppArticle,
+    viewerId: string | null,
+): string | undefined {
     const coverUrl = post.cover_url ? String(post.cover_url).trim() : "";
     if (coverUrl) {
         return coverUrl;
@@ -86,7 +133,14 @@ function resolveCoverImage(post: AppArticle): string | undefined {
         return undefined;
     }
 
-    return buildPublicAssetUrl(coverFile, {
+    const shouldUseAuthenticatedUrl =
+        post.status === "draft" &&
+        Boolean(viewerId) &&
+        String(post.author_id || "").trim() === viewerId;
+
+    return (
+        shouldUseAuthenticatedUrl ? buildDirectusAssetUrl : buildPublicAssetUrl
+    )(coverFile, {
         width: 1200,
         height: 675,
         fit: "cover",
@@ -286,6 +340,7 @@ type PostMappingContext = {
     userMap: Map<string, AuthorUser>;
     commentCountMap: Map<string, number>;
     likeCountMap: Map<string, number>;
+    viewerId: string | null;
 };
 
 type PostIds = {
@@ -325,14 +380,14 @@ function buildPostData(
     ids: PostIds,
     ctx: PostMappingContext,
 ): DirectusPostEntry["data"] {
-    const { title, normalizedSlug, articleId, authorId, category } = ids;
+    const { articleId, authorId, category } = ids;
     return {
         article_id: articleId,
         author_id: authorId,
         author: buildAuthor(authorId, ctx.profileMap, ctx.userMap),
-        title: title || normalizedSlug || articleId || "Untitled",
+        title: resolveArticleDisplayTitle(post),
         description: post.summary || undefined,
-        image: resolveCoverImage(post),
+        image: resolveCoverImageForViewer(post, ctx.viewerId),
         tags: normalizeTags(post.tags),
         category: category || undefined,
         comment_count: ctx.commentCountMap.get(articleId) || 0,
@@ -357,18 +412,12 @@ function mapPostToEntry(
     } satisfies DirectusPostEntry;
 }
 
-async function loadDirectusPosts(): Promise<DirectusPostEntry[]> {
-    const andFilters: JsonObject[] = [
-        { is_public: { _eq: true } },
-        excludeSpecialArticleSlugFilter(),
-    ];
-    if (import.meta.env.PROD) {
-        andFilters.push({ status: { _eq: "published" } });
-    }
-
+async function loadDirectusPosts(
+    viewerId?: string | null,
+): Promise<DirectusPostEntry[]> {
     try {
         const rows = await readMany("app_articles", {
-            filter: { _and: andFilters } as JsonObject,
+            filter: buildVisiblePostsFilter(viewerId),
             sort: ["-date_updated", "-date_created"],
             limit: 1000,
         });
@@ -396,6 +445,7 @@ async function loadDirectusPosts(): Promise<DirectusPostEntry[]> {
             userMap,
             commentCountMap,
             likeCountMap,
+            viewerId: String(viewerId || "").trim() || null,
         };
 
         const mapped = rows.map((post) => mapPostToEntry(post, ctx));
@@ -412,12 +462,10 @@ async function loadDirectusPosts(): Promise<DirectusPostEntry[]> {
     }
 }
 
-async function getRawSortedPosts(): Promise<DirectusPostEntry[]> {
-    return await loadDirectusPosts();
-}
-
-export async function getSortedPosts(): Promise<DirectusPostEntry[]> {
-    const sorted = await getRawSortedPosts();
+export async function getSortedPosts(
+    viewerId?: string | null,
+): Promise<DirectusPostEntry[]> {
+    const sorted = await loadDirectusPosts(viewerId);
 
     for (let i = 1; i < sorted.length; i += 1) {
         sorted[i].data.nextSlug = sorted[i - 1].id;
@@ -437,8 +485,10 @@ export type PostForList = {
     url?: string;
 };
 
-export async function getSortedPostsList(): Promise<PostForList[]> {
-    const sortedFullPosts = await getRawSortedPosts();
+export async function getSortedPostsList(
+    viewerId?: string | null,
+): Promise<PostForList[]> {
+    const sortedFullPosts = await loadDirectusPosts(viewerId);
     return sortedFullPosts.map((post) => ({
         id: post.id,
         data: post.data,
@@ -451,8 +501,8 @@ export type Tag = {
     count: number;
 };
 
-export async function getTagList(): Promise<Tag[]> {
-    const allBlogPosts = await getRawSortedPosts();
+export async function getTagList(viewerId?: string | null): Promise<Tag[]> {
+    const allBlogPosts = await loadDirectusPosts(viewerId);
     const countMap: Record<string, number> = {};
 
     for (const post of allBlogPosts) {
@@ -477,8 +527,10 @@ export type Category = {
     url: string;
 };
 
-export async function getCategoryList(): Promise<Category[]> {
-    const allBlogPosts = await getRawSortedPosts();
+export async function getCategoryList(
+    viewerId?: string | null,
+): Promise<Category[]> {
+    const allBlogPosts = await loadDirectusPosts(viewerId);
     const count: Record<string, number> = {};
 
     for (const post of allBlogPosts) {

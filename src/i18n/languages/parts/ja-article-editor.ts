@@ -34,6 +34,8 @@ export const jaArticleEditor: Record<string, string> = {
     [Key.articleEditorLoadFailed]: "読み込みに失敗しました",
     [Key.articleEditorLoadFailedRetry]:
         "読み込みに失敗しました。再試行してください",
+    [Key.articleEditorLocalDraftRestored]: "現在の作業用下書きを復元しました",
+    [Key.articleEditorLocalDraftSaved]: "作業用下書きを保存しました",
     [Key.articleEditorLoginExpired]:
         "ログインの有効期限が切れました。再ログインしてください",
     [Key.articleEditorPasswordRequired]: "パスワードを入力してください",

@@ -3,7 +3,12 @@ import type { APIContext } from "astro";
 import { fail } from "@/server/api/response";
 
 export function isWriteMethod(method: string): boolean {
-    return method === "POST" || method === "PATCH" || method === "DELETE";
+    return (
+        method === "POST" ||
+        method === "PUT" ||
+        method === "PATCH" ||
+        method === "DELETE"
+    );
 }
 
 export function assertSameOrigin(context: APIContext): Response | null {

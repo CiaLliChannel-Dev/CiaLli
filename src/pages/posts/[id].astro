@@ -12,6 +12,7 @@ import { renderMarkdown } from "@/server/markdown/render";
 import {
   DIRECTUS_ACCESS_COOKIE_NAME,
   DIRECTUS_REFRESH_COOKIE_NAME,
+  buildDirectusAssetUrl,
   buildPublicAssetUrl,
 } from "@/server/directus-auth";
 import {
@@ -55,6 +56,8 @@ let article: {
   tags: string[];
   category: string | null;
   allow_comments: boolean;
+  status: "draft" | "published" | "archived";
+  is_public: boolean;
   date_created: string | null;
   date_updated: string | null;
   author?: { id?: string; name?: string };
@@ -67,6 +70,7 @@ let articleLikedByViewer = false;
 let viewerIsOwner = false;
 let ownerPasswordStorageKeys: string[] = [];
 let sessionUserId: string | null = null;
+let articleSupportsPublicInteraction = false;
 const hasSessionCookie = Boolean(
   Astro.cookies.get(DIRECTUS_ACCESS_COOKIE_NAME)?.value ||
   Astro.cookies.get(DIRECTUS_REFRESH_COOKIE_NAME)?.value,
@@ -125,12 +129,20 @@ if (rawId) {
     if (rawArticle) {
       const rawBodyMarkdown = String(rawArticle.body_markdown || "");
       const isEncryptedBody = rawBodyMarkdown.trim().startsWith("CL2:");
+      const isPubliclyVisible =
+        rawArticle.status === "published" && rawArticle.is_public === true;
       const loadArticleViewData = async () => {
         const authorMapPromise = getAuthorBundle([rawArticle!.author_id]);
-        const interactionPromise = loadArticleInteractionSnapshot({
-          articleId: rawArticle!.id,
-          viewerId: sessionUserId,
-        });
+        const interactionPromise = isPubliclyVisible
+          ? loadArticleInteractionSnapshot({
+              articleId: rawArticle!.id,
+              viewerId: sessionUserId,
+            })
+          : Promise.resolve({
+              likeCount: 0,
+              commentCount: 0,
+              viewerLiked: false,
+            });
         const authorProfilePromise = loadProfileForViewerByUserId(
           rawArticle!.author_id,
           sessionUserId,
@@ -167,6 +179,7 @@ if (rawId) {
       viewerIsOwner = Boolean(
         sessionUserId && rawArticle.author_id === sessionUserId,
       );
+      articleSupportsPublicInteraction = isPubliclyVisible;
 
       if (isEncryptedBody) {
         encryptedBody = rawBodyMarkdown.trim();
@@ -205,25 +218,39 @@ if (responseStatus < 500) {
 }
 
 const hasCoverFile = Boolean(article?.cover_file);
+const articleVisibleToPublic =
+  article?.status === "published" && article?.is_public === true;
 const coverUrl = article?.cover_url
   ? article.cover_url
   : article?.cover_file
-    ? buildPublicAssetUrl(article.cover_file, {
-        width: 1600,
-        height: 900,
-        fit: "cover",
-      })
+    ? (articleVisibleToPublic ? buildPublicAssetUrl : buildDirectusAssetUrl)(
+        article.cover_file,
+        {
+          width: 1600,
+          height: 900,
+          fit: "cover",
+        },
+      )
     : null;
 
-// LCP preload: 当文章有 Directus 封面文件时，预加载 WebP 格式
-const coverPreloadUrl = article?.cover_file
-  ? buildPublicAssetUrl(article.cover_file, {
-      width: 1200,
-      height: 675,
-      fit: "cover",
-      format: "webp",
-    })
-  : null;
+const ownerOnlyNotice = viewerIsOwner
+  ? article?.status === "draft"
+    ? i18n(I18nKey.contentArticleOwnerDraftNotice)
+    : article && !articleVisibleToPublic
+      ? i18n(I18nKey.contentArticleOwnerPrivateNotice)
+      : ""
+  : "";
+
+// LCP preload: 当文章有 Directus 封面文件且当前对访问者可见时，预加载 WebP 格式
+const coverPreloadUrl =
+  article?.cover_file && articleVisibleToPublic
+    ? buildPublicAssetUrl(article.cover_file, {
+        width: 1200,
+        height: 675,
+        fit: "cover",
+        format: "webp",
+      })
+    : null;
 
 function formatArticleMetaDate(input: string | null | undefined): string {
   if (!input) {
@@ -260,7 +287,9 @@ const createdMetaText = formatArticleMetaDate(article?.date_created);
 
 <MainGridLayout
   setOGTypeArticle={true}
-  title={article?.title || i18n(I18nKey.contentArticleNotFoundTitle)}
+  title={article
+    ? article.title || i18n(I18nKey.contentUntitled)
+    : i18n(I18nKey.contentArticleNotFoundTitle)}
   description={article?.summary || ""}
 >
   {
@@ -292,7 +321,14 @@ const createdMetaText = formatArticleMetaDate(article?.date_created);
         >
           <div data-enter-skeleton-content>
             <header class="mb-6 space-y-3">
-              <h1 class="text-3xl font-bold text-90">{article.title}</h1>
+              <h1 class="text-3xl font-bold text-90">
+                {article.title || i18n(I18nKey.contentUntitled)}
+              </h1>
+              {ownerOnlyNotice && (
+                <p class="rounded-xl border border-(--line-divider) bg-(--btn-plain-bg-hover) px-4 py-3 text-sm text-75">
+                  {ownerOnlyNotice}
+                </p>
+              )}
               <div class="flex flex-wrap items-center gap-3 text-sm text-60">
                 {lastEditedAt && lastEditedMetaText && (
                   <span>
@@ -339,16 +375,16 @@ const createdMetaText = formatArticleMetaDate(article?.date_created);
                 {hasCoverFile && article?.cover_file ? (
                   <ResponsiveImage
                     fileId={article.cover_file}
-                    alt={article.title}
+                    alt={article.title || i18n(I18nKey.contentUntitled)}
                     preset="cover"
                     eager
-                    isPublic
+                    isPublic={articleVisibleToPublic}
                     class="w-full max-h-[420px] object-cover rounded-xl border border-(--line-divider)"
                   />
                 ) : (
                   <img
                     src={coverUrl}
-                    alt={article.title}
+                    alt={article.title || i18n(I18nKey.contentUntitled)}
                     class="w-full max-h-[420px] object-cover rounded-xl border border-(--line-divider)"
                     loading="lazy"
                   />
@@ -414,6 +450,8 @@ const createdMetaText = formatArticleMetaDate(article?.date_created);
           commentCount={articleCommentCount}
           likedByViewer={articleLikedByViewer}
           dockToBackTop={true}
+          showLikeAction={articleSupportsPublicInteraction}
+          showCommentAction={articleSupportsPublicInteraction}
           editHref={`/posts/${encodeURIComponent(article.short_id || rawId)}/edit`}
           deleteEndpoint={`/api/v1/me/articles/${encodeURIComponent(article.id)}`}
           adminDeleteEndpoint={`/api/v1/admin/content/articles/${encodeURIComponent(article.id)}`}
@@ -429,7 +467,9 @@ const createdMetaText = formatArticleMetaDate(article?.date_created);
           contentId={article.id}
           contentShortId={article.short_id || ""}
           contentAuthorId={article?.author?.id || ""}
-          allowComments={article.allow_comments}
+          allowComments={
+            articleSupportsPublicInteraction && article.allow_comments
+          }
         />
       </>
     )

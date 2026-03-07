@@ -20,8 +20,10 @@ import { ARTICLE_TITLE_MAX, charWeight } from "@/constants/text-limits";
 import I18nKey from "@/i18n/i18nKey";
 import type { PublishEditorAdapter } from "@/scripts/publish-editor-adapter";
 import { createPublishEditorAdapter } from "@/scripts/publish-editor-monaco";
+import { showConfirmDialog } from "@/scripts/dialogs";
 import { requestApi as api } from "@/scripts/http-client";
 import { t, tFmt } from "@/scripts/i18n-runtime";
+import { navigateToPage } from "@/utils/navigation-utils";
 import { generateClientShortId } from "@/utils/short-id";
 import {
     type PendingUpload,
@@ -57,6 +59,7 @@ import {
 } from "@/scripts/publish-page-preview";
 import { makeUiHelpers } from "@/scripts/publish-page-ui";
 import { setupUnsavedChangesGuard } from "@/scripts/unsaved-changes-guard";
+import { setupPageInit } from "@/utils/page-init";
 
 // ── 常量（依赖 i18n，在模块顶层初始化）──
 
@@ -66,6 +69,14 @@ const TITLE_TOO_LONG_MESSAGE = tFmt(I18nKey.articleEditorTitleMaxLength, {
 const DEFAULT_BODY_PLACEHOLDER = t(I18nKey.articleEditorBodyPlaceholder);
 let disposeActivePublishPage: (() => void) | null = null;
 let activePublishPageController: AbortController | null = null;
+
+function normalizeEditorArticleStatus(
+    value: unknown,
+): PublishState["currentStatus"] {
+    return value === "draft" || value === "published" || value === "archived"
+        ? value
+        : "";
+}
 
 function buildPublishDraftSnapshot(
     dom: PublishDomRefs,
@@ -134,6 +145,7 @@ async function fillArticleForm(
         true,
     );
     dom.articleIsPublicInput.checked = toBooleanValue(item.is_public, true);
+    state.currentStatus = normalizeEditorArticleStatus(item.status);
     state.currentCoverFileId = toStringValue(item.cover_file);
     updateCoverPreview();
     updateTitleHint();
@@ -156,6 +168,7 @@ type PageContext = {
     updateCoverPreview: () => void;
     fillForm: (item: Record<string, unknown>) => Promise<boolean>;
     resetForm: () => void;
+    loadWorkingDraft: () => Promise<boolean>;
     loadDetail: (id: string) => Promise<void>;
 };
 
@@ -364,40 +377,22 @@ function bindCoverEvents(ctx: PageContext): void {
 }
 
 function bindSubmitAndAuth(ctx: PageContext, initialIdFromUrl: string): void {
-    const {
-        dom,
-        editor,
-        state,
-        ui,
-        pendingUploads,
-        saveOverlay,
-        previewClient,
-        fillForm,
-        resetForm,
-        loadDetail,
-    } = ctx;
-
-    dom.savePublishedBtn.addEventListener("click", () => {
-        void submit({
-            dom,
-            state,
-            pendingUploads,
-            saveOverlay,
-            previewClient,
-            ui,
-            fillForm,
-        });
-    });
+    const { editor, state, resetForm, loadDetail } = ctx;
 
     const applyAuthState = (authState: AuthState): void => {
+        const wasLoggedIn = state.isLoggedIn;
         state.isLoggedIn = authState.isLoggedIn;
         state.currentUsername = toStringValue(authState.username);
-        const wasHidden = dom.workspaceEl.classList.contains("hidden");
-        dom.workspaceEl.classList.toggle("hidden", !state.isLoggedIn);
+        const wasHidden = ctx.dom.workspaceEl.classList.contains("hidden");
+        ctx.dom.workspaceEl.classList.toggle("hidden", !state.isLoggedIn);
         if (wasHidden && state.isLoggedIn) {
             requestAnimationFrame(() => {
                 editor.layout();
             });
+        }
+        if (wasLoggedIn && !state.isLoggedIn) {
+            state.initializedAfterLogin = false;
+            resetForm();
         }
         if (!state.isLoggedIn) {
             return;
@@ -409,6 +404,7 @@ function bindSubmitAndAuth(ctx: PageContext, initialIdFromUrl: string): void {
                     await loadDetail(initialIdFromUrl);
                 } else {
                     resetForm();
+                    await ctx.loadWorkingDraft();
                 }
             })();
         }
@@ -444,12 +440,20 @@ function bindSubmitAndAuth(ctx: PageContext, initialIdFromUrl: string): void {
     })();
 }
 
-function bindSettingsOverlay(): void {
-    const settingsOverlay = document.getElementById("publish-settings-overlay");
-    const openSettingsBtn = document.getElementById("publish-open-settings");
-    const cancelSettingsBtn = document.getElementById(
-        "publish-cancel-settings",
-    );
+function bindSettingsOverlay(ctx: PageContext): void {
+    const {
+        dom,
+        state,
+        pendingUploads,
+        saveOverlay,
+        previewClient,
+        ui,
+        fillForm,
+        resetForm,
+    } = ctx;
+    const settingsOverlay = dom.settingsOverlayEl;
+    const openSettingsBtn = dom.openSettingsBtn;
+    const cancelSettingsBtn = dom.cancelSettingsBtn;
 
     function openSettingsOverlay(): void {
         if (settingsOverlay) {
@@ -465,8 +469,87 @@ function bindSettingsOverlay(): void {
         }
     }
 
+    const submitCurrentArticle = async (
+        targetStatus: "draft" | "published",
+        redirectOnSuccess: boolean,
+    ): Promise<void> => {
+        const saved = await submit(
+            {
+                dom,
+                state,
+                pendingUploads,
+                saveOverlay,
+                previewClient,
+                ui,
+                fillForm,
+            },
+            {
+                redirectOnSuccess,
+                targetStatus,
+            },
+        );
+        if (saved && !redirectOnSuccess) {
+            closeSettingsOverlay();
+        }
+    };
+
+    const discardCurrentDraft = async (): Promise<void> => {
+        if (!state.currentItemId || state.currentStatus !== "draft") {
+            closeSettingsOverlay();
+            return;
+        }
+        const confirmed = await showConfirmDialog({
+            ariaLabel: t(I18nKey.interactionDialogConfirmTitle),
+            message: t(I18nKey.interactionPostDeleteConfirmOwnArticle),
+            confirmText: t(I18nKey.interactionCommonDiscardDraft),
+            confirmVariant: "danger",
+        });
+        if (!confirmed) {
+            return;
+        }
+        try {
+            const { response, data } = await api(
+                `/api/v1/me/articles/${encodeURIComponent(state.currentItemId)}`,
+                { method: "DELETE" },
+            );
+            if (response.status === 401) {
+                emitAuthState({
+                    isLoggedIn: false,
+                    isAdmin: false,
+                    userId: "",
+                    username: "",
+                });
+                closeSettingsOverlay();
+                return;
+            }
+            if (!response.ok || !data?.ok) {
+                ui.setSubmitError(
+                    getApiMessage(data, t(I18nKey.interactionPostDeleteFailed)),
+                );
+                return;
+            }
+            closeSettingsOverlay();
+            resetForm();
+            ui.setSubmitMessage(t(I18nKey.interactionCommonSaveSuccess));
+            navigateToPage("/posts/new", { replace: true });
+        } catch (error) {
+            console.error("[publish] discard draft failed:", error);
+            ui.setSubmitError(t(I18nKey.interactionPostDeleteFailed));
+        }
+    };
+
     openSettingsBtn?.addEventListener("click", openSettingsOverlay);
     cancelSettingsBtn?.addEventListener("click", closeSettingsOverlay);
+    dom.saveDraftBtn.addEventListener("click", () => {
+        void submitCurrentArticle("draft", false);
+    });
+    dom.savePublishedBtn.addEventListener("click", () => {
+        const shouldRedirect = state.currentStatus !== "published";
+        void submitCurrentArticle("published", shouldRedirect);
+    });
+    dom.discardDraftBtn.addEventListener("click", () => {
+        void discardCurrentDraft();
+    });
     settingsOverlay?.addEventListener("click", (event) => {
         if (event.target === settingsOverlay) {
             closeSettingsOverlay();
@@ -535,6 +618,7 @@ async function initPublishPageCore(): Promise<void> {
     const state: PublishState = {
         currentItemId: "",
         currentItemShortId: "",
+        currentStatus: "",
         currentCoverFileId: "",
         currentUsername: "",
         isLoggedIn: false,
@@ -595,6 +679,54 @@ async function initPublishPageCore(): Promise<void> {
         return unlocked;
     };
 
+    const loadWorkingDraft = async (): Promise<boolean> => {
+        if (state.currentItemId || initialIdFromUrl || !state.isLoggedIn) {
+            return false;
+        }
+        try {
+            const { response, data } = await api(
+                "/api/v1/me/articles/working-draft",
+                { method: "GET" },
+            );
+            if (response.status === 401) {
+                emitAuthState({
+                    isLoggedIn: false,
+                    isAdmin: false,
+                    userId: "",
+                    username: "",
+                });
+                return false;
+            }
+            if (!response.ok || !data?.ok) {
+                ui.setSubmitError(
+                    getApiMessage(data, t(I18nKey.articleEditorLoadFailed)),
+                );
+                return false;
+            }
+            const item = toRecord(data.item);
+            if (!item) {
+                return false;
+            }
+            clearPendingUploads(pendingUploads);
+            state.inlineImageCounter = 0;
+            await fillForm(item);
+            state.currentItemId = toStringValue(item.id);
+            state.currentItemShortId = toStringValue(item.short_id);
+            ui.updateEditorHeader();
+            ui.updateUrlState();
+            preview.resetPreviewState();
+            ui.setSubmitError("");
+            ui.setSubmitMessage(t(I18nKey.articleEditorLocalDraftRestored));
+            preview.markPreviewDirty();
+            markDraftSaved();
+            return true;
+        } catch (error) {
+            console.error("[publish] load working draft failed:", error);
+            ui.setSubmitError(t(I18nKey.articleEditorLoadFailedRetry));
+            return false;
+        }
+    };
+
     const resetForm = (): void => {
         dom.articleTitleInput.value = "";
         dom.articleSummaryInput.value = "";
@@ -611,10 +743,12 @@ async function initPublishPageCore(): Promise<void> {
         state.loadedEncryptedBodyUnlocked = false;
         ui.updateEncryptPanel();
         state.currentCoverFileId = "";
+        state.currentStatus = "";
         clearPendingUploads(pendingUploads);
         state.inlineImageCounter = 0;
         updateCoverPreview();
         state.currentItemId = "";
+        state.currentItemShortId = "";
         ui.updateEditorHeader();
         ui.updateUrlState();
         preview.resetPreviewState();
@@ -661,10 +795,7 @@ async function initPublishPageCore(): Promise<void> {
             state.inlineImageCounter = 0;
             const unlockedEncryptedBody = await fillForm(item);
             state.currentItemId = toStringValue(item.id) || targetId;
-            const loadedShortId = toStringValue(item.short_id);
-            if (loadedShortId) {
-                state.currentItemShortId = loadedShortId;
-            }
+            state.currentItemShortId = toStringValue(item.short_id);
             ui.updateEditorHeader();
             ui.updateUrlState();
             preview.resetPreviewState();
@@ -700,6 +831,7 @@ async function initPublishPageCore(): Promise<void> {
         updateCoverPreview,
         fillForm,
         resetForm,
+        loadWorkingDraft,
         loadDetail,
     };
 
@@ -716,6 +848,25 @@ async function initPublishPageCore(): Promise<void> {
         isDirty: hasUnsavedDraftChanges,
         getConfirmMessage: () =>
             t(I18nKey.interactionCommonUnsavedChangesLeaveConfirm),
+        saveBeforeLeave: () =>
+            submit(
+                {
+                    dom,
+                    state,
+                    pendingUploads,
+                    saveOverlay,
+                    previewClient,
+                    ui,
+                    fillForm,
+                },
+                {
+                    redirectOnSuccess: false,
+                    targetStatus:
+                        state.currentStatus === "published"
+                            ? "published"
+                            : "draft",
+                },
+            ),
     });
     let disposed = false;
     const disposePublishResources = (): void => {
@@ -742,7 +893,7 @@ async function initPublishPageCore(): Promise<void> {
     bindScrollSync(editor, dom.previewScrollEl);
     bindCoverEvents(ctx);
     bindSubmitAndAuth(ctx, initialIdFromUrl);
-    bindSettingsOverlay();
+    bindSettingsOverlay(ctx);
 
     document.addEventListener("astro:before-swap", disposePublishResources, {
         once: true,
@@ -755,5 +906,12 @@ async function initPublishPageCore(): Promise<void> {
 }
 
 export function initPublishPage(): void {
-    void initPublishPageCore();
+    setupPageInit({
+        key: "publish-page",
+        init: () => {
+            void initPublishPageCore();
+        },
+        delay: 0,
+        runOnPageShow: true,
+    });
 }

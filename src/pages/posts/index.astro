@@ -5,6 +5,11 @@ import MainGridLayout from "@layouts/MainGridLayout.astro";
 import PostPage from "@components/PostPage.astro";
 import Calendar from "@components/widget/Calendar.astro";
 import { Icon } from "astro-icon/components";
+import { getSessionUser } from "@/server/auth/session";
+import {
+  DIRECTUS_ACCESS_COOKIE_NAME,
+  DIRECTUS_REFRESH_COOKIE_NAME,
+} from "@/server/directus-auth";
 import {
   getSortedPosts,
   getTagList,
@@ -13,10 +18,26 @@ import {
 
 export const prerender = false;
 
-const allPosts = await getSortedPosts();
-const tags = await getTagList();
-const categories = await getCategoryList();
+const sessionUser = await getSessionUser(Astro);
+const viewerId = sessionUser?.id ?? null;
+const hasSessionCookie = Boolean(
+  Astro.cookies.get(DIRECTUS_ACCESS_COOKIE_NAME)?.value ||
+  Astro.cookies.get(DIRECTUS_REFRESH_COOKIE_NAME)?.value,
+);
+
+const allPosts = await getSortedPosts(viewerId);
+const tags = await getTagList(viewerId);
+const categories = await getCategoryList(viewerId);
 const uncategorizedLabel = i18n(I18nKey.contentUncategorized);
+
+if (hasSessionCookie || viewerId) {
+  Astro.response.headers.set("Cache-Control", "private, no-store");
+} else {
+  Astro.response.headers.set(
+    "Cache-Control",
+    "public, s-maxage=60, stale-while-revalidate=300",
+  );
+}
 ---
 
 <MainGridLayout title={i18n(I18nKey.coreArchive)}>

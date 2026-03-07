@@ -3,6 +3,7 @@ import * as z from "zod";
 
 import {
     CreateArticleSchema,
+    UpsertWorkingDraftSchema,
     UpdateArticleSchema,
 } from "@/server/api/schemas/article";
 
@@ -89,17 +90,41 @@ describe("UpdateArticleSchema", () => {
         expect(result.body_markdown).toBeUndefined();
     });
 
-    it("status=draft → 失败", () => {
-        expect(() =>
-            UpdateArticleSchema.parse({
-                status: "draft",
-            }),
-        ).toThrow(z.ZodError);
+    it("status=draft → 通过", () => {
+        const result = UpdateArticleSchema.parse({
+            status: "draft",
+        });
+        expect(result.status).toBe("draft");
     });
 
     it("更新标题超 30（中文按 2）→ 失败", () => {
         expect(() =>
             UpdateArticleSchema.parse({
+                title: "你".repeat(16),
+            }),
+        ).toThrow(z.ZodError);
+    });
+});
+
+describe("UpsertWorkingDraftSchema", () => {
+    it("空对象 → 通过", () => {
+        expect(UpsertWorkingDraftSchema.parse({})).toEqual({});
+    });
+
+    it("允许空标题与空正文草稿", () => {
+        const result = UpsertWorkingDraftSchema.parse({
+            title: "",
+            body_markdown: "",
+            tags: [],
+        });
+        expect(result.title).toBe("");
+        expect(result.body_markdown).toBe("");
+        expect(result.tags).toEqual([]);
+    });
+
+    it("草稿标题仍然受长度上限约束", () => {
+        expect(() =>
+            UpsertWorkingDraftSchema.parse({
                 title: "你".repeat(16),
             }),
         ).toThrow(z.ZodError);

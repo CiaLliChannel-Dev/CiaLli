@@ -25,6 +25,8 @@ export const zhTWArticleEditor: Record<string, string> = {
     [Key.articleEditorGeneratingEncryptedContent]: "正在產生加密內容...",
     [Key.articleEditorLoadFailed]: "載入失敗",
     [Key.articleEditorLoadFailedRetry]: "載入失敗，請重試",
+    [Key.articleEditorLocalDraftRestored]: "已恢復目前的工作草稿",
+    [Key.articleEditorLocalDraftSaved]: "工作草稿已儲存",
     [Key.articleEditorLoginExpired]: "登入已過期，請重新登入",
     [Key.articleEditorPasswordRequired]: "請輸入密碼",
     [Key.articleEditorPreviewFailedRetry]: "預覽失敗，請重試",
