@@ -89,6 +89,15 @@ const { payload, dialogId = "article-share-dialog" } = Astro.props;
 </div>
 
 <style lang="stylus">
+  .article-share-dialog
+    // 共享弹窗弱化文本与关闭按钮焦点环需显式提供深浅两套值，避免 Stylus 误解析现代颜色函数。
+    --article-share-dialog-muted: rgba(0, 0, 0, .75)
+    --article-share-dialog-close-ring: rgba(0, 0, 0, .08)
+
+  :global(:root.dark) .article-share-dialog
+    --article-share-dialog-muted: rgba(255, 255, 255, .75)
+    --article-share-dialog-close-ring: rgba(255, 255, 255, .12)
+
   .article-share-dialog-card
     max-width: 34rem
 
@@ -135,7 +144,7 @@ const { payload, dialogId = "article-share-dialog" } = Astro.props;
     margin: .35rem 0 0
     font-size: .9375rem
     line-height: 1.6
-    color: var(--text-75)
+    color: var(--article-share-dialog-muted)
 
   .article-share-dialog-close
     flex: 0 0 auto
@@ -147,12 +156,19 @@ const { payload, dialogId = "article-share-dialog" } = Astro.props;
     border: 1px solid var(--line-divider)
     border-radius: .85rem
     background: transparent
-    color: var(--text-75)
-    transition: background-color .2s ease, color .2s ease
+    color: var(--article-share-dialog-muted)
+    transition: background-color .2s ease, color .2s ease, border-color .2s ease, box-shadow .2s ease
 
     &:hover
       background: var(--btn-card-bg-active)
       color: var(--deep-text)
+
+    &:focus-visible
+      outline: none
+      border-color: var(--primary)
+      background: var(--btn-card-bg-active)
+      color: var(--deep-text)
+      box-shadow: 0 0 0 3px var(--article-share-dialog-close-ring)
 
     iconify-icon
       font-size: 1.4rem
@@ -174,7 +190,7 @@ const { payload, dialogId = "article-share-dialog" } = Astro.props;
     align-items: center
     justify-content: center
     gap: .75rem
-    color: var(--text-75)
+    color: var(--article-share-dialog-muted)
     text-align: center
 
     &[hidden]
@@ -205,7 +221,7 @@ const { payload, dialogId = "article-share-dialog" } = Astro.props;
     margin: 1rem 0 0
     font-size: .875rem
     line-height: 1.5
-    color: var(--text-75)
+    color: var(--article-share-dialog-muted)
 
     &[data-tone='danger']
       color: oklch(0.62 0.22 25)
