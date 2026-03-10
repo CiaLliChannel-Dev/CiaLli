@@ -67,6 +67,7 @@ const TITLE_TOO_LONG_MESSAGE = tFmt(I18nKey.articleEditorTitleMaxLength, {
     max: ARTICLE_TITLE_MAX,
 });
 const DEFAULT_BODY_PLACEHOLDER = t(I18nKey.articleEditorBodyPlaceholder);
+const NAVIGATION_SETTLED_EVENT = "cialli:navigation:settled";
 let disposeActivePublishPage: (() => void) | null = null;
 let activePublishPageController: AbortController | null = null;
 
@@ -119,14 +120,6 @@ function normalizeEditorArticleStatus(
     return value === "draft" || value === "published" || value === "archived"
         ? value
         : "";
-}
-
-function isPublishEditorPath(pathname: string): boolean {
-    const normalizedPath = pathname.replace(/\/+$/, "") || "/";
-    return (
-        normalizedPath === "/posts/new" ||
-        /^\/posts\/[^/]+\/edit$/.test(normalizedPath)
-    );
 }
 
 function buildPublishDraftSnapshot(
@@ -948,14 +941,31 @@ async function initPublishPageCore(): Promise<void> {
     };
     disposeActivePublishPage = disposePublishResources;
 
+    const scheduleEditorLayout = (): void => {
+        // 客户端切页时工作台高度会在收尾阶段继续调整；
+        // 这里延后两帧再 layout，确保 Monaco 在最终尺寸上完成一次重排。
+        window.requestAnimationFrame(() => {
+            window.requestAnimationFrame(() => {
+                if (disposed || pageController.signal.aborted) {
+                    return;
+                }
+                editor.layout();
+            });
+        });
+    };
+
     bindEditorEvents(ctx);
     bindScrollSync(editor, dom.previewScrollEl);
     bindCoverEvents(ctx);
     bindSubmitAndAuth(ctx, initialIdFromUrl);
     bindSettingsOverlay(ctx);
+    scheduleEditorLayout();
 
     document.addEventListener("astro:before-swap", disposePublishResources, {
         once: true,
+        signal: pageController.signal,
+    });
+    document.addEventListener(NAVIGATION_SETTLED_EVENT, scheduleEditorLayout, {
         signal: pageController.signal,
     });
     window.addEventListener("pagehide", disposePublishResources, {
@@ -965,11 +975,6 @@ async function initPublishPageCore(): Promise<void> {
 }
 
 export function initPublishPage(): void {
-    if (isPublishEditorPath(window.location.pathname)) {
-        // 首次完整加载时优先直启当前页，避免只依赖 page-load 监听导致首刷漏初始化。
-        void initPublishPageCore();
-    }
-
     setupPageInit({
         key: "publish-page",
         init: () => {
@@ -977,6 +982,8 @@ export function initPublishPage(): void {
         },
         delay: 0,
         runOnPageShow: true,
-        stages: ["page-load"],
+        // 客户端切页时，发布页工作台的布局与过渡要到 navigation-settled 才算稳定。
+        // 在 page-load 阶段直接起 Monaco，容易命中“第二次进入宿主尺寸/可见性还未稳定”的窗口。
+        stages: ["navigation-settled"],
     });
 }
