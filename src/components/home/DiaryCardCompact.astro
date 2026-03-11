@@ -1,5 +1,10 @@
 ---
 import type { AppDiary } from "@/types/app";
+import { getResolvedSiteSettings } from "@/server/site-settings/service";
+import {
+  buildSiteDateFormatContext,
+  formatSiteMonthDay,
+} from "@/utils/date-utils";
 
 interface Props {
   diary: AppDiary;
@@ -7,6 +12,9 @@ interface Props {
 }
 
 const { diary, username } = Astro.props;
+const resolvedSiteSettings =
+  Astro.locals.siteSettings ?? (await getResolvedSiteSettings());
+const siteDateContext = buildSiteDateFormatContext(resolvedSiteSettings);
 
 const href = `/${username}/diary/${diary.short_id || diary.id}`;
 
@@ -22,10 +30,7 @@ const displayText =
 
 const dateStr = diary.date_created;
 const formattedDate = dateStr
-  ? new Date(dateStr).toLocaleDateString("zh-CN", {
-      month: "short",
-      day: "numeric",
-    })
+  ? formatSiteMonthDay(dateStr, siteDateContext)
   : "";
 ---
 

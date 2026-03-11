@@ -12,6 +12,7 @@ import { LinkPreset } from "./types/config";
 export const systemSiteConfig: SystemSiteConfig = {
     siteURL: "https://www.ciallichannel.com/",
     lang: "zh_CN",
+    timeZone: "UTC",
     themeColor: {
         hue: 285,
         fixed: true,
@@ -45,6 +46,7 @@ export const defaultSiteSettings: SiteSettingsPayload = {
         title: "CiaLli",
         subtitle: "个人博客",
         lang: "zh_CN",
+        timeZone: null,
         keywords: [],
         siteStartDate: "2026-02-01",
         favicon: [],

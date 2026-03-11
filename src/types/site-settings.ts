@@ -32,6 +32,7 @@ export type EditableSiteSettings = {
         title: string;
         subtitle: string;
         lang: "en" | "zh_CN" | "zh_TW" | "ja";
+        timeZone: string | null;
         keywords: string[];
         siteStartDate: string | null;
         favicon: Favicon[];
@@ -60,6 +61,7 @@ export type PublicSiteSettings = EditableSiteSettings;
 export type SystemSiteConfig = {
     siteURL: string;
     lang: SiteConfig["lang"];
+    timeZone: string;
     themeColor: SiteConfig["themeColor"];
     font: SiteConfig["font"];
     pageScaling: NonNullable<SiteConfig["pageScaling"]>;

@@ -1,5 +1,9 @@
 import I18nKey from "@/i18n/i18nKey";
 import { t } from "@/scripts/i18n-runtime";
+import {
+    buildSiteDateFormatContext,
+    formatSiteDateTime,
+} from "@/utils/date-utils";
 
 export type UnknownRecord = Record<string, unknown>;
 
@@ -16,6 +20,19 @@ const getStr = (value: unknown, fallback = ""): string =>
 
 const getStrOrNone = (value: unknown): string =>
     getStr(value) || t(I18nKey.adminUsersNone);
+
+const formatAdminDateOrNone = (value: unknown): string => {
+    if (typeof window === "undefined") {
+        return getStrOrNone(value);
+    }
+    const siteDateContext = buildSiteDateFormatContext(
+        window.__CIALLI_RUNTIME_SETTINGS__,
+    );
+    return (
+        formatSiteDateTime(getStr(value), siteDateContext) ||
+        getStrOrNone(value)
+    );
+};
 
 const resolveRoleLabel = (
     userRecord: UnknownRecord,
@@ -180,11 +197,11 @@ function buildDetailFields(item: UnknownRecord): DetailContentItem[] {
         },
         {
             label: t(I18nKey.adminUsersReviewedAt),
-            value: getStrOrNone(item.reviewed_at),
+            value: formatAdminDateOrNone(item.reviewed_at),
         },
         {
             label: t(I18nKey.adminUsersSubmittedAt),
-            value: getStrOrNone(item.date_created),
+            value: formatAdminDateOrNone(item.date_created),
         },
         {
             label: t(I18nKey.adminUsersRegistrationReason),

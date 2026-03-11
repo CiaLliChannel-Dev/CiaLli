@@ -5,6 +5,7 @@ import {
     createMockAPIContext,
     parseResponseJson,
 } from "@/__tests__/helpers/mock-api-context";
+import { defaultSiteSettings } from "@/config";
 
 vi.mock("@/server/api/v1/shared", () => ({
     requireAdmin: vi.fn(),
@@ -228,6 +229,155 @@ describe("handleAdminSettings /bulletin", () => {
         expect(body.announcement.body_markdown).toBe("# 新正文");
         expect(body.announcement.closable).toBe(false);
         expect(body.updated_at).toBe("2026-02-16T00:00:00.000Z");
+    });
+});
+
+describe("handleAdminSettings /site", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockedRequireAdmin.mockResolvedValue({
+            access: {
+                isAdmin: true,
+                user: {
+                    id: "admin-1",
+                },
+            },
+            accessToken: "test-access-token",
+        } as never);
+    });
+
+    it("GET /admin/settings/site 返回站点设置与更新时间", async () => {
+        mockedGetResolvedSiteSettings.mockResolvedValue({
+            system: {
+                timeZone: "Asia/Shanghai",
+            },
+            settings: {
+                site: {
+                    title: "CiaLli",
+                    subtitle: "个人博客",
+                    lang: "zh_CN",
+                    timeZone: "Asia/Shanghai",
+                    keywords: ["blog"],
+                    siteStartDate: "2026-02-01",
+                    favicon: [],
+                },
+            },
+        } as never);
+        mockedReadMany.mockResolvedValue([
+            {
+                id: "row-1",
+                date_updated: "2026-02-15T12:00:00.000Z",
+                date_created: "2026-02-10T12:00:00.000Z",
+            },
+        ] as never);
+
+        const ctx = makeCtx("admin/settings/site");
+        const response = await handleAdminSettings(
+            ctx as unknown as APIContext,
+            ["settings", "site"],
+        );
+        expect(response.status).toBe(200);
+
+        const body = await parseResponseJson<{
+            ok: boolean;
+            settings: {
+                site: {
+                    timeZone: string | null;
+                };
+            };
+            updated_at: string | null;
+        }>(response);
+        expect(body.ok).toBe(true);
+        expect(body.settings.site.timeZone).toBe("Asia/Shanghai");
+        expect(body.updated_at).toBe("2026-02-15T12:00:00.000Z");
+    });
+
+    it("PATCH /admin/settings/site 保存站点时区", async () => {
+        mockedGetResolvedSiteSettings.mockResolvedValue({
+            system: {
+                timeZone: "Asia/Shanghai",
+            },
+            settings: {
+                ...defaultSiteSettings,
+                site: {
+                    ...defaultSiteSettings.site,
+                    title: "旧标题",
+                    timeZone: null,
+                },
+            },
+        } as never);
+        mockedResolveSiteSettingsPayload.mockReturnValue({
+            ...defaultSiteSettings,
+            site: {
+                ...defaultSiteSettings.site,
+                title: "旧标题",
+                timeZone: "UTC",
+            },
+        } as never);
+        mockedReadMany.mockResolvedValue([
+            {
+                id: "row-1",
+                date_updated: "2026-02-15T12:00:00.000Z",
+                date_created: "2026-02-10T12:00:00.000Z",
+            },
+        ] as never);
+        mockedUpdateOne.mockResolvedValue({
+            date_updated: "2026-02-16T00:00:00.000Z",
+            date_created: "2026-02-10T12:00:00.000Z",
+        } as never);
+
+        const ctx = makeCtx("admin/settings/site", "PATCH", {
+            site: {
+                timeZone: "UTC",
+            },
+        });
+        const response = await handleAdminSettings(
+            ctx as unknown as APIContext,
+            ["settings", "site"],
+        );
+        expect(response.status).toBe(200);
+        expect(mockedResolveSiteSettingsPayload).toHaveBeenCalledWith(
+            {
+                site: {
+                    timeZone: "UTC",
+                },
+            },
+            expect.anything(),
+        );
+
+        const body = await parseResponseJson<{
+            ok: boolean;
+            settings: {
+                site: {
+                    timeZone: string | null;
+                };
+            };
+        }>(response);
+        expect(body.ok).toBe(true);
+        expect(body.settings.site.timeZone).toBe("UTC");
+    });
+
+    it("PATCH /admin/settings/site 拒绝非法站点时区", async () => {
+        const ctx = makeCtx("admin/settings/site", "PATCH", {
+            site: {
+                timeZone: "Mars/Olympus",
+            },
+        });
+        const response = await handleAdminSettings(
+            ctx as unknown as APIContext,
+            ["settings", "site"],
+        );
+        expect(response.status).toBe(400);
+
+        const body = await parseResponseJson<{
+            ok: boolean;
+            error: {
+                code: string;
+                message: string;
+            };
+        }>(response);
+        expect(body.ok).toBe(false);
+        expect(body.error.code).toBe("INVALID_TIME_ZONE");
     });
 });
 

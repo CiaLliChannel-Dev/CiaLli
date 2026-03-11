@@ -6,6 +6,7 @@
 
 import I18nKey from "@/i18n/i18nKey";
 import { t } from "@/scripts/i18n-runtime";
+import { SITE_TIME_ZONE_AUTO_VALUE } from "@/utils/date-utils";
 import {
     inputVal,
     textareaVal,
@@ -43,6 +44,12 @@ function bindSiteBasicFields(site: SettingsObj, profile: SettingsObj): void {
     setVal("ss-title", String(site.title ?? ""));
     setVal("ss-subtitle", String(site.subtitle ?? ""));
     setSelect("ss-language", String(site.lang ?? "zh_CN"));
+    setSelect(
+        "ss-timezone",
+        typeof site.timeZone === "string" && site.timeZone.trim()
+            ? String(site.timeZone)
+            : SITE_TIME_ZONE_AUTO_VALUE,
+    );
     setVal(
         "ss-keywords",
         Array.isArray(site.keywords)
@@ -232,6 +239,10 @@ export function collectSitePayload(current: SettingsObj): SettingsObj {
             title: inputVal("ss-title"),
             subtitle: inputVal("ss-subtitle"),
             lang: inputVal("ss-language") || "zh_CN",
+            timeZone:
+                inputVal("ss-timezone") === SITE_TIME_ZONE_AUTO_VALUE
+                    ? null
+                    : inputVal("ss-timezone") || null,
             keywords: inputVal("ss-keywords")
                 .split(",")
                 .map((x) => x.trim())

@@ -1,5 +1,6 @@
 import type { SiteSettingsPayload } from "@/types/site-settings";
 import { buildDirectusAssetUrl } from "@/server/directus-auth";
+import { canonicalizeSiteTimeZone } from "@/utils/date-utils";
 
 // ---- 内部工具类型 ----
 
@@ -185,6 +186,13 @@ export function normalizeSiteInfo(
     merged.site.lang = isSiteLanguageOption(merged.site.lang)
         ? merged.site.lang
         : base.site.lang;
+    const resolvedTimeZone = canonicalizeSiteTimeZone(merged.site.timeZone);
+    if (merged.site.timeZone && !resolvedTimeZone) {
+        console.warn(
+            `[site-settings] 检测到无效站点时区配置，已回退为跟随环境: ${String(merged.site.timeZone)}`,
+        );
+    }
+    merged.site.timeZone = resolvedTimeZone;
     merged.site.keywords = Array.isArray(merged.site.keywords)
         ? merged.site.keywords
               .map((item) => String(item || "").trim())

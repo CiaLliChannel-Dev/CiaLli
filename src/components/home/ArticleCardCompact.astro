@@ -2,7 +2,8 @@
 import type { AppArticle } from "@/types/app";
 import ExternalImage from "@components/misc/ExternalImage.astro";
 import { buildPublicAssetUrl } from "@/server/directus-auth";
-import { formatDateToYYYYMMDD } from "@/utils/date-utils";
+import { getResolvedSiteSettings } from "@/server/site-settings/service";
+import { buildSiteDateFormatContext, formatSiteDate } from "@/utils/date-utils";
 
 interface Props {
   article: AppArticle & { tags: string[] };
@@ -10,6 +11,9 @@ interface Props {
 }
 
 const { article } = Astro.props;
+const resolvedSiteSettings =
+  Astro.locals.siteSettings ?? (await getResolvedSiteSettings());
+const siteDateContext = buildSiteDateFormatContext(resolvedSiteSettings);
 
 const href = `/posts/${article.short_id || article.id}`;
 
@@ -25,7 +29,7 @@ const hasCover = Boolean(coverUrl);
 
 const publishedDate = article.date_updated || article.date_created;
 const dateStr = publishedDate
-  ? formatDateToYYYYMMDD(new Date(publishedDate)).replace(/-/g, "/")
+  ? formatSiteDate(publishedDate, siteDateContext)
   : "";
 ---
 

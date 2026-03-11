@@ -5,7 +5,6 @@ import ExternalImage from "@components/misc/ExternalImage.astro";
 import Markdown from "@components/misc/Markdown.astro";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
-import { systemSiteConfig } from "@/config";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
 import {
   buildDirectusAssetUrl,
@@ -18,6 +17,7 @@ import {
   runWithDirectusUserAccess,
 } from "@/server/directus/client";
 import { renderMarkdown } from "@/server/markdown/render";
+import { getResolvedSiteSettings } from "@/server/site-settings/service";
 import {
   loadProfileForViewer,
   loadUserDiaryDetail,
@@ -29,6 +29,10 @@ import type {
 } from "@/server/api/v1/public-data";
 import { getSessionAccessToken, getSessionUser } from "@/server/auth/session";
 import type { JsonObject } from "@/types/json";
+import {
+  buildSiteDateFormatContext,
+  formatSiteDateTime,
+} from "@/utils/date-utils";
 import DetailActionFloat from "@components/control/DetailActionFloat.astro";
 
 export const prerender = false;
@@ -43,6 +47,9 @@ let diaryCommentCount = 0;
 let diaryLikedByViewer = false;
 let viewerOwnsDiary = false;
 let diaryData = null as DiaryDetail | null;
+const resolvedSiteSettings =
+  Astro.locals.siteSettings ?? (await getResolvedSiteSettings());
+const siteDateContext = buildSiteDateFormatContext(resolvedSiteSettings);
 
 type DiaryGalleryItem = {
   thumb: string;
@@ -179,35 +186,7 @@ const diary = diaryData;
 const diaryGallery = resolveDiaryGallery(diary);
 const diaryGalleryCount = diaryGallery.length;
 
-function formatDiaryMetaDate(input: string | null | undefined): string {
-  if (!input) {
-    return "";
-  }
-  const date = new Date(input);
-  if (Number.isNaN(date.getTime())) {
-    return "";
-  }
-  const localeMap: Record<string, string> = {
-    zh_CN: "zh-CN",
-    zh_TW: "zh-TW",
-    ja: "ja-JP",
-    en: "en-US",
-  };
-  const locale = localeMap[systemSiteConfig.lang] || "en-US";
-  const timePart = new Intl.DateTimeFormat(locale, {
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  }).format(date);
-  const datePart = new Intl.DateTimeFormat(locale, {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(date);
-  return `${timePart} · ${datePart}`;
-}
-
-const diaryMetaText = formatDiaryMetaDate(diary?.date_created);
+const diaryMetaText = formatSiteDateTime(diary?.date_created, siteDateContext);
 ---
 
 <MainGridLayout

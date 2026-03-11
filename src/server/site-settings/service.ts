@@ -7,6 +7,7 @@ import type {
     ResolvedSiteSettings,
     SiteSettingsPayload,
 } from "@/types/site-settings";
+import { resolveEffectiveSiteTimeZone } from "@/utils/date-utils";
 import {
     isRecord,
     isSiteLanguageOption,
@@ -75,12 +76,38 @@ function mergeWithDefaults<T>(defaults: T, patch: unknown): T {
     }
 }
 
+function readExplicitSiteTimeZonePatch(raw: unknown): {
+    hasValue: boolean;
+    value: SiteSettingsPayload["site"]["timeZone"];
+} {
+    if (!isRecord(raw) || !isRecord(raw.site)) {
+        return { hasValue: false, value: null };
+    }
+    if (!Object.prototype.hasOwnProperty.call(raw.site, "timeZone")) {
+        return { hasValue: false, value: null };
+    }
+
+    const rawValue = raw.site.timeZone;
+    if (rawValue === null || rawValue === undefined) {
+        return { hasValue: true, value: null };
+    }
+
+    return { hasValue: true, value: String(rawValue) };
+}
+
 function normalizeSettings(
     raw: unknown,
     base: SiteSettingsPayload,
 ): SiteSettingsPayload {
     const merged = mergeWithDefaults(cloneSettings(base), raw);
     const rawBannerSrc = readRawBannerSrc(raw);
+    const explicitSiteTimeZone = readExplicitSiteTimeZonePatch(raw);
+
+    // `site.timeZone` 是 string | null，可空字段会被通用 merge 逻辑吞掉，
+    // 这里需要在归一化前显式回灌一次原始补丁值。
+    if (explicitSiteTimeZone.hasValue) {
+        merged.site.timeZone = explicitSiteTimeZone.value;
+    }
 
     normalizeSiteInfo(merged, base);
     normalizeSiteFavicon(merged);
@@ -112,6 +139,7 @@ function buildSystemSiteConfig(
 ): ResolvedSiteSettings["system"] {
     return {
         ...systemSiteConfig,
+        timeZone: resolveEffectiveSiteTimeZone(settings.site.timeZone),
         lang: isSiteLanguageOption(settings.site.lang)
             ? settings.site.lang
             : systemSiteConfig.lang,

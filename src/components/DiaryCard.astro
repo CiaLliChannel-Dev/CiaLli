@@ -5,7 +5,9 @@ import ExternalImage from "@components/misc/ExternalImage.astro";
 import type { AppDiary, AppDiaryImage } from "@/types/app";
 import type { AuthorBundleItem } from "@/server/api/v1/shared/author-cache";
 import { buildPublicAssetUrl } from "@/server/directus-auth";
+import { getResolvedSiteSettings } from "@/server/site-settings/service";
 import { resolveAuthorIdentity } from "@/utils/author-identity";
+import { buildSiteDateFormatContext, formatSiteDate } from "@/utils/date-utils";
 
 interface Props {
   class?: string;
@@ -20,6 +22,9 @@ interface Props {
 
 const { entry, username } = Astro.props;
 const className = Astro.props.class;
+const resolvedSiteSettings =
+  Astro.locals.siteSettings ?? (await getResolvedSiteSettings());
+const siteDateContext = buildSiteDateFormatContext(resolvedSiteSettings);
 
 const {
   id,
@@ -54,10 +59,8 @@ const excerpt =
 
 const publishedDate = date_created
   ? (() => {
-      const d = new Date(date_created);
-      return !Number.isNaN(d.getTime())
-        ? `${d.getFullYear()}/${String(d.getMonth() + 1).padStart(2, "0")}/${String(d.getDate()).padStart(2, "0")}`
-        : "1970/01/01";
+      const formattedDate = formatSiteDate(date_created, siteDateContext);
+      return formattedDate || "1970/01/01";
     })()
   : "1970/01/01";
 

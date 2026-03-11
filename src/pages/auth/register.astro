@@ -19,6 +19,10 @@ import {
   buildRegisterI18n,
   buildRegistrationStatusMeta,
 } from "@/utils/register-i18n";
+import {
+  buildSiteDateFormatContext,
+  formatSiteDateTime,
+} from "@/utils/date-utils";
 import RegisterFormSkeleton from "@/components/auth/RegisterFormSkeleton.astro";
 import RegisterAvatarCropModal from "@/components/auth/RegisterAvatarCropModal.astro";
 
@@ -26,6 +30,7 @@ export const prerender = false;
 
 const resolvedSettings =
   Astro.locals.siteSettings ?? (await getResolvedSiteSettings());
+const siteDateContext = buildSiteDateFormatContext(resolvedSettings);
 const registerEnabled = Boolean(
   resolvedSettings.settings.auth?.register_enabled,
 );
@@ -107,6 +112,14 @@ const currentRegistrationAvatar = currentRegistrationAvatarFile
     })
   : "";
 const currentRegistrationRejectReason = currentRegistration?.reject_reason;
+const currentRegistrationCreatedAt = formatSiteDateTime(
+  currentRegistration?.date_created,
+  siteDateContext,
+);
+const currentRegistrationReviewedAt = formatSiteDateTime(
+  currentRegistration?.reviewed_at,
+  siteDateContext,
+);
 const currentRegistrationReviewReason =
   currentRegistration?.request_status === "rejected"
     ? String(currentRegistrationRejectReason || "").trim()
@@ -175,7 +188,7 @@ const registerI18n = buildRegisterI18n();
                     </p>
                     <p class="text-sm text-75">
                       {i18n(I18nKey.authRegisterSubmittedAtLabel)}：
-                      {currentRegistration.date_created || "-"}
+                      {currentRegistrationCreatedAt || "-"}
                     </p>
                   </div>
                 </div>
@@ -228,7 +241,7 @@ const registerI18n = buildRegisterI18n();
                     {i18n(I18nKey.authRegisterReviewedAtLabel)}
                   </p>
                   <p class="text-90 break-all">
-                    {currentRegistration.reviewed_at || "-"}
+                    {currentRegistrationReviewedAt || "-"}
                   </p>
                 </div>
                 <div class="rounded-lg border border-(--line-divider) bg-black/5 dark:bg-white/5 px-3 py-2.5 col-span-2">

@@ -7,6 +7,7 @@ import type {
     SiteSettingsPayload,
 } from "@/types/site-settings";
 import type { JsonObject } from "@/types/json";
+import { canonicalizeSiteTimeZone } from "@/utils/date-utils";
 import {
     createOne,
     readMany,
@@ -40,6 +41,35 @@ import { requireAdmin } from "../shared";
 
 const ABOUT_ARTICLE_SLUG = "about";
 const ABOUT_FALLBACK_TITLE = "关于我们";
+
+function isObjectRecord(value: unknown): value is Record<string, unknown> {
+    return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function validateSiteTimeZonePatch(body: unknown): string | null {
+    if (!isObjectRecord(body) || !isObjectRecord(body.site)) {
+        return null;
+    }
+    if (!Object.prototype.hasOwnProperty.call(body.site, "timeZone")) {
+        return null;
+    }
+    const rawTimeZone = body.site.timeZone;
+    if (
+        rawTimeZone === null ||
+        rawTimeZone === undefined ||
+        String(rawTimeZone).trim() === ""
+    ) {
+        return null;
+    }
+    if (typeof rawTimeZone !== "string") {
+        throw new Error("站点时区无效");
+    }
+    const normalized = canonicalizeSiteTimeZone(rawTimeZone);
+    if (!normalized) {
+        throw new Error("站点时区无效");
+    }
+    return normalized;
+}
 
 async function readSiteSettingsRowMeta(): Promise<{
     id: string;
@@ -321,6 +351,22 @@ async function handleAdminSitePatch(
     adminUserId: string,
 ): Promise<Response> {
     const body = await parseJsonBody(context.request);
+    try {
+        const normalizedTimeZone = validateSiteTimeZonePatch(body);
+        if (
+            normalizedTimeZone &&
+            isObjectRecord(body) &&
+            isObjectRecord(body.site)
+        ) {
+            body.site.timeZone = normalizedTimeZone;
+        }
+    } catch (error) {
+        return fail(
+            error instanceof Error ? error.message : "站点时区无效",
+            400,
+            "INVALID_TIME_ZONE",
+        );
+    }
     const patch = body as Partial<EditableSiteSettings>;
     const current = await getResolvedSiteSettings();
     const settings = resolveSiteSettingsPayload(patch, current.settings);
