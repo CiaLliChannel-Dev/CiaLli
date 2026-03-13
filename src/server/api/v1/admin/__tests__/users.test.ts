@@ -21,7 +21,7 @@ vi.mock("@/server/api/v1/shared", async (importOriginal) => {
 vi.mock("@/server/directus/client", () => ({
     createOne: vi.fn(),
     deleteDirectusUser: vi.fn(),
-    deleteOne: vi.fn(),
+    deleteOne: vi.fn().mockResolvedValue(undefined),
     listDirectusUsers: vi.fn(),
     readMany: vi.fn(),
     readOneById: vi.fn(),
@@ -32,6 +32,15 @@ vi.mock("@/server/directus/client", () => ({
     updateDirectusFileMetadata: vi.fn(),
     updateDirectusUser: vi.fn(),
     updateOne: vi.fn(),
+}));
+
+vi.mock("@/server/repositories/directus/scope", () => ({
+    withServiceRepositoryContext: vi.fn(
+        async (task: () => Promise<unknown>) => await task(),
+    ),
+    withUserRepositoryContext: vi.fn(
+        async (_token: string, task: () => Promise<unknown>) => await task(),
+    ),
 }));
 
 vi.mock("@/server/auth/directus-registry", () => ({
@@ -71,14 +80,44 @@ vi.mock("@/server/api/v1/admin/users-helpers", () => ({
 
 import { requireAdmin } from "@/server/api/v1/shared";
 import { loadDirectusAccessRegistry } from "@/server/auth/directus-registry";
-import { readMany, readOneById, updateOne } from "@/server/directus/client";
+import {
+    deleteDirectusUser,
+    readMany,
+    readOneById,
+    updateOne,
+} from "@/server/directus/client";
 import { handleAdminUsers } from "@/server/api/v1/admin/users";
+import {
+    cleanupOwnedOrphanDirectusFiles,
+    collectReferencedDirectusFileIds,
+    collectUserOwnedFileIds,
+} from "@/server/api/v1/shared/file-cleanup";
+import {
+    clearBlockingUserReferences,
+    loadReferencedFilesByUser,
+    nullifyReferencedFileOwnership,
+} from "@/server/api/v1/admin/users-helpers";
 
 const mockedRequireAdmin = vi.mocked(requireAdmin);
 const mockedLoadDirectusAccessRegistry = vi.mocked(loadDirectusAccessRegistry);
+const mockedDeleteDirectusUser = vi.mocked(deleteDirectusUser);
 const mockedReadMany = vi.mocked(readMany);
 const mockedReadOneById = vi.mocked(readOneById);
 const mockedUpdateOne = vi.mocked(updateOne);
+const mockedCleanupOwnedOrphanDirectusFiles = vi.mocked(
+    cleanupOwnedOrphanDirectusFiles,
+);
+const mockedCollectReferencedDirectusFileIds = vi.mocked(
+    collectReferencedDirectusFileIds,
+);
+const mockedCollectUserOwnedFileIds = vi.mocked(collectUserOwnedFileIds);
+const mockedClearBlockingUserReferences = vi.mocked(
+    clearBlockingUserReferences,
+);
+const mockedLoadReferencedFilesByUser = vi.mocked(loadReferencedFilesByUser);
+const mockedNullifyReferencedFileOwnership = vi.mocked(
+    nullifyReferencedFileOwnership,
+);
 
 function createDirectusUser(overrides: Partial<AppUser> = {}): AppUser {
     return {
@@ -176,5 +215,118 @@ describe("PATCH /admin/users/:id", () => {
         }>(response);
         expect(body.ok).toBe(true);
         expect(body.profile.display_name).toBe("Updated User");
+    });
+});
+
+describe("DELETE /admin/users/:id", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockedRequireAdmin.mockResolvedValue({
+            access: {
+                isAdmin: true,
+                user: mockSessionUser({ id: "admin-1" }),
+            },
+            accessToken: "admin-access-token",
+        } as never);
+        mockedLoadDirectusAccessRegistry.mockResolvedValue({
+            policyNameById: new Map<string, string>(),
+            policyIdByName: new Map<string, string>(),
+            roleIdByName: new Map<string, string>(),
+        } as never);
+        mockedCleanupOwnedOrphanDirectusFiles
+            .mockResolvedValueOnce(["file-orphan"])
+            .mockResolvedValueOnce(["file-referenced"]);
+        mockedCollectReferencedDirectusFileIds.mockResolvedValue(
+            new Set(["file-referenced"]),
+        );
+        mockedCollectUserOwnedFileIds.mockResolvedValue([
+            "file-orphan",
+            "file-referenced",
+        ]);
+        mockedLoadReferencedFilesByUser.mockResolvedValue([
+            {
+                id: "file-referenced",
+                uploaded_by: "user-2",
+                modified_by: null,
+            },
+        ]);
+    });
+
+    it("先清理文件与阻塞引用，再删除用户", async () => {
+        const actingAdmin = createDirectusUser({
+            id: "admin-1",
+            email: "admin@example.com",
+            role: {
+                id: "role-site-admin",
+                name: DIRECTUS_ROLE_NAME.siteAdmin,
+            },
+        });
+        const targetUser = createDirectusUser();
+
+        mockedReadOneById
+            .mockResolvedValueOnce(actingAdmin as never)
+            .mockResolvedValueOnce(targetUser as never);
+        mockedReadMany
+            .mockResolvedValueOnce([{ id: "profile-2" }] as never)
+            .mockResolvedValueOnce([
+                { id: "request-2", avatar_file: "file-referenced" },
+            ] as never);
+
+        const ctx = createMockAPIContext({
+            method: "DELETE",
+            url: "http://localhost:4321/api/v1/admin/users/user-2",
+            params: {
+                segments: "admin/users/user-2",
+            },
+        });
+
+        const response = await handleAdminUsers(ctx as unknown as APIContext, [
+            "users",
+            "user-2",
+        ]);
+
+        expect(response.status).toBe(200);
+        expect(mockedCleanupOwnedOrphanDirectusFiles).toHaveBeenNthCalledWith(
+            1,
+            {
+                candidateFileIds: ["file-orphan"],
+                ownerUserIds: ["user-2"],
+            },
+        );
+        expect(mockedNullifyReferencedFileOwnership).toHaveBeenCalledWith(
+            [
+                {
+                    id: "file-referenced",
+                    uploaded_by: "user-2",
+                    modified_by: null,
+                },
+            ],
+            "user-2",
+        );
+        expect(mockedClearBlockingUserReferences).toHaveBeenCalledWith(
+            "user-2",
+        );
+        expect(mockedDeleteDirectusUser).toHaveBeenCalledWith("user-2");
+        expect(mockedCleanupOwnedOrphanDirectusFiles).toHaveBeenNthCalledWith(
+            2,
+            {
+                candidateFileIds: ["file-orphan", "file-referenced"],
+                ownerUserIds: ["user-2"],
+            },
+        );
+
+        expect(
+            mockedCleanupOwnedOrphanDirectusFiles.mock.invocationCallOrder[0],
+        ).toBeLessThan(
+            mockedNullifyReferencedFileOwnership.mock.invocationCallOrder[0],
+        );
+        expect(
+            mockedNullifyReferencedFileOwnership.mock.invocationCallOrder[0],
+        ).toBeLessThan(
+            mockedClearBlockingUserReferences.mock.invocationCallOrder[0],
+        );
+        expect(
+            mockedClearBlockingUserReferences.mock.invocationCallOrder[0],
+        ).toBeLessThan(mockedDeleteDirectusUser.mock.invocationCallOrder[0]);
     });
 });

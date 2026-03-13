@@ -74,6 +74,14 @@ type DirectusUserPolicyAssignment = {
     policy: string;
 };
 
+type BatchCollectionPath =
+    | "/comments"
+    | "/files"
+    | "/notifications"
+    | "/users"
+    | "/versions"
+    | `/items/${string}`;
+
 const SAFE_DIARY_FIELDS = [
     "id",
     "short_id",
@@ -242,6 +250,25 @@ function parseItemArrayResponse<T>(input: unknown): T[] {
         return ((input as { data: unknown[] }).data ?? []) as T[];
     }
     return [];
+}
+
+function resolveBatchCollectionPath(collection: string): BatchCollectionPath {
+    if (collection === "directus_comments") {
+        return "/comments";
+    }
+    if (collection === "directus_files") {
+        return "/files";
+    }
+    if (collection === "directus_notifications") {
+        return "/notifications";
+    }
+    if (collection === "directus_users") {
+        return "/users";
+    }
+    if (collection === "directus_versions") {
+        return "/versions";
+    }
+    return `/items/${encodeURIComponent(collection)}`;
 }
 
 export async function readMany<K extends keyof DirectusSchema>(
@@ -674,10 +701,11 @@ export async function updateManyItemsByFilter(params: {
     filter: JsonObject;
     data: JsonObject;
 }): Promise<void> {
+    const path = resolveBatchCollectionPath(params.collection);
     const rows = await executeDirectusRequest(
         `读取集合 ${params.collection} 批量更新候选`,
         customEndpoint({
-            path: `/items/${encodeURIComponent(params.collection)}`,
+            path,
             method: "GET",
             params: {
                 filter: params.filter,
@@ -697,12 +725,12 @@ export async function updateManyItemsByFilter(params: {
     await executeDirectusRequest(
         `批量更新集合 ${params.collection} 数据`,
         customEndpoint({
-            path: `/items/${encodeURIComponent(params.collection)}`,
+            path,
             method: "PATCH",
-            body: {
+            body: JSON.stringify({
                 keys,
                 data: params.data,
-            } as never,
+            }) as never,
         }),
     );
 }

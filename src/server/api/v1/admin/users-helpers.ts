@@ -41,17 +41,6 @@ async function nullifyUserReferenceField(
         ) {
             return;
         }
-        if (
-            /forbidden|permission|readonly|read-only|invalid payload|field/i.test(
-                message,
-            )
-        ) {
-            console.warn(
-                `[admin/users] skip nullify reference ${collection}.${field}:`,
-                message,
-            );
-            return;
-        }
         throw error;
     }
 }

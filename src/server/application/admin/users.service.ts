@@ -42,7 +42,10 @@ import {
 import { cacheManager } from "@/server/cache/manager";
 import { badRequest, forbidden } from "@/server/api/errors";
 import { fail, ok } from "@/server/api/response";
-import { withUserRepositoryContext } from "@/server/repositories/directus/scope";
+import {
+    withServiceRepositoryContext,
+    withUserRepositoryContext,
+} from "@/server/repositories/directus/scope";
 import { parseJsonBody, parsePagination } from "@/server/api/utils";
 import { validateBody } from "@/server/api/validate";
 import type { AdminUpdateUserInput } from "@/server/api/schemas";
@@ -607,31 +610,30 @@ async function handleUserDelete(
         throw badRequest("USER_DELETE_SELF_FORBIDDEN", "不能删除当前登录账号");
     }
 
-    const [targetUser, registry] = await Promise.all([
-        loadDirectusUserForAdmin(userId),
-        loadDirectusAccessRegistry(),
-    ]);
-    if (!targetUser) {
-        return fail("用户不存在", 404);
-    }
+    return await withServiceRepositoryContext(async () => {
+        const [targetUser, registry] = await Promise.all([
+            loadDirectusUserForAdmin(userId),
+            loadDirectusAccessRegistry(),
+        ]);
+        if (!targetUser) {
+            return fail("用户不存在", 404);
+        }
 
-    const actingSnapshot = extractSnapshot(actingAdminUser, registry);
-    const targetSnapshot = extractSnapshot(targetUser, registry);
-    assertEditableBySiteAdmin({
-        actingIsPlatformAdmin: actingSnapshot.isPlatformAdmin,
-        targetIsPlatformAdmin: targetSnapshot.isPlatformAdmin,
-    });
+        const actingSnapshot = extractSnapshot(actingAdminUser, registry);
+        const targetSnapshot = extractSnapshot(targetUser, registry);
+        assertEditableBySiteAdmin({
+            actingIsPlatformAdmin: actingSnapshot.isPlatformAdmin,
+            targetIsPlatformAdmin: targetSnapshot.isPlatformAdmin,
+        });
 
-    const candidateFileIds = await collectCandidateFileIds(userId);
-    const referencedFileIds =
-        await collectReferencedDirectusFileIds(candidateFileIds);
-    const removableFileIds = candidateFileIds.filter(
-        (fileId) => !referencedFileIds.has(fileId),
-    );
-    const referencedFilesPromise = loadReferencedFilesByUser(userId);
+        const candidateFileIds = await collectCandidateFileIds(userId);
+        const referencedFileIds =
+            await collectReferencedDirectusFileIds(candidateFileIds);
+        const removableFileIds = candidateFileIds.filter(
+            (fileId) => !referencedFileIds.has(fileId),
+        );
 
-    const [profiles, registrationRequests, referencedFiles] = await Promise.all(
-        [
+        const [profiles, registrationRequests] = await Promise.all([
             readMany("app_user_profiles", {
                 filter: { user_id: { _eq: userId } } as JsonObject,
                 limit: 10,
@@ -647,44 +649,57 @@ async function handleUserDelete(
                 limit: 200,
                 fields: ["id", "avatar_file"],
             }),
-            referencedFilesPromise,
-        ],
-    );
+        ]);
 
-    for (const profile of profiles) {
-        await deleteOne("app_user_profiles", profile.id).catch((error) => {
+        for (const profile of profiles) {
+            await deleteOne("app_user_profiles", profile.id).catch((error) => {
+                console.warn(
+                    "[admin/users] 删除 profile 失败, profileId:",
+                    profile.id,
+                    error,
+                );
+            });
+        }
+        await nullifyRegistrationRequestAvatars(registrationRequests).catch(
+            (error) => {
+                console.warn(
+                    "[admin/users] 清空注册请求头像引用失败, userId:",
+                    userId,
+                    error,
+                );
+            },
+        );
+        // 先删明确孤立的文件，再清空剩余文件归属，避免 directus_files 外键阻塞用户删除。
+        await cleanupOwnedOrphanDirectusFiles({
+            candidateFileIds: removableFileIds,
+            ownerUserIds: [userId],
+        }).catch((error) => {
             console.warn(
-                "[admin/users] 删除 profile 失败, profileId:",
-                profile.id,
-                error,
-            );
-        });
-    }
-    await nullifyRegistrationRequestAvatars(registrationRequests).catch(
-        (error) => {
-            console.warn(
-                "[admin/users] 清空注册请求头像引用失败, userId:",
+                "[admin/users] 预清理孤立文件失败, userId:",
                 userId,
                 error,
             );
-        },
-    );
-    await nullifyReferencedFileOwnership(
-        referencedFiles.filter((file) => referencedFileIds.has(file.id)),
-        userId,
-    );
-    await clearBlockingUserReferences(userId);
-    await deleteDirectusUser(userId);
-    await cleanupOwnedOrphanDirectusFiles({
-        candidateFileIds: removableFileIds,
-        ownerUserIds: [userId],
-    }).catch((error) => {
-        console.warn("[admin/users] 清理孤立文件失败, userId:", userId, error);
+        });
+
+        const remainingFiles = await loadReferencedFilesByUser(userId);
+        await nullifyReferencedFileOwnership(remainingFiles, userId);
+        await clearBlockingUserReferences(userId);
+        await deleteDirectusUser(userId);
+        await cleanupOwnedOrphanDirectusFiles({
+            candidateFileIds,
+            ownerUserIds: [userId],
+        }).catch((error) => {
+            console.warn(
+                "[admin/users] 清理孤立文件失败, userId:",
+                userId,
+                error,
+            );
+        });
+        invalidateAuthorCache(userId);
+        invalidateOfficialSidebarCache();
+        invalidateDirectusAccessRegistry();
+        return ok({ id: userId, deleted: true });
     });
-    invalidateAuthorCache(userId);
-    invalidateOfficialSidebarCache();
-    invalidateDirectusAccessRegistry();
-    return ok({ id: userId, deleted: true });
 }
 
 async function handleResetPassword(
@@ -715,12 +730,21 @@ export async function handleAdminUsers(
         return required.response;
     }
 
-    const actingAdminUser = await loadDirectusUserForAdmin(
-        required.access.user.id,
+    const actingAdminUser = await withServiceRepositoryContext(async () =>
+        loadDirectusUserForAdmin(required.access.user.id),
     );
     if (!actingAdminUser) {
         return fail("管理员用户不存在", 404);
     }
+
+    if (segments.length === 2 && context.request.method === "DELETE") {
+        const userId = parseRouteId(segments[1]);
+        if (!userId) {
+            return fail("缺少用户 ID", 400);
+        }
+        return handleUserDelete(userId, actingAdminUser);
+    }
+
     return await withUserRepositoryContext(required.accessToken, async () => {
         if (segments.length === 1) {
             if (context.request.method === "GET") {
@@ -738,9 +762,6 @@ export async function handleAdminUsers(
             }
             if (context.request.method === "PATCH") {
                 return handleUserPatch(context, userId, actingAdminUser);
-            }
-            if (context.request.method === "DELETE") {
-                return handleUserDelete(userId, actingAdminUser);
             }
         }
 
