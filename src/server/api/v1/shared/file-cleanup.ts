@@ -249,8 +249,15 @@ async function collectReferencedIdsInSiteSettings(
         return referenced;
     }
     const rows = await readMany("app_site_settings", {
+        filter: {
+            _and: [
+                { key: { _eq: "default" } },
+                { status: { _eq: "published" } },
+            ],
+        } as JsonObject,
         fields: ["settings"],
-        limit: 20,
+        sort: ["-date_updated", "-date_created"],
+        limit: 1,
     });
     for (const row of rows as Array<Record<string, unknown>>) {
         collectReferencedAssetIdsFromUnknown(

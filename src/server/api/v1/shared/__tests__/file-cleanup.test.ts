@@ -116,7 +116,12 @@ describe("cleanupOwnedOrphanDirectusFiles", () => {
     it("不会删除不属于当前用户的候选文件", async () => {
         mockedReadMany.mockImplementation((async (
             collection: string,
-            query?: { fields?: string[]; filter?: Record<string, unknown> },
+            query?: {
+                fields?: string[];
+                filter?: Record<string, unknown>;
+                limit?: number;
+                sort?: string[];
+            },
         ) => {
             if (
                 collection === "directus_files" &&
@@ -215,5 +220,60 @@ describe("cleanupOwnedOrphanDirectusFiles", () => {
         expect(mockedDeleteDirectusFile).toHaveBeenNthCalledWith(1, UUID_A);
         expect(mockedDeleteDirectusFile).toHaveBeenNthCalledWith(2, UUID_B);
         expect(mockedRunWithDirectusServiceAccess).toHaveBeenCalled();
+    });
+
+    it("仅以当前生效站点设置判断引用，忽略历史记录中的旧引用", async () => {
+        mockedReadMany.mockImplementation((async (
+            collection: string,
+            query?: {
+                fields?: string[];
+                filter?: Record<string, unknown>;
+                limit?: number;
+                sort?: string[];
+            },
+        ) => {
+            if (
+                collection === "directus_files" &&
+                query?.fields?.includes("app_owner_user_id")
+            ) {
+                return [
+                    {
+                        id: UUID_A,
+                        app_owner_user_id: "admin-1",
+                        uploaded_by: "admin-1",
+                    },
+                ] as never;
+            }
+            if (collection === "app_site_settings") {
+                expect(query?.limit).toBe(1);
+                expect(query?.sort).toEqual(["-date_updated", "-date_created"]);
+                expect(query?.filter).toEqual({
+                    _and: [
+                        { key: { _eq: "default" } },
+                        { status: { _eq: "published" } },
+                    ],
+                });
+                return [
+                    {
+                        settings: {
+                            banner: {
+                                src: [
+                                    "/api/v1/public/assets/00000000-0000-0000-0000-000000000000",
+                                ],
+                            },
+                        },
+                    },
+                ] as never;
+            }
+            return [] as never;
+        }) as typeof readMany);
+
+        const deleted = await cleanupOwnedOrphanDirectusFiles({
+            candidateFileIds: [UUID_A],
+            ownerUserIds: ["admin-1"],
+        });
+
+        expect(deleted).toEqual([UUID_A]);
+        expect(mockedDeleteDirectusFile).toHaveBeenCalledWith(UUID_A);
     });
 });
