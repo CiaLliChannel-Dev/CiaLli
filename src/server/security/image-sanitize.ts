@@ -57,10 +57,7 @@ export async function sanitizeImage(
         }
         return Buffer.from(result);
     } catch (error) {
-        console.warn(
-            "[image-sanitize] failed to sanitize, returning original:",
-            error,
-        );
-        return buffer;
+        console.warn("[image-sanitize] failed to sanitize:", error);
+        throw new Error("图片清理失败", { cause: error });
     }
 }

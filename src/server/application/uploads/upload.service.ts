@@ -97,6 +97,7 @@ async function processUploadBuffer(params: {
     const dims = await validateImageDimensions(
         params.initialBuffer,
         params.purpose,
+        magic.detectedMime,
     );
     if (!dims.valid) {
         return {
@@ -109,9 +110,17 @@ async function processUploadBuffer(params: {
         };
     }
 
-    const sanitized = Buffer.from(
-        await sanitizeImage(params.initialBuffer, magic.detectedMime),
-    );
+    let sanitized: Buffer;
+    try {
+        sanitized = Buffer.from(
+            await sanitizeImage(params.initialBuffer, magic.detectedMime),
+        );
+    } catch {
+        return {
+            ok: false,
+            response: fail("图片处理失败，请检查文件是否损坏", 422),
+        };
+    }
 
     if (params.targetFormat === "ico") {
         try {
@@ -149,7 +158,7 @@ async function processUploadBuffer(params: {
         file: {
             buffer: sanitized,
             fileName: params.file.name,
-            mime: params.file.type,
+            mime: magic.detectedMime!,
         },
     };
 }

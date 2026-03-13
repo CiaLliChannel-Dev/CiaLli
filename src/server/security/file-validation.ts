@@ -27,8 +27,6 @@ const SIGNATURES: MimeSignature[] = [
         offset: 0,
         bytes: [0x00, 0x00, 0x01, 0x00],
     },
-    // AVIF: ftyp box — 字节 4-7 为 "ftyp"
-    { mime: "image/avif", offset: 4, bytes: [0x66, 0x74, 0x79, 0x70] },
 ];
 
 /** 各 purpose 允许的 MIME 类型 */
@@ -79,6 +77,25 @@ function detectMime(header: Uint8Array): string | null {
         }
         if (match) return sig.mime;
     }
+
+    // ISO BMFF 家族需要额外校验 major brand 以区分 AVIF / HEIC / MP4
+    if (header.length >= 12) {
+        const isFtyp =
+            header[4] === 0x66 &&
+            header[5] === 0x74 &&
+            header[6] === 0x79 &&
+            header[7] === 0x70;
+        if (isFtyp) {
+            const brand = String.fromCharCode(
+                header[8],
+                header[9],
+                header[10],
+                header[11],
+            );
+            if (brand === "avif" || brand === "avis") return "image/avif";
+        }
+    }
+
     return null;
 }
 
@@ -115,6 +132,7 @@ const DIMENSION_LIMITS: Record<UploadPurpose, DimensionLimit> = {
 export async function validateImageDimensions(
     buffer: Buffer,
     purpose: UploadPurpose,
+    detectedMime: string | null,
 ): Promise<{ valid: boolean; message?: string }> {
     const limit = DIMENSION_LIMITS[purpose];
     try {
@@ -129,7 +147,8 @@ export async function validateImageDimensions(
         }
         return { valid: true };
     } catch {
-        // sharp 无法解析的文件（如 ICO），跳过尺寸检查
-        return { valid: true };
+        // ICO 不被 sharp 支持，特例放行
+        if (detectedMime === "image/x-icon") return { valid: true };
+        return { valid: false, message: "无法解析图片尺寸，文件可能已损坏" };
     }
 }
