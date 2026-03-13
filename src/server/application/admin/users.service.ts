@@ -652,9 +652,23 @@ async function handleUserDelete(
     );
 
     for (const profile of profiles) {
-        await deleteOne("app_user_profiles", profile.id);
+        await deleteOne("app_user_profiles", profile.id).catch((error) => {
+            console.warn(
+                "[admin/users] 删除 profile 失败, profileId:",
+                profile.id,
+                error,
+            );
+        });
     }
-    await nullifyRegistrationRequestAvatars(registrationRequests);
+    await nullifyRegistrationRequestAvatars(registrationRequests).catch(
+        (error) => {
+            console.warn(
+                "[admin/users] 清空注册请求头像引用失败, userId:",
+                userId,
+                error,
+            );
+        },
+    );
     await nullifyReferencedFileOwnership(
         referencedFiles.filter((file) => referencedFileIds.has(file.id)),
         userId,
@@ -664,6 +678,8 @@ async function handleUserDelete(
     await cleanupOwnedOrphanDirectusFiles({
         candidateFileIds: removableFileIds,
         ownerUserIds: [userId],
+    }).catch((error) => {
+        console.warn("[admin/users] 清理孤立文件失败, userId:", userId, error);
     });
     invalidateAuthorCache(userId);
     invalidateOfficialSidebarCache();

@@ -151,18 +151,31 @@ async function activateManagedUser(params: {
         directusPayload.avatar = params.avatarFile;
     }
     await updateDirectusUser(params.pendingUserId, directusPayload);
-    await syncDirectusUserPolicies({
-        userId: params.pendingUserId,
-        currentAssignments: [],
-        desiredPolicyIds,
-    });
-
-    const profile = await ensureManagedProfile({
-        userId: params.pendingUserId,
-        requestedUsername: params.requestedUsername,
-        displayName: params.displayName,
-        avatarFile: params.avatarFile,
-    });
+    let profile: AppProfile;
+    try {
+        await syncDirectusUserPolicies({
+            userId: params.pendingUserId,
+            currentAssignments: [],
+            desiredPolicyIds,
+        });
+        profile = await ensureManagedProfile({
+            userId: params.pendingUserId,
+            requestedUsername: params.requestedUsername,
+            displayName: params.displayName,
+            avatarFile: params.avatarFile,
+        });
+    } catch (error) {
+        await updateDirectusUser(params.pendingUserId, {
+            status: "draft",
+        }).catch((rollbackError) => {
+            console.error(
+                "[registration-approve] 补偿回退用户状态失败, userId:",
+                params.pendingUserId,
+                rollbackError,
+            );
+        });
+        throw error;
+    }
 
     const permissions = buildPermissionsFromDirectus({
         roleName: targetRoleName,
@@ -310,6 +323,12 @@ async function handleRegistrationApprove(
             uploaded_by: created.user.id,
             app_owner_user_id: created.user.id,
             app_visibility: "public",
+        }).catch((error) => {
+            console.warn(
+                "[registration-approve] 更新头像文件元数据失败, fileId:",
+                registrationAvatarFileId,
+                error,
+            );
         });
     }
 
@@ -324,7 +343,20 @@ async function handleRegistrationApprove(
             approved_user_id: created.user.id,
             reject_reason: null,
         },
-    );
+    ).catch((error) => {
+        console.error(
+            "[registration-approve] 更新申请记录状态失败, requestId:",
+            target.id,
+            "userId:",
+            created.user.id,
+            error,
+        );
+        return {
+            ...target,
+            request_status: "approved" as const,
+            approved_user_id: created.user.id,
+        };
+    });
     return ok({
         item: updated,
         user: created.user,

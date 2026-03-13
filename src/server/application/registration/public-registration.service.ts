@@ -243,14 +243,27 @@ export async function createPublicRegistration(
         memberRoleId,
     });
 
-    return await createRegistrationRequestItem({
-        email,
-        username,
-        displayName,
-        avatarFile,
-        registrationReason,
-        pendingUserId: pendingUser.id,
-    });
+    try {
+        return await createRegistrationRequestItem({
+            email,
+            username,
+            displayName,
+            avatarFile,
+            registrationReason,
+            pendingUserId: pendingUser.id,
+        });
+    } catch (error) {
+        await deletePendingRegistrationUser(pendingUser.id).catch(
+            (cleanupError) => {
+                console.error(
+                    "[registration] 补偿删除 draft 用户失败, pendingUserId:",
+                    pendingUser.id,
+                    cleanupError,
+                );
+            },
+        );
+        throw error;
+    }
 }
 
 export async function cancelPublicRegistration(params: {

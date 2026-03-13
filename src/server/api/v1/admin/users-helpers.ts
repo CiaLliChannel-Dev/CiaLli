@@ -135,9 +135,13 @@ export async function nullifyRegistrationRequestAvatars(
     registrationRequests: Array<{ id: string; avatar_file?: unknown }>,
 ): Promise<void> {
     for (const request of registrationRequests) {
-        if (!request.avatar_file) {
-            continue;
-        }
-        await updateRegistrationRequestAvatar(request.id);
+        if (!request.avatar_file) continue;
+        await updateRegistrationRequestAvatar(request.id).catch((error) => {
+            console.warn(
+                "[admin/users] 清空注册请求头像引用失败, requestId:",
+                request.id,
+                error,
+            );
+        });
     }
 }
