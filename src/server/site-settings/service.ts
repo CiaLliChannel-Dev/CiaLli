@@ -44,6 +44,7 @@ type SiteSettingsFailureFallback = {
 const SITE_SETTINGS_FAILURE_BACKOFF_MS = 5_000;
 
 let recentFailureFallback: SiteSettingsFailureFallback | null = null;
+let lastKnownGood: ResolvedSiteSettings | null = null;
 
 function cloneSettings(settings: SiteSettingsPayload): SiteSettingsPayload {
     return structuredClone(settings);
@@ -228,6 +229,7 @@ const loadResolvedSiteSettingsSingleFlight = createSingleFlightRunner(
                     resolved: defaultResolved,
                     updatedAt: null,
                 };
+                lastKnownGood = defaultResolved;
                 recentFailureFallback = null;
                 void cacheManager.set("site-settings", "default", value);
                 return defaultResolved;
@@ -245,14 +247,16 @@ const loadResolvedSiteSettingsSingleFlight = createSingleFlightRunner(
                 resolved,
                 updatedAt: row.updatedAt,
             };
+            lastKnownGood = resolved;
             recentFailureFallback = null;
             void cacheManager.set("site-settings", "default", value);
             return resolved;
         } catch (error) {
             // 短暂上游抖动时，使用短 TTL 退避，避免多个实例同时击穿 Directus。
             console.error("[site-settings] 拉取设置失败，进入短暂退避:", error);
-            writeRecentFailureFallback(defaultResolved);
-            return defaultResolved;
+            const fallbackValue = lastKnownGood ?? defaultResolved;
+            writeRecentFailureFallback(fallbackValue);
+            return fallbackValue;
         }
     },
     () => "default",
@@ -264,6 +268,7 @@ export async function getResolvedSiteSettings(): Promise<ResolvedSiteSettings> {
         "default",
     );
     if (cached) {
+        lastKnownGood = cached.resolved;
         return cached.resolved;
     }
 

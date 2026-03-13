@@ -138,4 +138,31 @@ describe("site-settings/service", () => {
         expect(first.settings.site.title).toBe(second.settings.site.title);
         expect(readManyMock).toHaveBeenCalledTimes(1);
     });
+
+    it("回源失败后使用最后一次成功值而非默认值", async () => {
+        const customTitle = "My Custom Site";
+        readManyMock
+            .mockResolvedValueOnce([
+                {
+                    settings: { site: { title: customTitle } },
+                    date_updated: "2026-03-11T00:00:00.000Z",
+                    date_created: "2026-03-10T00:00:00.000Z",
+                },
+            ])
+            .mockRejectedValue(new Error("fetch failed"));
+
+        const { getResolvedSiteSettings } =
+            await import("@/server/site-settings/service");
+
+        // 第一次调用：成功加载自定义设置
+        const first = await getResolvedSiteSettings();
+        expect(first.settings.site.title).toBe(customTitle);
+
+        // 第二次调用：回源失败，应返回最后一次成功值而非默认值
+        const second = await getResolvedSiteSettings();
+        expect(second.settings.site.title).toBe(customTitle);
+        expect(second.settings.site.title).not.toBe(
+            defaultSiteSettings.site.title,
+        );
+    });
 });
