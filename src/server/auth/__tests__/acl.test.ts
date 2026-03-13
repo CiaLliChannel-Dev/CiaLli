@@ -10,6 +10,7 @@ vi.mock("@/server/directus/client", () => ({
     createOne: vi.fn(),
     readMany: vi.fn(),
     updateOne: vi.fn(),
+    runWithDirectusServiceAccess: vi.fn((task: () => unknown) => task()),
 }));
 
 import { readMany } from "@/server/directus/client";

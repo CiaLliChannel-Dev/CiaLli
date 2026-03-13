@@ -2,7 +2,10 @@ import { cacheManager } from "@/server/cache/manager";
 import { hashParams } from "@/server/cache/key-utils";
 import { permalinkConfig } from "@/config";
 import { getAuthorBundle } from "@/server/api/v1/shared/author-cache";
-import { readMany } from "@/server/directus/client";
+import {
+    readMany,
+    runWithDirectusServiceAccess,
+} from "@/server/directus/client";
 import { createSingleFlightRunner } from "@/server/utils/single-flight";
 import type { JsonObject } from "@/types/json";
 import { initPostIdMap } from "@/utils/permalink-utils";
@@ -388,65 +391,71 @@ export function mixHomeFeedCandidates(
 export async function buildHomeFeed(
     options: HomeFeedBuildOptions = {},
 ): Promise<HomeFeedBuildResult> {
-    const viewerId = normalizeIdentity(options.viewerId || "") || null;
-    const outputLimit = normalizePositiveInt(
-        options.outputLimit,
-        DEFAULT_OUTPUT_LIMIT,
-        DEFAULT_OUTPUT_LIMIT,
-    );
-    const limit = normalizePositiveInt(options.limit, outputLimit, outputLimit);
-    const articleCandidateLimit = normalizePositiveInt(
-        options.articleCandidateLimit,
-        DEFAULT_ARTICLE_CANDIDATE_LIMIT,
-        DEFAULT_ARTICLE_CANDIDATE_LIMIT,
-    );
-    const diaryCandidateLimit = normalizePositiveInt(
-        options.diaryCandidateLimit,
-        DEFAULT_DIARY_CANDIDATE_LIMIT,
-        DEFAULT_DIARY_CANDIDATE_LIMIT,
-    );
-    const engagementWindowHours = normalizePositiveInt(
-        options.engagementWindowHours,
-        DEFAULT_ENGAGEMENT_WINDOW_HOURS,
-        24 * 14,
-    );
-    const personalizationLookbackDays = normalizePositiveInt(
-        options.personalizationLookbackDays,
-        DEFAULT_PERSONALIZATION_LOOKBACK_DAYS,
-        365,
-    );
-    const algoVersion =
-        normalizeIdentity(options.algoVersion) || HOME_FEED_ALGO_VERSION;
-    const now = options.now ? toSafeDate(options.now) : new Date();
-    await ensurePermalinkPostIdMapInitialized();
+    return await runWithDirectusServiceAccess(async () => {
+        const viewerId = normalizeIdentity(options.viewerId || "") || null;
+        const outputLimit = normalizePositiveInt(
+            options.outputLimit,
+            DEFAULT_OUTPUT_LIMIT,
+            DEFAULT_OUTPUT_LIMIT,
+        );
+        const limit = normalizePositiveInt(
+            options.limit,
+            outputLimit,
+            outputLimit,
+        );
+        const articleCandidateLimit = normalizePositiveInt(
+            options.articleCandidateLimit,
+            DEFAULT_ARTICLE_CANDIDATE_LIMIT,
+            DEFAULT_ARTICLE_CANDIDATE_LIMIT,
+        );
+        const diaryCandidateLimit = normalizePositiveInt(
+            options.diaryCandidateLimit,
+            DEFAULT_DIARY_CANDIDATE_LIMIT,
+            DEFAULT_DIARY_CANDIDATE_LIMIT,
+        );
+        const engagementWindowHours = normalizePositiveInt(
+            options.engagementWindowHours,
+            DEFAULT_ENGAGEMENT_WINDOW_HOURS,
+            24 * 14,
+        );
+        const personalizationLookbackDays = normalizePositiveInt(
+            options.personalizationLookbackDays,
+            DEFAULT_PERSONALIZATION_LOOKBACK_DAYS,
+            365,
+        );
+        const algoVersion =
+            normalizeIdentity(options.algoVersion) || HOME_FEED_ALGO_VERSION;
+        const now = options.now ? toSafeDate(options.now) : new Date();
+        await ensurePermalinkPostIdMapInitialized();
 
-    const cacheKey = hashParams({
-        viewerId: viewerId || "guest",
-        limit,
-        outputLimit,
-        articleCandidateLimit,
-        diaryCandidateLimit,
-        engagementWindowHours,
-        personalizationLookbackDays,
-        algoVersion,
-    });
-    const cached = await cacheManager.get<HomeFeedBuildResult>(
-        "home-feed",
-        cacheKey,
-    );
-    if (cached) {
-        return hydrateHomeFeedResult(cached);
-    }
+        const cacheKey = hashParams({
+            viewerId: viewerId || "guest",
+            limit,
+            outputLimit,
+            articleCandidateLimit,
+            diaryCandidateLimit,
+            engagementWindowHours,
+            personalizationLookbackDays,
+            algoVersion,
+        });
+        const cached = await cacheManager.get<HomeFeedBuildResult>(
+            "home-feed",
+            cacheKey,
+        );
+        if (cached) {
+            return hydrateHomeFeedResult(cached);
+        }
 
-    return await buildHomeFeedSingleFlight(cacheKey, {
-        viewerId,
-        limit,
-        outputLimit,
-        articleCandidateLimit,
-        diaryCandidateLimit,
-        engagementWindowHours,
-        personalizationLookbackDays,
-        algoVersion,
-        now,
+        return await buildHomeFeedSingleFlight(cacheKey, {
+            viewerId,
+            limit,
+            outputLimit,
+            articleCandidateLimit,
+            diaryCandidateLimit,
+            engagementWindowHours,
+            personalizationLookbackDays,
+            algoVersion,
+            now,
+        });
     });
 }

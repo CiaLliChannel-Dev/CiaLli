@@ -41,11 +41,11 @@ describe("directus client scope guard", () => {
         const { readMany } = await import("@/server/directus/client");
         await expect(readMany("app_articles")).rejects.toMatchObject({
             code: "INTERNAL_ERROR",
-            message: "Directus 访问缺少 request scope",
+            message: expect.stringContaining("Directus 访问缺少 request scope"),
         });
     });
 
-    it("请求上下文内允许受控的 service 访问回退", async () => {
+    it("请求上下文内未声明显式 scope 时同样报错", async () => {
         const { readMany } = await import("@/server/directus/client");
         await expect(
             runWithRequestContext(
@@ -55,8 +55,9 @@ describe("directus client scope guard", () => {
                 },
                 async () => await readMany("app_articles", { limit: 1 }),
             ),
-        ).rejects.not.toMatchObject({
-            message: "Directus 访问缺少 request scope",
+        ).rejects.toMatchObject({
+            code: "INTERNAL_ERROR",
+            message: expect.stringContaining("Directus 访问缺少 request scope"),
         });
     });
 });

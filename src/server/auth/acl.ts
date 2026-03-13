@@ -7,7 +7,12 @@ import type {
 import type { JsonObject } from "@/types/json";
 import { conflict, forbidden } from "@/server/api/errors";
 import { cacheManager } from "@/server/cache/manager";
-import { createOne, readMany, updateOne } from "@/server/directus/client";
+import {
+    createOne,
+    readMany,
+    runWithDirectusServiceAccess,
+    updateOne,
+} from "@/server/directus/client";
 import { toAppProfileView } from "@/server/profile-view";
 import {
     buildPermissionsFromDirectus,
@@ -201,26 +206,28 @@ async function ensureProfile(user: SessionUser): Promise<AppProfile> {
 export async function getAppAccessContext(
     user: SessionUser,
 ): Promise<AppAccessContext> {
-    const profile = await ensureProfile(user);
-    const profileView = toAppProfileView(profile, {
-        avatar: user.avatarFileId ?? null,
-        description: user.description ?? null,
+    return await runWithDirectusServiceAccess(async () => {
+        const profile = await ensureProfile(user);
+        const profileView = toAppProfileView(profile, {
+            avatar: user.avatarFileId ?? null,
+            description: user.description ?? null,
+        });
+        const permissions = buildPermissionsFromDirectus({
+            roleName: user.roleName,
+            policyNames: user.policyNames,
+            isPlatformAdmin: user.isSystemAdmin,
+        });
+        const isPlatformAdmin = user.isSystemAdmin;
+        const isSiteAdmin = isSiteAdminRoleName(user.roleName);
+        return {
+            user,
+            profile: profileView,
+            permissions,
+            isAdmin: isPlatformAdmin || isSiteAdmin,
+            isSiteAdmin,
+            isPlatformAdmin,
+        };
     });
-    const permissions = buildPermissionsFromDirectus({
-        roleName: user.roleName,
-        policyNames: user.policyNames,
-        isPlatformAdmin: user.isSystemAdmin,
-    });
-    const isPlatformAdmin = user.isSystemAdmin;
-    const isSiteAdmin = isSiteAdminRoleName(user.roleName);
-    return {
-        user,
-        profile: profileView,
-        permissions,
-        isAdmin: isPlatformAdmin || isSiteAdmin,
-        isSiteAdmin,
-        isPlatformAdmin,
-    };
 }
 
 export function assertCan(
@@ -251,25 +258,27 @@ export async function updateProfileUsername(
     profileId: string,
     requested: string,
 ): Promise<string> {
-    const normalized = normalizeRequestedUsername(requested);
-    const rows = await readMany("app_user_profiles", {
-        filter: {
-            _and: [
-                { username: { _eq: normalized } },
-                { id: { _neq: profileId } },
-            ],
-        } as JsonObject,
-        limit: 1,
-        fields: ["id"],
+    return await runWithDirectusServiceAccess(async () => {
+        const normalized = normalizeRequestedUsername(requested);
+        const rows = await readMany("app_user_profiles", {
+            filter: {
+                _and: [
+                    { username: { _eq: normalized } },
+                    { id: { _neq: profileId } },
+                ],
+            } as JsonObject,
+            limit: 1,
+            fields: ["id"],
+        });
+        if (rows.length > 0) {
+            throw conflict("USERNAME_EXISTS", "用户名已存在");
+        }
+        await updateOne("app_user_profiles", profileId, {
+            username: normalized,
+        });
+        void cacheManager.invalidateByDomain("profile-viewer");
+        return normalized;
     });
-    if (rows.length > 0) {
-        throw conflict("USERNAME_EXISTS", "用户名已存在");
-    }
-    await updateOne("app_user_profiles", profileId, {
-        username: normalized,
-    });
-    void cacheManager.invalidateByDomain("profile-viewer");
-    return normalized;
 }
 
 export function normalizeTagsCsv(

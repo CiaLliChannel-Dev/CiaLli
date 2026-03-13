@@ -8,7 +8,10 @@ import {
     resolvePolicyNames,
 } from "@/server/auth/directus-access";
 import { loadDirectusAccessRegistry } from "@/server/auth/directus-registry";
-import { readOneById } from "@/server/directus/client";
+import {
+    readOneById,
+    runWithDirectusServiceAccess,
+} from "@/server/directus/client";
 import {
     DIRECTUS_ACCESS_COOKIE_NAME,
     DIRECTUS_REFRESH_COOKIE_NAME,
@@ -247,20 +250,22 @@ async function buildSessionUser(
 
 async function loadDirectusUserById(userId: string): Promise<AppUser | null> {
     try {
-        return await readOneById("directus_users", userId, {
-            fields: [
-                "id",
-                "email",
-                "first_name",
-                "last_name",
-                "description",
-                "avatar",
-                "status",
-                "role.id",
-                "role.name",
-                "policies.*",
-            ],
-        });
+        return await runWithDirectusServiceAccess(() =>
+            readOneById("directus_users", userId, {
+                fields: [
+                    "id",
+                    "email",
+                    "first_name",
+                    "last_name",
+                    "description",
+                    "avatar",
+                    "status",
+                    "role.id",
+                    "role.name",
+                    "policies.*",
+                ],
+            }),
+        );
     } catch (error) {
         console.warn(
             "[auth/session] Failed to load directus user by id",
