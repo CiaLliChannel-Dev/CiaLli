@@ -11,6 +11,7 @@ import icon from "astro-icon";
 import { systemSiteConfig } from "./src/config.ts";
 import { pluginCustomCopyButton } from "./src/plugins/expressive-code/custom-copy-button.js";
 import { pluginLanguageBadge } from "./src/plugins/expressive-code/language-badge.ts";
+import { shouldIgnoreBuildWarning } from "./src/utils/vite-build-warning-filter.ts";
 import {
     rehypePlugins,
     remarkPlugins,
@@ -131,14 +132,8 @@ export default defineConfig({
                     },
                 },
                 onwarn(warning, warn) {
-                    if (
-                        warning.message.includes(
-                            "is dynamically imported by",
-                        ) &&
-                        warning.message.includes(
-                            "but also statically imported by",
-                        )
-                    ) {
+                    // 仅收敛已确认无害的上游构建链噪音，其他 warning 继续原样透传。
+                    if (shouldIgnoreBuildWarning(warning)) {
                         return;
                     }
                     warn(warning);
