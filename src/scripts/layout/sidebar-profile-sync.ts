@@ -10,12 +10,31 @@ type SidebarSocialLink = {
     iconNodes: Node[];
 };
 
+export type SidebarAvatarState = {
+    src: string;
+    srcset: string;
+    sizes: string;
+};
+
+type SidebarAvatarStateInput = {
+    currentSrc?: string | null;
+    src?: string | null;
+    srcset?: string | null;
+    sizes?: string | null;
+    fallbackSrc?: string | null;
+};
+
+type SidebarAvatarAttributeTarget = {
+    setAttribute: (name: string, value: string) => void;
+    removeAttribute: (name: string) => void;
+};
+
 export type SidebarProfilePatch = {
     uid: string;
     displayName: string;
     bio: string;
     profileLink: string;
-    avatarUrl: string;
+    avatar: SidebarAvatarState;
     socialMode: SidebarSocialMode;
     socialLinks: SidebarSocialLink[];
 };
@@ -46,6 +65,68 @@ const SOCIAL_ICON_TAG_ALLOWLIST = new Set([
 
 function clean(value: string | null | undefined): string {
     return String(value || "").trim();
+}
+
+function createEmptySidebarAvatarState(): SidebarAvatarState {
+    return {
+        src: "",
+        srcset: "",
+        sizes: "",
+    };
+}
+
+/**
+ * 客户端切页时必须回放 SSR 已解析的头像资源属性，
+ * 不能把站点设置里的相对源路径直接写回 img，否则嵌套路由下会被解析成错误地址。
+ */
+export function resolveSidebarAvatarState(
+    input: SidebarAvatarStateInput,
+): SidebarAvatarState {
+    const resolvedSrc =
+        clean(input.currentSrc) || clean(input.src) || clean(input.fallbackSrc);
+    if (!resolvedSrc) {
+        return createEmptySidebarAvatarState();
+    }
+
+    return {
+        src: resolvedSrc,
+        srcset: clean(input.srcset),
+        sizes: clean(input.sizes),
+    };
+}
+
+export function areSidebarAvatarStatesEqual(
+    left: SidebarAvatarState,
+    right: SidebarAvatarState,
+): boolean {
+    return (
+        left.src === right.src &&
+        left.srcset === right.srcset &&
+        left.sizes === right.sizes
+    );
+}
+
+export function applySidebarAvatarStateAttributes(
+    target: SidebarAvatarAttributeTarget,
+    state: SidebarAvatarState,
+): void {
+    if (state.src) {
+        target.setAttribute("src", state.src);
+    } else {
+        target.removeAttribute("src");
+    }
+
+    if (state.srcset) {
+        target.setAttribute("srcset", state.srcset);
+    } else {
+        target.removeAttribute("srcset");
+    }
+
+    if (state.sizes) {
+        target.setAttribute("sizes", state.sizes);
+    } else {
+        target.removeAttribute("sizes");
+    }
 }
 
 function toRecord(value: unknown): Record<string, unknown> | null {
@@ -370,6 +451,19 @@ function resolveAvatarImage(
     return { shell, img };
 }
 
+function readSidebarAvatarState(
+    avatar: HTMLImageElement | null,
+    fallbackSrc?: string,
+): SidebarAvatarState {
+    return resolveSidebarAvatarState({
+        currentSrc: avatar?.currentSrc,
+        src: avatar?.getAttribute("src"),
+        srcset: avatar?.getAttribute("srcset"),
+        sizes: avatar?.getAttribute("sizes"),
+        fallbackSrc,
+    });
+}
+
 function observeAvatarImageLoad(
     shell: HTMLElement,
     img: HTMLImageElement,
@@ -452,9 +546,10 @@ export function extractSidebarProfilePatch(
         clean(root.dataset.sidebarProfileLink) ||
         clean(link?.getAttribute("href")) ||
         "/about";
-    const avatarUrl =
-        clean(root.dataset.sidebarProfileAvatar) ||
-        clean(avatar?.getAttribute("src"));
+    const avatarState = readSidebarAvatarState(
+        avatar,
+        root.dataset.sidebarProfileAvatar,
+    );
     const bioText =
         clean(root.dataset.sidebarProfileBio) || clean(bio?.textContent);
     const socialLinksFromAnchors = parseSocialLinksFromAnchors(social);
@@ -475,7 +570,7 @@ export function extractSidebarProfilePatch(
         displayName,
         bio: bioText,
         profileLink,
-        avatarUrl,
+        avatar: avatarState,
         socialMode,
         socialLinks: normalizedSocialLinks,
     };
@@ -530,7 +625,7 @@ export function applySidebarProfilePatch(patch: SidebarProfilePatch): void {
         root.dataset.sidebarProfileUid = patch.uid || "__official__";
         root.dataset.sidebarProfileName = patch.displayName || "user";
         root.dataset.sidebarProfileBio = patch.bio;
-        root.dataset.sidebarProfileAvatar = patch.avatarUrl;
+        root.dataset.sidebarProfileAvatar = patch.avatar.src;
         root.dataset.sidebarProfileLink = patch.profileLink || "/about";
         root.dataset.sidebarProfileSocialMode = patch.socialMode;
         root.dataset.sidebarProfileSocialLinks = serializeSocialLinks(
@@ -541,12 +636,12 @@ export function applySidebarProfilePatch(patch: SidebarProfilePatch): void {
     sidebar.dataset.sidebarUid = patch.uid || "__official__";
     syncSidebarAvatarLoadingState(sidebar);
 
-    const nextAvatarUrl = clean(patch.avatarUrl);
-    const currentAvatarUrl = clean(avatars[0]?.getAttribute("src"));
+    const nextAvatarState = patch.avatar;
+    const currentAvatarState = readSidebarAvatarState(avatars[0] || null);
     if (
         avatars.length === 0 ||
-        !nextAvatarUrl ||
-        nextAvatarUrl === currentAvatarUrl
+        !nextAvatarState.src ||
+        areSidebarAvatarStatesEqual(nextAvatarState, currentAvatarState)
     ) {
         syncSidebarAvatarLoadingState(sidebar);
         return;
@@ -559,8 +654,7 @@ export function applySidebarProfilePatch(patch: SidebarProfilePatch): void {
         }
         finished = true;
         avatars.forEach((avatar) => {
-            avatar.setAttribute("src", nextAvatarUrl);
-            avatar.removeAttribute("srcset");
+            applySidebarAvatarStateAttributes(avatar, nextAvatarState);
         });
         syncSidebarAvatarLoadingState(sidebar);
     };
@@ -568,6 +662,6 @@ export function applySidebarProfilePatch(patch: SidebarProfilePatch): void {
     const preloader = new Image();
     preloader.addEventListener("load", finish, { once: true });
     preloader.addEventListener("error", finish, { once: true });
-    preloader.src = nextAvatarUrl;
+    preloader.src = nextAvatarState.src;
     window.setTimeout(finish, PROFILE_UPDATE_TIMEOUT_MS);
 }
