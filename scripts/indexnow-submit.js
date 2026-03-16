@@ -1,12 +1,16 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { loadEnv } from "./load-env.js";
+import dotenv from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-loadEnv();
+dotenv.config({
+    path: path.resolve(__dirname, "..", ".env"),
+    override: true,
+    quiet: true,
+});
 
 // 从 sitemap 文件中解析 URL 列表
 function parseSitemap(sitemapPath) {
