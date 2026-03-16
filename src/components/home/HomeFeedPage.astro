@@ -1,22 +1,14 @@
 ---
-import PostCard from "@components/PostCard.astro";
-import DiaryCard from "@/components/DiaryCard.astro";
-import type { HomeFeedItem } from "@/server/recommendation/home-feed.types";
-import { getResolvedSiteSettings } from "@/server/site-settings/service";
-import { resolveAuthorIdentity } from "@/utils/author-identity";
-import { buildSiteDateFormatContext, formatSiteDate } from "@utils/date-utils";
+import HomeFeedItems from "@/components/home/HomeFeedItems.astro";
+import type { HomeFeedPageItem } from "@/server/recommendation/home-feed.types";
 import { widgetManager } from "@utils/widget-manager";
 
 interface Props {
-  items: HomeFeedItem[];
+  items: HomeFeedPageItem[];
   maxAnimationIndex?: number;
 }
 
 const { items, maxAnimationIndex } = Astro.props;
-const resolvedSiteSettings =
-  Astro.locals.siteSettings ?? (await getResolvedSiteSettings());
-const siteDateContext = buildSiteDateFormatContext(resolvedSiteSettings);
-
 const hasRightSidebars =
   widgetManager.getComponentsByPosition("top", "right").length > 0 ||
   widgetManager.getComponentsByPosition("sticky", "right").length > 0;
@@ -27,68 +19,7 @@ const hasRightSidebars =
   class="transition-all duration-500 ease-in-out rounded-(--radius-large) bg-(--card-bg) bg-transparent mb-4 list-mode"
   data-both-sidebars={hasRightSidebars}
 >
-  {
-    items.map((item, index) => {
-      const formattedDate =
-        formatSiteDate(item.publishedAt, siteDateContext) || "1970/01/01";
-      const normalizedDate = formattedDate.replace(/\//g, "-");
-      const [year, month] = normalizedDate.split("-");
-      const monthKey = `${year}-${month}`;
-      const authorSource =
-        item.type === "article" ? item.entry.data.author : item.entry.author;
-      const authorId =
-        item.type === "article"
-          ? item.entry.data.author_id
-          : item.entry.author_id;
-      const { username: authorHandle } = resolveAuthorIdentity(
-        {
-          id: authorSource?.id,
-          name: authorSource?.name,
-          username: authorSource?.username,
-          display_name: authorSource?.display_name,
-        },
-        authorId,
-      );
-
-      const tags = item.type === "article" ? item.entry.data.tags || [] : [];
-      const category =
-        item.type === "article" ? item.entry.data.category || "" : "";
-      const animationIndex =
-        maxAnimationIndex !== undefined
-          ? Math.min(index, maxAnimationIndex)
-          : index;
-
-      return (
-        <div
-          class:list={[
-            "post-list-item",
-            {
-              "diary-list-item": item.type === "diary",
-            },
-          ]}
-          style={`--i: ${animationIndex}; --interval: 50ms;`}
-          data-year={year}
-          data-month={monthKey}
-          data-day={normalizedDate}
-          data-tags={JSON.stringify(tags)}
-          data-category={category}
-          data-author-id={authorId}
-          data-author-handle={authorHandle}
-          data-content-type={item.type}
-        >
-          {item.type === "article" ? (
-            <PostCard entry={item.entry} class:list="onload-animation" />
-          ) : (
-            <DiaryCard
-              entry={item.entry}
-              username={authorHandle}
-              class:list="onload-animation"
-            />
-          )}
-        </div>
-      );
-    })
-  }
+  <HomeFeedItems items={items} maxAnimationIndex={maxAnimationIndex} />
 </div>
 
 <script>

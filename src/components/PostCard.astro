@@ -2,6 +2,7 @@
 import { Icon } from "astro-icon/components";
 
 import ExternalImage from "@components/misc/ExternalImage.astro";
+import type { HomeFeedViewerState } from "@/server/recommendation/home-feed.types";
 import type { DirectusPostEntry } from "@/utils/content-utils";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
@@ -12,10 +13,17 @@ interface Props {
   class?: string;
   entry: DirectusPostEntry;
   style?: string;
+  viewerState?: HomeFeedViewerState;
 }
 
 const { entry, style } = Astro.props;
 const className = Astro.props.class;
+const viewerState: HomeFeedViewerState = Astro.props.viewerState ?? {
+  hasLiked: false,
+  canDeleteOwn: false,
+  canDeleteAdmin: false,
+  canBlock: false,
+};
 
 const {
   title,
@@ -141,8 +149,16 @@ const adminDeleteLabel = i18n(I18nKey.interactionCommonDeleteAdmin);
       >
         <button
           type="button"
-          class="inline-flex h-6 items-center gap-1.5 text-50 text-base font-medium hover:text-(--primary) transition-colors post-card-action-btn"
+          class:list={[
+            "inline-flex h-6 items-center gap-1.5 text-base font-medium hover:text-(--primary) transition-colors post-card-action-btn",
+            {
+              "text-(--primary)": viewerState.hasLiked,
+              "text-50": !viewerState.hasLiked,
+            },
+          ]}
           data-action="toggle-like"
+          data-liked={viewerState.hasLiked ? "true" : "false"}
+          data-like-count={like_count}
           aria-label="切换点赞"
         >
           <Icon name="material-symbols:thumb-up-rounded" class="text-xl" />
@@ -167,21 +183,36 @@ const adminDeleteLabel = i18n(I18nKey.interactionCommonDeleteAdmin);
           >
             <button
               type="button"
-              class="hidden w-full text-left px-3 py-2 text-sm rounded-lg text-red-500 hover:text-red-500 hover:bg-(--btn-plain-bg-hover) post-card-action-btn transition-colors"
+              class:list={[
+                "w-full text-left px-3 py-2 text-sm rounded-lg text-red-500 hover:text-red-500 hover:bg-(--btn-plain-bg-hover) post-card-action-btn transition-colors",
+                {
+                  hidden: !viewerState.canDeleteOwn,
+                },
+              ]}
               data-action="delete-own-article"
             >
               删除文章
             </button>
             <button
               type="button"
-              class="hidden w-full text-left px-3 py-2 text-sm rounded-lg text-red-500 hover:text-red-500 hover:bg-(--btn-plain-bg-hover) post-card-action-btn transition-colors"
+              class:list={[
+                "w-full text-left px-3 py-2 text-sm rounded-lg text-red-500 hover:text-red-500 hover:bg-(--btn-plain-bg-hover) post-card-action-btn transition-colors",
+                {
+                  hidden: !viewerState.canDeleteAdmin,
+                },
+              ]}
               data-action="delete-admin-article"
             >
               {adminDeleteLabel}
             </button>
             <button
               type="button"
-              class="w-full text-left px-3 py-2 text-sm rounded-lg text-black/75 dark:text-white/75 hover:text-(--primary) hover:bg-(--btn-plain-bg-hover) post-card-action-btn transition-colors"
+              class:list={[
+                "w-full text-left px-3 py-2 text-sm rounded-lg text-black/75 dark:text-white/75 hover:text-(--primary) hover:bg-(--btn-plain-bg-hover) post-card-action-btn transition-colors",
+                {
+                  hidden: !viewerState.canBlock,
+                },
+              ]}
               data-action="block-user"
             >
               屏蔽用户

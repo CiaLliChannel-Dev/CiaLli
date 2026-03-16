@@ -4,6 +4,7 @@ import { Icon } from "astro-icon/components";
 import ExternalImage from "@components/misc/ExternalImage.astro";
 import type { AppDiary, AppDiaryImage } from "@/types/app";
 import type { AuthorBundleItem } from "@/server/api/v1/shared/author-cache";
+import type { HomeFeedViewerState } from "@/server/recommendation/home-feed.types";
 import { buildPublicAssetUrl } from "@/server/directus-auth";
 import { getResolvedSiteSettings } from "@/server/site-settings/service";
 import { resolveAuthorIdentity } from "@/utils/author-identity";
@@ -18,10 +19,17 @@ interface Props {
     like_count: number;
   };
   username: string;
+  viewerState?: HomeFeedViewerState;
 }
 
 const { entry, username } = Astro.props;
 const className = Astro.props.class;
+const viewerState: HomeFeedViewerState = Astro.props.viewerState ?? {
+  hasLiked: false,
+  canDeleteOwn: false,
+  canDeleteAdmin: false,
+  canBlock: false,
+};
 const resolvedSiteSettings =
   Astro.locals.siteSettings ?? (await getResolvedSiteSettings());
 const siteDateContext = buildSiteDateFormatContext(resolvedSiteSettings);
@@ -145,8 +153,16 @@ function resolveDiaryImageSrc(image: AppDiaryImage): string {
       >
         <button
           type="button"
-          class="inline-flex h-6 items-center gap-1.5 text-50 text-base font-medium hover:text-(--primary) transition-colors post-card-action-btn"
+          class:list={[
+            "inline-flex h-6 items-center gap-1.5 text-base font-medium hover:text-(--primary) transition-colors post-card-action-btn",
+            {
+              "text-(--primary)": viewerState.hasLiked,
+              "text-50": !viewerState.hasLiked,
+            },
+          ]}
           data-action="toggle-like"
+          data-liked={viewerState.hasLiked ? "true" : "false"}
+          data-like-count={like_count}
           aria-label="切换点赞"
         >
           <Icon name="material-symbols:thumb-up-rounded" class="text-xl" />
@@ -171,21 +187,36 @@ function resolveDiaryImageSrc(image: AppDiaryImage): string {
           >
             <button
               type="button"
-              class="hidden w-full text-left px-3 py-2 text-sm rounded-lg text-black/75 dark:text-white/75 hover:text-(--primary) hover:bg-(--btn-plain-bg-hover) post-card-action-btn transition-colors"
+              class:list={[
+                "w-full text-left px-3 py-2 text-sm rounded-lg text-black/75 dark:text-white/75 hover:text-(--primary) hover:bg-(--btn-plain-bg-hover) post-card-action-btn transition-colors",
+                {
+                  hidden: !viewerState.canDeleteOwn,
+                },
+              ]}
               data-action="delete-own-diary"
             >
               删除日记
             </button>
             <button
               type="button"
-              class="hidden w-full text-left px-3 py-2 text-sm rounded-lg text-black/75 dark:text-white/75 hover:text-(--primary) hover:bg-(--btn-plain-bg-hover) post-card-action-btn transition-colors"
+              class:list={[
+                "w-full text-left px-3 py-2 text-sm rounded-lg text-black/75 dark:text-white/75 hover:text-(--primary) hover:bg-(--btn-plain-bg-hover) post-card-action-btn transition-colors",
+                {
+                  hidden: !viewerState.canDeleteAdmin,
+                },
+              ]}
               data-action="delete-admin-diary"
             >
               删除此日记(管理员)
             </button>
             <button
               type="button"
-              class="w-full text-left px-3 py-2 text-sm rounded-lg text-black/75 dark:text-white/75 hover:text-(--primary) hover:bg-(--btn-plain-bg-hover) post-card-action-btn transition-colors"
+              class:list={[
+                "w-full text-left px-3 py-2 text-sm rounded-lg text-black/75 dark:text-white/75 hover:text-(--primary) hover:bg-(--btn-plain-bg-hover) post-card-action-btn transition-colors",
+                {
+                  hidden: !viewerState.canBlock,
+                },
+              ]}
               data-action="block-user"
             >
               屏蔽用户

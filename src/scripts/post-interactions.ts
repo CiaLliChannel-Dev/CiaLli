@@ -507,6 +507,20 @@ function setupPostCardActions(): void {
     runtimeWindow._postCardActionsAttached = true;
 }
 
+export async function refreshPostInteractions(): Promise<void> {
+    if (!runtimeWindow._postInteractionsInitialized) {
+        initPostInteractions();
+        return;
+    }
+
+    updateCurrentAuthState(getAuthState());
+    updateCardActionVisibility(currentAuthState);
+
+    // 新插入的卡片也必须重新同步交互态，避免首页首屏与后续批次出现行为分叉。
+    await applyBlockedUsersFilter();
+    await syncLikeButtons();
+}
+
 export function initPostInteractions(): void {
     if (runtimeWindow._postInteractionsInitialized) {
         return;
@@ -515,10 +529,5 @@ export function initPostInteractions(): void {
 
     setupCalendarFilterListeners();
     setupPostCardActions();
-    updateCurrentAuthState(getAuthState());
-    updateCardActionVisibility(currentAuthState);
-    void (async () => {
-        await applyBlockedUsersFilter();
-        await syncLikeButtons();
-    })();
+    void refreshPostInteractions();
 }
