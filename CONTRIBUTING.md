@@ -28,8 +28,6 @@ pnpm check && pnpm lint && pnpm build && pnpm format
 | `pnpm build` | 完整构建（确保无编译错误） |
 | `pnpm format` | Prettier 格式化 |
 
-CI 流水线会在 PR 上自动运行这些检查。
-
 ## 代码规范
 
 ### TypeScript
@@ -114,11 +112,3 @@ import { safeCsv } from "@server/api/v1/shared";
 - `master`：生产分支
 - `dev`：开发分支
 - 功能分支从 `dev` 创建，PR 合并到 `master`
-
-## 相关文档
-
-- [架构概述](CiaLli.wiki/Architecture-Overview.md) - 系统架构
-- [数据模型](CiaLli.wiki/Data-Model.md) - 数据模型
-- [API 参考](CiaLli.wiki/API-Reference.md) - API 参考
-- [Markdown Guidance](CiaLli.wiki/Markdown-Guidance.md) - Markdown 管线指导
-- [Layout State Machine](CiaLli.wiki/Layout-State-Machine.md) - 布局状态机
