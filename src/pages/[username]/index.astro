@@ -9,6 +9,7 @@ import BangumiCardCompact from "@components/home/BangumiCardCompact.astro";
 import AlbumCardCompact from "@components/home/AlbumCardCompact.astro";
 import DiaryCardCompact from "@components/home/DiaryCardCompact.astro";
 import ExternalImage from "@components/misc/ExternalImage.astro";
+import ImageWrapper from "@components/misc/ImageWrapper.astro";
 import {
   loadProfileForViewer,
   loadUserHomeData,
@@ -27,8 +28,10 @@ import {
   runWithDirectusPublicAccess,
   runWithDirectusUserAccess,
 } from "@/server/directus/client";
+import { getResolvedSiteSettings } from "@/server/site-settings/service";
 import { isShortId } from "@/server/utils/short-id";
 import { getSessionAccessToken, getSessionUser } from "@/server/auth/session";
+import { resolveDisplayAvatarUrl } from "@/utils/profile-avatar";
 
 export const prerender = false;
 
@@ -89,6 +92,13 @@ try {
 const payload = result.status === "ok" ? result.data : null;
 const ownerUsername = payload?.owner?.username || username;
 const isOwner = Boolean(viewerId) && payload?.owner?.id === viewerId;
+const resolvedSiteSettings =
+  Astro.locals.siteSettings ?? (await getResolvedSiteSettings());
+// 主页头像与侧栏 Profile 统一回退到站点默认头像，避免无头像用户出现空占位。
+const profileCardAvatarUrl = resolveDisplayAvatarUrl(
+  payload?.owner?.avatar_url,
+  resolvedSiteSettings.settings.profile.avatar,
+);
 
 const DEFAULT_SECTION_ORDER = ["articles", "diaries", "bangumi", "albums"];
 const sectionOrder =
@@ -154,13 +164,15 @@ const sectionOrder =
 
               <div class="px-6 pb-6 -mt-10 relative">
                 <div class="flex items-end gap-4">
-                  {payload!.owner?.avatar_url ? (
-                    <ExternalImage
-                      src={payload!.owner.avatar_url}
-                      alt="avatar"
-                      class="w-20 h-20 rounded-full object-cover border-3 border-(--card-bg) shadow-sm"
-                      loading="eager"
-                    />
+                  {profileCardAvatarUrl ? (
+                    <div class="w-20 h-20 rounded-full border-3 border-(--card-bg) shadow-sm overflow-hidden">
+                      <ImageWrapper
+                        src={profileCardAvatarUrl}
+                        alt="avatar"
+                        class="w-full h-full rounded-full"
+                        loading="eager"
+                      />
+                    </div>
                   ) : (
                     <div class="w-20 h-20 rounded-full bg-black/10 dark:bg-white/10 border-2 border-(--card-bg)" />
                   )}

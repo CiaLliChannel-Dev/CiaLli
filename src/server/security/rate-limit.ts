@@ -5,9 +5,12 @@
  * 生产环境使用 Upstash Redis，开发环境使用内存兜底。
  */
 import { Ratelimit } from "@upstash/ratelimit";
-import { Redis } from "@upstash/redis";
 
 import { internal } from "@/server/api/errors";
+import {
+    getUpstashRedisClient,
+    getUpstashRedisConfig,
+} from "@/server/upstash/redis";
 
 /** 限流分类 */
 export type RateLimitCategory =
@@ -56,27 +59,12 @@ function getIsProductionRuntime(): boolean {
     return import.meta.env.PROD || process.env.NODE_ENV === "production";
 }
 
-function getUpstashConfig(): { url: string; token: string } | null {
-    const url = String(
-        process.env.KV_REST_API_URL || import.meta.env.KV_REST_API_URL || "",
-    ).trim();
-    const token = String(
-        process.env.KV_REST_API_TOKEN ||
-            import.meta.env.KV_REST_API_TOKEN ||
-            "",
-    ).trim();
-    if (!url || !token) return null;
-    return { url, token };
-}
-
 function getInstance(category: RateLimitCategory): Ratelimit {
     const cached = instanceCache.get(category);
     if (cached) return cached;
 
-    const config = getUpstashConfig();
-    if (!config) throw internal("Upstash 限流服务未配置");
-
-    const redis = new Redis({ url: config.url, token: config.token });
+    const redis = getUpstashRedisClient();
+    if (!redis) throw internal("Upstash 限流服务未配置");
     const cat = CATEGORY_CONFIG[category];
 
     const instance = new Ratelimit({
@@ -128,7 +116,7 @@ export async function applyRateLimit(
 ): Promise<RateLimitResult> {
     const cleanIp = String(ip || "unknown").trim() || "unknown";
     const cat = CATEGORY_CONFIG[category];
-    const hasUpstash = Boolean(getUpstashConfig());
+    const hasUpstash = Boolean(getUpstashRedisConfig());
     const isProduction = getIsProductionRuntime();
 
     if (!hasUpstash) {

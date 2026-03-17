@@ -1,6 +1,7 @@
 ---
 import { Icon } from "astro-icon/components";
 import { getResolvedSiteSettings } from "@/server/site-settings/service";
+import { resolveDisplayAvatarUrl } from "@/utils/profile-avatar";
 import { url } from "@utils/url-utils";
 import ImageWrapper from "../misc/ImageWrapper.astro";
 import TypewriterText from "../TypewriterText.astro";
@@ -46,7 +47,10 @@ const bioTypewriterSpeed = Math.max(
   10,
   Math.min(500, Math.floor(Number(sidebarData.bio_typewriter_speed) || 80)),
 );
-const avatarUrl = sidebarData.avatar_url || profileConfig.avatar || "";
+const avatarUrl = resolveDisplayAvatarUrl(
+  sidebarData.avatar_url,
+  profileConfig.avatar,
+);
 const profileLink = sidebarData.username
   ? url(`/${sidebarData.username}`)
   : url("/about");

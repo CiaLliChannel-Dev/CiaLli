@@ -52,6 +52,17 @@ export type HomeFeedScoredCandidate = HomeFeedCandidate & {
 
 export type HomeFeedItem = HomeFeedScoredCandidate;
 
+export type HomeFeedViewerState = {
+    hasLiked: boolean;
+    canDeleteOwn: boolean;
+    canDeleteAdmin: boolean;
+    canBlock: boolean;
+};
+
+export type HomeFeedPageItem = HomeFeedItem & {
+    viewerState: HomeFeedViewerState;
+};
+
 export type HomeFeedScoreInput = {
     recency: number;
     engagement: number;
@@ -98,7 +109,7 @@ export type HomeFeedBuildResult = {
 };
 
 export type HomeFeedPageResponse = {
-    items: HomeFeedItem[];
+    items: HomeFeedPageItem[];
     offset: number;
     limit: number;
     next_offset: number;

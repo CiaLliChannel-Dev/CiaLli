@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createDirectus, readItems, rest, staticToken } from "@directus/sdk";
-import { loadEnv } from "./load-env.js";
+import dotenv from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -263,7 +263,11 @@ async function rmDirIfExists(dirPath) {
 }
 
 export async function exportDirectusContent(options = {}) {
-    loadEnv();
+    dotenv.config({
+        path: path.resolve(rootDir, ".env"),
+        override: true,
+        quiet: true,
+    });
 
     const baseUrl = options.directusUrl ?? getEnv("DIRECTUS_URL");
     const token = options.staticToken ?? getEnv("DIRECTUS_STATIC_TOKEN");

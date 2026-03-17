@@ -2,12 +2,14 @@
  * 两级缓存管理器
  *
  * L1: 进程内 Map（按域隔离，FIFO 淘汰）
- * L2: Upstash Redis HTTP REST（可选，不可用时静默降级）
+ * L2: Upstash Redis 官方 SDK（可选，不可用时静默降级）
  *
  * 域版本号机制：每个域维护 v1:<domain>:__ver__ 计数器，
  * 完整键 = v1:<domain>:v<ver>:<key>。invalidateByDomain() 递增版本号，
  * 旧键自然过期，无需 scan。
  */
+import { getUpstashRedisClient } from "@/server/upstash/redis";
+
 import type { CacheDomain, CacheMetrics, CacheStrategy } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -182,45 +184,8 @@ function l1Clear(domain: CacheDomain): void {
 }
 
 // ---------------------------------------------------------------------------
-// L2 — Upstash Redis（HTTP REST）
+// L2 — Upstash Redis
 // ---------------------------------------------------------------------------
-
-let redisConfig: { url: string; token: string } | null | undefined;
-
-function getRedisConfig(): { url: string; token: string } | null {
-    if (redisConfig !== undefined) return redisConfig;
-    const url = String(
-        process.env.KV_REST_API_URL || import.meta.env.KV_REST_API_URL || "",
-    ).trim();
-    const token = String(
-        process.env.KV_REST_API_TOKEN ||
-            import.meta.env.KV_REST_API_TOKEN ||
-            "",
-    ).trim();
-    redisConfig = url && token ? { url, token } : null;
-    return redisConfig;
-}
-
-async function redisCommand(
-    args: string[],
-): Promise<{ result: unknown } | null> {
-    const cfg = getRedisConfig();
-    if (!cfg) return null;
-    try {
-        const response = await fetch(cfg.url, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${cfg.token}`,
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify(args),
-        });
-        if (!response.ok) return null;
-        return (await response.json()) as { result: unknown };
-    } catch {
-        return null;
-    }
-}
 
 async function l2Get(
     domain: CacheDomain,
@@ -228,11 +193,21 @@ async function l2Get(
 ): Promise<string | null> {
     const strategy = STRATEGIES[domain];
     if (strategy.l2TtlMs <= 0) return null;
-    const result = await redisCommand(["GET", fullKey]);
-    if (!result || result.result === null || result.result === undefined) {
+    const redis = getUpstashRedisClient({
+        automaticDeserialization: false,
+    });
+    if (!redis) {
         return null;
     }
-    return String(result.result);
+    try {
+        const value = await redis.get<string>(fullKey);
+        if (value === null) {
+            return null;
+        }
+        return typeof value === "string" ? value : String(value);
+    } catch {
+        return null;
+    }
 }
 
 async function l2Set(
@@ -243,11 +218,31 @@ async function l2Set(
     const strategy = STRATEGIES[domain];
     if (strategy.l2TtlMs <= 0) return;
     const ttlSeconds = Math.ceil(strategy.l2TtlMs / 1000);
-    await redisCommand(["SET", fullKey, value, "EX", String(ttlSeconds)]);
+    const redis = getUpstashRedisClient({
+        automaticDeserialization: false,
+    });
+    if (!redis) {
+        return;
+    }
+    try {
+        await redis.set(fullKey, value, { ex: ttlSeconds });
+    } catch {
+        // Redis 不可用时静默降级到仅 L1
+    }
 }
 
 async function l2Delete(fullKey: string): Promise<void> {
-    await redisCommand(["DEL", fullKey]);
+    const redis = getUpstashRedisClient({
+        automaticDeserialization: false,
+    });
+    if (!redis) {
+        return;
+    }
+    try {
+        await redis.del(fullKey);
+    } catch {
+        // Redis 不可用时静默降级到仅 L1
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -273,11 +268,18 @@ async function getDomainVersion(domain: CacheDomain): Promise<number> {
         return local.version;
     }
 
-    const result = await redisCommand(["GET", versionKey(domain)]);
-    const ver =
-        result?.result !== null && result?.result !== undefined
-            ? parseInt(String(result.result), 10)
-            : 0;
+    const redis = getUpstashRedisClient({
+        automaticDeserialization: false,
+    });
+    let ver = 0;
+    if (redis) {
+        try {
+            const value = await redis.get<string>(versionKey(domain));
+            ver = value !== null ? parseInt(String(value), 10) : 0;
+        } catch {
+            ver = 0;
+        }
+    }
     const version = Number.isFinite(ver) ? ver : 0;
     localVersions.set(domain, {
         version,
@@ -287,11 +289,17 @@ async function getDomainVersion(domain: CacheDomain): Promise<number> {
 }
 
 async function incrementDomainVersion(domain: CacheDomain): Promise<number> {
-    const result = await redisCommand(["INCR", versionKey(domain)]);
-    const ver =
-        result?.result !== null && result?.result !== undefined
-            ? parseInt(String(result.result), 10)
-            : 1;
+    const redis = getUpstashRedisClient({
+        automaticDeserialization: false,
+    });
+    let ver = 1;
+    if (redis) {
+        try {
+            ver = await redis.incr(versionKey(domain));
+        } catch {
+            ver = 1;
+        }
+    }
     const version = Number.isFinite(ver) ? ver : 1;
     localVersions.set(domain, {
         version,
