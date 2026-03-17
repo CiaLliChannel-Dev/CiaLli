@@ -1,0 +1,155 @@
+---
+import I18nKey from "@i18n/i18nKey";
+import { i18n } from "@i18n/translation";
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import HomeFeedPage from "@components/home/HomeFeedPage.astro";
+import { getSessionUser } from "@/server/auth/session";
+import { buildHomeFeed } from "@/server/recommendation/home-feed";
+import type { HomeFeedItem } from "@/server/recommendation/home-feed.types";
+
+export const prerender = false;
+
+const rawPagePath = Astro.params.page || "";
+
+// 重定向旧分页 URL
+if (rawPagePath) {
+  const isOldPagination =
+    /^\d+$/.test(rawPagePath) || /^page\/\d+$/i.test(rawPagePath);
+  if (isOldPagination) {
+    return Astro.redirect("/", 301);
+  }
+  // 非分页路径 → 404
+  Astro.response.status = 404;
+}
+
+let homeFeedItems: HomeFeedItem[] = [];
+const invalidPath = Boolean(rawPagePath);
+
+if (!invalidPath) {
+  try {
+    const sessionUser = await getSessionUser(Astro);
+    const homeFeed = await buildHomeFeed({
+      viewerId: sessionUser?.id ?? null,
+      limit: 180,
+    });
+    homeFeedItems = homeFeed.items;
+  } catch (error) {
+    console.error("[home] failed to load mixed feed:", error);
+  }
+}
+---
+
+<MainGridLayout>
+  {
+    invalidPath ? (
+      <div class="card-base p-8 rounded-(--radius-large)">
+        <h1 class="text-2xl font-bold mb-2">{i18n(I18nKey.notFoundTitle)}</h1>
+        <p class="text-70">{i18n(I18nKey.pageNotFoundPathCheck)}</p>
+      </div>
+    ) : (
+      <div class="home-layout">
+        <div class="min-w-0">
+          {homeFeedItems.length === 0 ? (
+            <div class="card-base p-8 rounded-(--radius-large) text-70">
+              {i18n(I18nKey.pageNoPublicPosts)}
+            </div>
+          ) : (
+            <HomeFeedPage items={homeFeedItems} maxAnimationIndex={15} />
+          )}
+
+          {/* 无限滚动哨兵 */}
+          <div id="infinite-scroll-sentinel" class="h-1" />
+          <div
+            id="scroll-loading"
+            class="hidden text-center py-4 text-sm text-60"
+          >
+            {i18n(I18nKey.commonLoading)}
+          </div>
+        </div>
+        {/* 右侧占位，与归档页筛选面板等宽 */}
+        <div class="home-sidebar-placeholder" />
+      </div>
+    )
+  }
+</MainGridLayout>
+
+<style>
+  .home-layout {
+    display: grid;
+    grid-template-columns: 1fr 17.5rem;
+    gap: 1rem;
+    align-items: start;
+  }
+  .home-sidebar-placeholder {
+    /* 纯占位，不渲染任何内容 */
+  }
+</style>
+
+<script>
+  type HomeRuntimeWindow = Window &
+    typeof globalThis & {
+      __homeScrollCleanup?: () => void;
+    };
+
+  const INITIAL_COUNT = 5;
+  const BATCH_SIZE = 5;
+
+  function initHomeInfiniteScroll(): void {
+    const rw = window as HomeRuntimeWindow;
+    rw.__homeScrollCleanup?.();
+
+    const container = document.querySelector(".home-layout");
+    if (!container) return;
+
+    const items = document.querySelectorAll<HTMLElement>(".post-list-item");
+    const sentinel = document.getElementById("infinite-scroll-sentinel");
+    const loadingEl = document.getElementById("scroll-loading");
+
+    if (!items.length || !sentinel) {
+      sentinel?.classList.add("hidden");
+      return;
+    }
+
+    items.forEach((item, i) => {
+      if (i >= INITIAL_COUNT) item.classList.add("hidden");
+      else item.classList.remove("hidden");
+    });
+    let revealedCount = Math.min(INITIAL_COUNT, items.length);
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0].isIntersecting || revealedCount >= items.length) return;
+        loadingEl?.classList.remove("hidden");
+        const end = Math.min(revealedCount + BATCH_SIZE, items.length);
+        for (let i = revealedCount; i < end; i++) {
+          const item = items[i] as HTMLElement;
+          item.style.setProperty("--i", String(i - revealedCount));
+          item.classList.remove("hidden");
+        }
+        revealedCount = end;
+        if (revealedCount >= items.length) {
+          observer.disconnect();
+          sentinel.classList.add("hidden");
+          loadingEl?.classList.add("hidden");
+        } else {
+          setTimeout(() => loadingEl?.classList.add("hidden"), 300);
+        }
+      },
+      { rootMargin: "200px" },
+    );
+
+    if (revealedCount < items.length) {
+      observer.observe(sentinel);
+    } else {
+      sentinel.classList.add("hidden");
+    }
+
+    rw.__homeScrollCleanup = () => {
+      observer.disconnect();
+      rw.__homeScrollCleanup = undefined;
+    };
+  }
+
+  initHomeInfiniteScroll();
+  document.addEventListener("astro:after-swap", initHomeInfiniteScroll);
+</script>

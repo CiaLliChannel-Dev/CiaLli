@@ -1,0 +1,269 @@
+import type { APIContext } from "astro";
+
+import type { AppUser } from "@/types/app";
+import { readOneById } from "@/server/directus/client";
+import {
+    DIRECTUS_ACCESS_COOKIE_NAME,
+    DIRECTUS_REFRESH_COOKIE_NAME,
+    DirectusAuthError,
+    REMEMBER_COOKIE_NAME,
+    buildDirectusAssetUrl,
+    directusGetMe,
+    directusRefresh,
+    getCookieOptions,
+    isSessionOnlyMode,
+    resolveAccessTokenMaxAgeSeconds,
+} from "@/server/directus-auth";
+
+export type SessionUser = {
+    id: string;
+    email: string;
+    name: string;
+    avatarUrl?: string;
+    roleId?: string;
+    roleName?: string;
+    isSystemAdmin: boolean;
+};
+
+type RefreshedTokens = Awaited<ReturnType<typeof directusRefresh>>;
+type DirectusMe = Awaited<ReturnType<typeof directusGetMe>>;
+
+const refreshTaskMap = new Map<string, Promise<RefreshedTokens>>();
+const refreshResultCache = new Map<
+    string,
+    { tokens: RefreshedTokens; expiresAt: number }
+>();
+const REFRESH_RESULT_CACHE_TTL_MS = 5000;
+
+function toDisplayName(params: {
+    id: string;
+    email: string;
+    firstName?: string | null;
+    lastName?: string | null;
+}): string {
+    const firstName = (params.firstName || "").trim();
+    const lastName = (params.lastName || "").trim();
+    const fullName = [firstName, lastName].filter(Boolean).join(" ").trim();
+    if (fullName) {
+        return fullName;
+    }
+    if (params.email.trim()) {
+        return params.email.trim();
+    }
+    return `user-${params.id.slice(0, 8)}`;
+}
+
+function extractRole(
+    meRole: DirectusMe["role"] | undefined,
+    fallbackRole: AppUser["role"] | undefined | null,
+): { roleId?: string; roleName?: string } {
+    const role = meRole ?? fallbackRole;
+    if (!role) {
+        return {};
+    }
+    if (typeof role === "string") {
+        return { roleId: role };
+    }
+    const roleId = typeof role.id === "string" ? role.id : undefined;
+    const roleName = typeof role.name === "string" ? role.name : undefined;
+    return { roleId, roleName };
+}
+
+function buildSessionUser(
+    me: DirectusMe,
+    fallbackUser?: AppUser | null,
+): SessionUser | null {
+    const id = String(me.id || fallbackUser?.id || "").trim();
+    if (!id) {
+        return null;
+    }
+    const email = String(me.email || fallbackUser?.email || "").trim();
+    const avatarFromMe = me.avatarId
+        ? buildDirectusAssetUrl(me.avatarId, {
+              width: 128,
+              height: 128,
+              fit: "cover",
+          })
+        : undefined;
+    const avatarFromFallback =
+        fallbackUser?.avatar && String(fallbackUser.avatar).trim()
+            ? buildDirectusAssetUrl(String(fallbackUser.avatar).trim(), {
+                  width: 128,
+                  height: 128,
+                  fit: "cover",
+              })
+            : undefined;
+    const { roleId, roleName } = extractRole(me.role, fallbackUser?.role);
+    const isSystemAdmin = roleName?.toLowerCase().includes("admin") || false;
+
+    return {
+        id,
+        email,
+        name: toDisplayName({
+            id,
+            email,
+            firstName: me.first_name ?? fallbackUser?.first_name,
+            lastName: me.last_name ?? fallbackUser?.last_name,
+        }),
+        avatarUrl: avatarFromMe || avatarFromFallback,
+        roleId,
+        roleName,
+        isSystemAdmin,
+    };
+}
+
+async function loadDirectusUserById(userId: string): Promise<AppUser | null> {
+    try {
+        return await readOneById("directus_users", userId, {
+            fields: [
+                "id",
+                "email",
+                "first_name",
+                "last_name",
+                "avatar",
+                "role",
+            ],
+        });
+    } catch (error) {
+        console.warn(
+            "[auth/session] Failed to load directus user by id",
+            error,
+        );
+        return null;
+    }
+}
+
+function clearCookie(context: APIContext, cookieName: string): void {
+    try {
+        context.cookies.delete(cookieName, { path: "/" });
+    } catch {
+        context.cookies.set(cookieName, "", {
+            ...getCookieOptions({
+                requestUrl: context.url,
+            }),
+            maxAge: 0,
+        });
+    }
+}
+
+function setSessionCookies(
+    context: APIContext,
+    tokens: RefreshedTokens,
+    sessionOnly: boolean,
+): void {
+    context.cookies.set(
+        DIRECTUS_REFRESH_COOKIE_NAME,
+        tokens.refreshToken,
+        getCookieOptions({
+            requestUrl: context.url,
+            sessionOnly,
+        }),
+    );
+    context.cookies.set(
+        DIRECTUS_ACCESS_COOKIE_NAME,
+        tokens.accessToken,
+        getCookieOptions({
+            requestUrl: context.url,
+            maxAge: resolveAccessTokenMaxAgeSeconds(tokens.expiresMs),
+            sessionOnly,
+        }),
+    );
+}
+
+async function loadUserByAccessToken(
+    accessToken: string,
+): Promise<SessionUser | null> {
+    if (!accessToken) {
+        return null;
+    }
+    try {
+        const me = await directusGetMe({ accessToken });
+        const fallbackUser = me.id ? await loadDirectusUserById(me.id) : null;
+        return buildSessionUser(me, fallbackUser);
+    } catch (error) {
+        const isAuthError =
+            error instanceof DirectusAuthError &&
+            (error.directusStatus === 401 || error.directusStatus === 403);
+        if (!isAuthError) {
+            console.error(
+                "[auth/session] loadUserByAccessToken failed:",
+                error,
+            );
+        }
+        return null;
+    }
+}
+
+async function refreshWithLock(refreshToken: string): Promise<RefreshedTokens> {
+    const cached = refreshResultCache.get(refreshToken);
+    if (cached && cached.expiresAt > Date.now()) {
+        return cached.tokens;
+    }
+    if (cached) {
+        refreshResultCache.delete(refreshToken);
+    }
+
+    const activeTask = refreshTaskMap.get(refreshToken);
+    if (activeTask) {
+        return await activeTask;
+    }
+
+    const task = directusRefresh({ refreshToken })
+        .then((tokens) => {
+            const cachedValue = {
+                tokens,
+                expiresAt: Date.now() + REFRESH_RESULT_CACHE_TTL_MS,
+            };
+            refreshResultCache.set(refreshToken, cachedValue);
+            refreshResultCache.set(tokens.refreshToken, cachedValue);
+            return tokens;
+        })
+        .finally(() => {
+            refreshTaskMap.delete(refreshToken);
+        });
+    refreshTaskMap.set(refreshToken, task);
+    return await task;
+}
+
+export async function getSessionUser(
+    context: APIContext,
+): Promise<SessionUser | null> {
+    const accessToken =
+        context.cookies.get(DIRECTUS_ACCESS_COOKIE_NAME)?.value || "";
+    if (accessToken) {
+        const user = await loadUserByAccessToken(accessToken);
+        if (user) {
+            return user;
+        }
+        clearCookie(context, DIRECTUS_ACCESS_COOKIE_NAME);
+    }
+
+    const refreshToken =
+        context.cookies.get(DIRECTUS_REFRESH_COOKIE_NAME)?.value || "";
+    if (!refreshToken) {
+        return null;
+    }
+
+    try {
+        const tokens = await refreshWithLock(refreshToken);
+        const rememberValue =
+            context.cookies.get(REMEMBER_COOKIE_NAME)?.value ?? undefined;
+        const sessionOnly = isSessionOnlyMode(rememberValue);
+        setSessionCookies(context, tokens, sessionOnly);
+        const user = await loadUserByAccessToken(tokens.accessToken);
+        if (!user) {
+            clearSession(context);
+            return null;
+        }
+        return user;
+    } catch {
+        clearSession(context);
+        return null;
+    }
+}
+
+export function clearSession(context: APIContext): void {
+    clearCookie(context, DIRECTUS_REFRESH_COOKIE_NAME);
+    clearCookie(context, DIRECTUS_ACCESS_COOKIE_NAME);
+    clearCookie(context, REMEMBER_COOKIE_NAME);
+}

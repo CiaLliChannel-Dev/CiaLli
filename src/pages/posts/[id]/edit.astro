@@ -1,0 +1,525 @@
+---
+import MainGridLayout from "@layouts/MainGridLayout.astro";
+import { Icon } from "astro-icon/components";
+import { getSessionUser } from "@/server/auth/session";
+import "@/styles/markdown.css";
+import "@/styles/markdown-extend.styl";
+
+export const prerender = false;
+
+const articleId = (Astro.params.id || "").trim();
+if (!articleId) {
+  return Astro.redirect("/posts");
+}
+
+const user = await getSessionUser(Astro);
+if (!user) {
+  return Astro.redirect(
+    `/auth/login?redirect=${encodeURIComponent(`/posts/${articleId}/edit`)}`,
+  );
+}
+---
+
+<MainGridLayout title="编辑文章" description="编辑文章">
+  <div
+    id="publish-root"
+    class="space-y-4 text-90"
+    data-mode="edit"
+    data-article-id={articleId}
+    data-enter-skeleton-page="publish-page"
+    data-enter-skeleton-target="publish-page"
+  >
+    <div data-enter-skeleton-inline-content class="space-y-4">
+      <!-- 标题栏 -->
+      <section class="card-base px-9 py-6 rounded-(--radius-large)">
+        <div>
+          <h1
+            class="text-4xl font-bold text-black/90 dark:text-white/90 mb-2 relative
+            before:w-1 before:h-8 before:rounded-md before:bg-(--primary)
+            before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
+          >
+            发布中心
+          </h1>
+          <p id="publish-current-hint" class="text-base text-70">
+            正在编辑已有文章，编辑完成后可直接发布。
+          </p>
+        </div>
+      </section>
+
+      <!-- 主编辑区 -->
+      <section id="publish-workspace" class="hidden space-y-4">
+        <!-- 元数据区 -->
+        <div class="card-base p-6 rounded-(--radius-large) space-y-4">
+          <h2 id="publish-editor-title" class="text-xl font-semibold text-90">
+            编辑文章
+          </h2>
+
+          <div id="publish-form-article" class="space-y-4">
+            <label class="space-y-1.5 block">
+              <span class="text-sm text-60"
+                >标题 <span class="text-red-500">*</span></span
+              >
+              <input
+                id="publish-article-title"
+                type="text"
+                placeholder="输入文章标题"
+                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-90"
+              />
+              <span id="publish-article-title-hint" class="text-xs text-60">
+                0/30
+              </span>
+            </label>
+
+            <label class="space-y-1.5 block">
+              <span class="text-sm text-60">摘要</span>
+              <textarea
+                id="publish-article-summary"
+                rows="3"
+                placeholder="简要描述这篇文章（可选）"
+                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-90 resize-y"
+              ></textarea>
+            </label>
+
+            <!-- 封面裁剪上传区域 -->
+            <div class="space-y-2">
+              <span class="text-sm text-60">封面图片</span>
+              <div class="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  id="publish-cover-crop-btn"
+                  class="px-4 py-2 rounded-lg border border-(--line-divider) text-sm text-75 hover:bg-(--btn-plain-bg-hover) transition"
+                >
+                  选择封面
+                </button>
+                <button
+                  type="button"
+                  id="publish-cover-clear-btn"
+                  class="px-4 py-2 rounded-lg border border-(--line-divider) text-sm text-75 hover:bg-(--btn-plain-bg-hover) transition"
+                >
+                  清空封面
+                </button>
+                <span id="publish-cover-msg" class="text-xs text-60"></span>
+              </div>
+              <div
+                id="publish-cover-preview-wrap"
+                class="hidden rounded-xl border border-(--line-divider) p-3 space-y-2"
+              >
+                <p class="text-xs text-60">封面预览</p>
+                <img
+                  id="publish-cover-preview"
+                  src=""
+                  alt="article cover preview"
+                  class="w-full max-h-56 object-cover rounded-lg border border-(--line-divider)"
+                  loading="lazy"
+                />
+              </div>
+              <!-- 折叠：外部封面 URL -->
+              <details class="text-sm text-60">
+                <summary
+                  class="cursor-pointer select-none hover:text-75 transition"
+                >
+                  或使用外部链接
+                </summary>
+                <div class="mt-2">
+                  <input
+                    id="publish-article-cover-url"
+                    type="text"
+                    placeholder="https://..."
+                    class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-90"
+                  />
+                </div>
+              </details>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <label class="space-y-1.5 block">
+                <span class="text-sm text-60">标签（逗号分隔）</span>
+                <input
+                  id="publish-article-tags"
+                  type="text"
+                  placeholder="Astro, Svelte, TypeScript"
+                  class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-90"
+                />
+              </label>
+              <label class="space-y-1.5 block">
+                <span class="text-sm text-60">分类</span>
+                <input
+                  id="publish-article-category"
+                  type="text"
+                  placeholder="前端"
+                  class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-90"
+                />
+              </label>
+            </div>
+
+            <div
+              class="rounded-xl border border-(--line-divider) p-4 space-y-3"
+            >
+              <label
+                class="flex items-center gap-3 text-sm text-75 cursor-pointer select-none"
+              >
+                <input
+                  id="publish-article-encrypt-enabled"
+                  type="checkbox"
+                  class="toggle-checkbox"
+                />
+                <span class="toggle-track"
+                  ><span class="toggle-knob"></span></span
+                >
+                启用密码保护
+              </label>
+              <div
+                id="publish-article-encrypt-panel"
+                class="hidden space-y-1.5"
+              >
+                <label class="space-y-1.5 block">
+                  <span class="text-sm text-60">
+                    访问密码 <span class="text-red-500">*</span>
+                  </span>
+                  <input
+                    id="publish-article-encrypt-password"
+                    type="password"
+                    autocomplete="new-password"
+                    placeholder="输入访问密码"
+                    class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-90"
+                  />
+                </label>
+                <p id="publish-article-encrypt-hint" class="text-xs text-60">
+                  启用后，正文将以密文存储，访客需要输入密码才能查看内容。
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 双栏编辑+预览 -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 publish-dual-pane">
+          <!-- 左栏：编辑 -->
+          <div
+            class="card-base p-6 rounded-(--radius-large) flex flex-col publish-editor-col"
+          >
+            <div class="flex items-center justify-between gap-2 mb-4">
+              <span class="text-sm text-60">
+                正文内容 <span class="text-red-500">*</span>
+              </span>
+            </div>
+
+            <div
+              id="publish-toolbar"
+              class="flex flex-wrap items-center gap-2 mb-4 shrink-0"
+            >
+              <button
+                type="button"
+                class="publish-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
+                data-md-action="bold"
+                aria-label="加粗"
+                title="加粗"
+              >
+                <Icon
+                  name="material-symbols:format-bold"
+                  class="text-[1.1rem]"
+                />
+              </button>
+              <button
+                type="button"
+                class="publish-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
+                data-md-action="italic"
+                aria-label="斜体"
+                title="斜体"
+              >
+                <Icon
+                  name="material-symbols:format-italic"
+                  class="text-[1.1rem]"
+                />
+              </button>
+              <button
+                type="button"
+                class="publish-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
+                data-md-action="underline"
+                aria-label="下划线"
+                title="下划线"
+              >
+                <Icon
+                  name="material-symbols:format-underlined"
+                  class="text-[1.1rem]"
+                />
+              </button>
+              <button
+                type="button"
+                class="publish-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
+                data-md-action="strike"
+                aria-label="删除线"
+                title="删除线"
+              >
+                <Icon
+                  name="material-symbols:format-strikethrough"
+                  class="text-[1.1rem]"
+                />
+              </button>
+              <button
+                type="button"
+                class="publish-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
+                data-md-action="quote"
+                aria-label="引用"
+                title="引用"
+              >
+                <Icon
+                  name="material-symbols:format-quote"
+                  class="text-[1.1rem]"
+                />
+              </button>
+              <button
+                type="button"
+                class="publish-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
+                data-md-action="inline-code"
+                aria-label="行内代码"
+                title="行内代码"
+              >
+                <Icon name="material-symbols:code" class="text-[1.1rem]" />
+              </button>
+              <button
+                type="button"
+                class="publish-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
+                data-md-action="code-block"
+                aria-label="代码块"
+                title="代码块"
+              >
+                <Icon name="material-symbols:terminal" class="text-[1.1rem]" />
+              </button>
+            </div>
+
+            <textarea
+              id="publish-article-body"
+              rows="20"
+              placeholder="写点什么..."
+              class="w-full flex-1 rounded-xl border border-(--line-divider) bg-transparent px-4 py-3 text-90 font-mono focus:outline-none focus:border-(--primary) resize-none overflow-y-auto"
+            ></textarea>
+          </div>
+
+          <!-- 右栏：实时预览 -->
+          <div
+            class="card-base p-6 rounded-(--radius-large) flex flex-col publish-preview-col"
+          >
+            <span class="text-sm text-60 mb-4 shrink-0">实时预览</span>
+            <p
+              id="publish-preview-error"
+              class="hidden text-sm text-red-500 shrink-0"
+            >
+            </p>
+            <div id="publish-preview-scroll" class="flex-1 overflow-y-auto">
+              <div
+                id="publish-preview-content"
+                class="hidden prose prose-base dark:prose-invert max-w-none! custom-md text-90"
+              >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 操作栏 -->
+        <div
+          class="card-base px-6 py-4 rounded-(--radius-large) flex flex-wrap items-center justify-between gap-2"
+        >
+          <span id="publish-submit-msg" class="text-sm text-60"></span>
+          <div class="flex flex-wrap items-center gap-4 ml-auto">
+            <label
+              class="flex items-center gap-3 text-sm text-75 cursor-pointer select-none"
+            >
+              <input
+                id="publish-article-allow-comments"
+                type="checkbox"
+                class="toggle-checkbox"
+                checked
+              />
+              <span class="toggle-track"><span class="toggle-knob"></span></span
+              >
+              允许评论
+            </label>
+            <label
+              class="flex items-center gap-3 text-sm text-75 cursor-pointer select-none"
+            >
+              <input
+                id="publish-article-is-public"
+                type="checkbox"
+                class="toggle-checkbox"
+                checked
+              />
+              <span class="toggle-track"><span class="toggle-knob"></span></span
+              >
+              公开可见
+            </label>
+            <button
+              id="publish-save-published"
+              type="button"
+              class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
+            >
+              立即发布
+            </button>
+          </div>
+        </div>
+        <p id="publish-submit-error" class="hidden text-sm text-red-500"></p>
+      </section>
+    </div>
+    <div
+      data-enter-skeleton-inline-placeholder
+      aria-hidden="true"
+      class="space-y-4"
+    >
+      <section class="card-base px-9 py-6 rounded-(--radius-large) space-y-3">
+        <div
+          class="md3-skeleton-text"
+          style="--skeleton-width: 16%; --skeleton-height: 2rem;"
+        >
+        </div>
+        <div
+          class="md3-skeleton-text"
+          style="--skeleton-width: 46%; --skeleton-height: 0.95rem;"
+        >
+        </div>
+      </section>
+
+      <section class="space-y-4">
+        <div class="card-base p-6 rounded-(--radius-large) space-y-4">
+          <div
+            class="md3-skeleton-text"
+            style="--skeleton-width: 20%; --skeleton-height: 1.35rem;"
+          >
+          </div>
+          <div class="space-y-2.5">
+            <div
+              class="md3-skeleton-text"
+              style="--skeleton-width: 12%; --skeleton-height: 0.85rem;"
+            >
+            </div>
+            <div class="md3-skeleton-block h-11 rounded-lg"></div>
+          </div>
+          <div class="space-y-2.5">
+            <div
+              class="md3-skeleton-text"
+              style="--skeleton-width: 10%; --skeleton-height: 0.85rem;"
+            >
+            </div>
+            <div class="md3-skeleton-block h-24 rounded-lg"></div>
+          </div>
+          <div class="space-y-2.5">
+            <div
+              class="md3-skeleton-text"
+              style="--skeleton-width: 16%; --skeleton-height: 0.85rem;"
+            >
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <div class="md3-skeleton-block h-9 w-24 rounded-lg"></div>
+              <div class="md3-skeleton-block h-9 w-24 rounded-lg"></div>
+              <div
+                class="md3-skeleton-text mt-2"
+                style="--skeleton-width: 22%; --skeleton-height: 0.8rem;"
+              >
+              </div>
+            </div>
+          </div>
+          <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="space-y-2.5">
+              <div
+                class="md3-skeleton-text"
+                style="--skeleton-width: 24%; --skeleton-height: 0.85rem;"
+              >
+              </div>
+              <div class="md3-skeleton-block h-11 rounded-lg"></div>
+            </div>
+            <div class="space-y-2.5">
+              <div
+                class="md3-skeleton-text"
+                style="--skeleton-width: 22%; --skeleton-height: 0.85rem;"
+              >
+              </div>
+              <div class="md3-skeleton-block h-11 rounded-lg"></div>
+            </div>
+          </div>
+          <div class="flex gap-6">
+            <div class="flex items-center gap-2">
+              <div class="md3-skeleton-circle h-5 w-9 rounded-full"></div>
+              <div
+                class="md3-skeleton-text"
+                style="--skeleton-width: 5.8rem; --skeleton-height: 0.82rem;"
+              >
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              <div class="md3-skeleton-circle h-5 w-9 rounded-full"></div>
+              <div
+                class="md3-skeleton-text"
+                style="--skeleton-width: 5.8rem; --skeleton-height: 0.82rem;"
+              >
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 publish-dual-pane">
+          <div class="card-base p-6 rounded-(--radius-large) space-y-4">
+            <div
+              class="md3-skeleton-text"
+              style="--skeleton-width: 22%; --skeleton-height: 0.85rem;"
+            >
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <div class="md3-skeleton-block h-9 w-9 rounded-lg"></div>
+              <div class="md3-skeleton-block h-9 w-9 rounded-lg"></div>
+              <div class="md3-skeleton-block h-9 w-9 rounded-lg"></div>
+              <div class="md3-skeleton-block h-9 w-9 rounded-lg"></div>
+              <div class="md3-skeleton-block h-9 w-9 rounded-lg"></div>
+              <div class="md3-skeleton-block h-9 w-9 rounded-lg"></div>
+              <div class="md3-skeleton-block h-9 w-9 rounded-lg"></div>
+            </div>
+            <div class="md3-skeleton-block h-[32rem] rounded-xl"></div>
+          </div>
+          <div class="card-base p-6 rounded-(--radius-large) space-y-4">
+            <div
+              class="md3-skeleton-text"
+              style="--skeleton-width: 18%; --skeleton-height: 0.85rem;"
+            >
+            </div>
+            <div class="space-y-3">
+              <div class="md3-skeleton-text" style="--skeleton-width: 92%;">
+              </div>
+              <div class="md3-skeleton-text" style="--skeleton-width: 88%;">
+              </div>
+              <div class="md3-skeleton-text" style="--skeleton-width: 86%;">
+              </div>
+              <div class="md3-skeleton-text" style="--skeleton-width: 72%;">
+              </div>
+              <div class="md3-skeleton-block h-24 rounded-xl"></div>
+              <div class="md3-skeleton-text" style="--skeleton-width: 90%;">
+              </div>
+              <div class="md3-skeleton-text" style="--skeleton-width: 82%;">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="card-base px-6 py-4 rounded-(--radius-large) flex items-center justify-between gap-2"
+        >
+          <div
+            class="md3-skeleton-text"
+            style="--skeleton-width: 12rem; --skeleton-height: 0.85rem;"
+          >
+          </div>
+          <div class="md3-skeleton-block h-10 w-24 rounded-lg"></div>
+        </div>
+      </section>
+    </div>
+  </div>
+</MainGridLayout>
+
+<style>
+  .publish-dual-pane {
+    height: calc(100vh - 12rem);
+    min-height: 28rem;
+  }
+  .publish-editor-col,
+  .publish-preview-col {
+    min-height: 0;
+    overflow: hidden;
+  }
+</style>
