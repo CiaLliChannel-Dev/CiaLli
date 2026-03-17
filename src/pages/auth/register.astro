@@ -214,7 +214,7 @@ const registerI18n = {
     data-enter-skeleton-target="auth-register"
   >
     <div data-enter-skeleton-inline-content>
-      <div class="card-base rounded-(--radius-large) p-6 p-8 space-y-5">
+      <div class="card-base rounded-(--radius-large) p-6 space-y-5">
         <div class="flex items-center gap-3">
           <div
             class="w-12 h-12 rounded-2xl bg-(--btn-regular-bg) flex items-center justify-center"
@@ -287,7 +287,7 @@ const registerI18n = {
                 {currentRegistrationStatus?.description ||
                   i18n(I18nKey.authRegisterStatusUpdated)}
               </p>
-              <div class="grid grid-cols-1 grid-cols-2 gap-3 text-sm">
+              <div class="grid grid-cols-1 gap-3 text-sm">
                 <div class="rounded-lg border border-(--line-divider) bg-black/5 dark:bg-white/5 px-3 py-2.5">
                   <p class="text-60 text-xs mb-1">
                     {i18n(I18nKey.authEmailLabel)}
@@ -552,7 +552,7 @@ const registerI18n = {
       </div>
     </div>
     <div data-enter-skeleton-inline-placeholder aria-hidden="true">
-      <div class="card-base rounded-(--radius-large) p-6 p-8 space-y-5">
+      <div class="card-base rounded-(--radius-large) p-6 space-y-5">
         <div class="flex items-center gap-3">
           <div class="md3-skeleton-block w-12 h-12 rounded-2xl"></div>
           <div class="space-y-2 flex-1">
@@ -627,16 +627,15 @@ const registerI18n = {
   </div>
 
   <div
-    slot="modal"
     id="register-avatar-crop-modal"
     class="fixed inset-0 z-9999 hidden items-center justify-center bg-black/70 px-4 py-5"
     tabindex="-1"
   >
     <div
-      class="card-base w-full max-w-xl rounded-(--radius-large) border border-(--line-divider) p-5 p-6 space-y-4 text-75"
+      class="card-base w-full max-w-xl rounded-(--radius-large) border border-(--line-divider) p-5 space-y-4 text-75"
     >
       <div class="flex items-center gap-2">
-        <h3 class="text-lg text-xl font-semibold text-90">
+        <h3 class="text-lg font-semibold text-90">
           {i18n(I18nKey.authRegisterCropAvatarTitle)}
         </h3>
       </div>
@@ -715,7 +714,69 @@ const registerI18n = {
     import "@/scripts/dialogs";
   </script>
 
-  <script is:inline define:vars={{ defaultAvatarPreviewSrc, registerI18n }}>
+  <div
+    id="register-page-config"
+    data-default-avatar-src={defaultAvatarPreviewSrc}
+    data-register-i18n={JSON.stringify(registerI18n)}
+    hidden
+  >
+  </div>
+
+  <script>
+    import { setupPageInit } from "@/utils/page-init";
+
+    let defaultAvatarPreviewSrc = "";
+    let registerI18n: Record<string, string> = {};
+
+    type ProgressTaskHandle = number;
+    type ProgressTaskPayload = Record<string, unknown>;
+    type ProgressTaskStartPayload = ProgressTaskPayload & {
+      delayMs?: number;
+    };
+
+    type RegisterPageMessageTone = "normal" | "error" | "success";
+    type FieldHintTone = "default" | "error" | "success" | "loading";
+
+    type RegisterErrorPayload = {
+      error?: {
+        code?: string;
+        message?: string;
+      };
+    };
+
+    type ReapplyDraftPayload = {
+      email: string;
+      username: string;
+      displayName: string;
+      reason: string;
+      avatarFileId: string;
+      avatarUrl: string;
+    };
+
+    type ReapplyDraftInput =
+      | {
+          email?: string | null;
+          username?: string | null;
+          displayName?: string | null;
+          reason?: string | null;
+          avatarFileId?: string | null;
+          avatarUrl?: string | null;
+        }
+      | null
+      | undefined;
+
+    function readPageConfig() {
+      const el = document.getElementById("register-page-config");
+      if (el) {
+        defaultAvatarPreviewSrc =
+          el.getAttribute("data-default-avatar-src") ?? "";
+        registerI18n = JSON.parse(
+          el.getAttribute("data-register-i18n") ?? "{}",
+        );
+      }
+    }
+
+    readPageConfig();
     const API_REGISTER = "/api/v1/public/registration-requests";
     const API_REGISTER_CHECK = "/api/v1/public/registration-check";
     const API_REGISTER_SESSION = "/api/v1/public/registration-session";
@@ -728,7 +789,7 @@ const registerI18n = {
       return window.__CIALLI_PROGRESS_OVERLAY__;
     }
 
-    function startOverlayTask(options) {
+    function startOverlayTask(options: ProgressTaskStartPayload) {
       const progressOverlay = getProgressOverlay();
       if (!progressOverlay) return null;
       return progressOverlay.startTask({
@@ -737,26 +798,32 @@ const registerI18n = {
       });
     }
 
-    function updateOverlayTask(handle, stage) {
+    function updateOverlayTask(
+      handle: ProgressTaskHandle | null,
+      stage: ProgressTaskPayload,
+    ) {
       const progressOverlay = getProgressOverlay();
       if (!progressOverlay || typeof handle !== "number") return;
       progressOverlay.updateTask(handle, stage);
     }
 
-    function finishOverlayTask(handle) {
+    function finishOverlayTask(handle: ProgressTaskHandle | null) {
       const progressOverlay = getProgressOverlay();
       if (!progressOverlay || typeof handle !== "number") return;
       progressOverlay.finishTask(handle);
     }
 
     function getCsrfToken() {
-      const m = document.cookie.match(/(?:^|;\s*)cialli_csrf=([^;]*)/);
-      return m ? decodeURIComponent(m[1]) : "";
+      const element = document.querySelector('meta[name="cialli-csrf-token"]');
+      if (!(element instanceof HTMLMetaElement)) {
+        return "";
+      }
+      return element.content || "";
     }
     const AVATAR_OUTPUT_SIZE = 512;
     const AVATAR_ZOOM_MIN = 100;
     const AVATAR_ZOOM_MAX = 300;
-    const DEFAULT_AVATAR_SRC = String(defaultAvatarPreviewSrc || "").trim();
+    let DEFAULT_AVATAR_SRC = String(defaultAvatarPreviewSrc || "").trim();
 
     function bindCurrentAvatarFallback() {
       const currentAvatarEl = document.getElementById(
@@ -774,7 +841,10 @@ const registerI18n = {
       );
     }
 
-    function setPageMessage(message, tone = "normal") {
+    function setPageMessage(
+      message: string,
+      tone: RegisterPageMessageTone = "normal",
+    ) {
       const messageEl = document.getElementById("register-message");
       if (!messageEl) {
         return;
@@ -793,7 +863,11 @@ const registerI18n = {
       messageEl.textContent = message;
     }
 
-    function setFieldHint(element, message, tone = "default") {
+    function setFieldHint(
+      element: Element | null,
+      message: string,
+      tone: FieldHintTone = "default",
+    ) {
       if (!element) {
         return;
       }
@@ -826,7 +900,13 @@ const registerI18n = {
       element.classList.add("text-60");
     }
 
-    async function requestRegistrationCheck({ email, username }) {
+    async function requestRegistrationCheck({
+      email,
+      username,
+    }: {
+      email?: string;
+      username?: string;
+    }) {
       const params = new URLSearchParams();
       if (email) {
         params.set("email", email);
@@ -851,7 +931,7 @@ const registerI18n = {
       return data;
     }
 
-    function buildAssetUrl(fileId) {
+    function buildAssetUrl(fileId: string) {
       const normalized = String(fileId || "").trim();
       if (!normalized) {
         return "";
@@ -859,14 +939,14 @@ const registerI18n = {
       return `/api/v1/public/assets/${encodeURIComponent(normalized)}?width=160&height=160&fit=cover`;
     }
 
-    function toSafeFileLabel(value) {
+    function toSafeFileLabel(value: string) {
       return String(value || "")
         .trim()
         .replace(/[\\/:*?"<>|]/g, "-")
         .replace(/\s+/g, " ");
     }
 
-    function resolveRegisterError(data) {
+    function resolveRegisterError(data: RegisterErrorPayload | null): string {
       const error = data?.error;
       const code = String(error?.code || "");
       if (code === "REGISTER_DISABLED") {
@@ -902,9 +982,9 @@ const registerI18n = {
       return String(error?.message || registerI18n.submitFailed);
     }
 
-    function persistReapplyDraft(draft) {
+    function persistReapplyDraft(draft: ReapplyDraftInput) {
       try {
-        const payload = {
+        const payload: ReapplyDraftPayload = {
           email: String(draft?.email || "").trim(),
           username: String(draft?.username || "").trim(),
           displayName: String(draft?.displayName || "").trim(),
@@ -930,7 +1010,7 @@ const registerI18n = {
       }
     }
 
-    function consumeReapplyDraft() {
+    function consumeReapplyDraft(): ReapplyDraftPayload | null {
       try {
         const raw = window.sessionStorage.getItem(REAPPLY_DRAFT_STORAGE_KEY);
         if (!raw) {
@@ -960,22 +1040,34 @@ const registerI18n = {
         return;
       }
 
-      const emailEl = document.getElementById("register-email");
+      const emailEl = document.getElementById(
+        "register-email",
+      ) as HTMLInputElement | null;
       const emailHintEl = document.getElementById("register-email-hint");
-      const usernameEl = document.getElementById("register-username");
+      const usernameEl = document.getElementById(
+        "register-username",
+      ) as HTMLInputElement | null;
       const usernameHintEl = document.getElementById("register-username-hint");
-      const displayNameEl = document.getElementById("register-display-name");
-      const passwordEl = document.getElementById("register-password");
+      const displayNameEl = document.getElementById(
+        "register-display-name",
+      ) as HTMLInputElement | null;
+      const passwordEl = document.getElementById(
+        "register-password",
+      ) as HTMLInputElement | null;
       const passwordHintEl = document.getElementById("register-password-hint");
       const passwordToggleEl = document.getElementById(
         "register-password-toggle",
-      );
-      const reasonEl = document.getElementById("register-reason");
-      const submitBtn = document.getElementById("register-submit");
+      ) as HTMLButtonElement | null;
+      const reasonEl = document.getElementById(
+        "register-reason",
+      ) as HTMLTextAreaElement | null;
+      const submitBtn = document.getElementById(
+        "register-submit",
+      ) as HTMLButtonElement | null;
       const submitText = document.getElementById("register-submit-text");
       const avatarPreviewEl = document.getElementById(
         "register-avatar-preview",
-      );
+      ) as HTMLImageElement | null;
       const avatarUploadBtn = document.getElementById(
         "register-avatar-upload-btn",
       );
@@ -986,23 +1078,25 @@ const registerI18n = {
       const cropViewport = document.getElementById(
         "register-avatar-crop-viewport",
       );
-      const cropImage = document.getElementById("register-avatar-crop-image");
+      const cropImage = document.getElementById(
+        "register-avatar-crop-image",
+      ) as HTMLImageElement | null;
       const cropEmpty = document.getElementById("register-avatar-crop-empty");
       const cropFileInput = document.getElementById(
         "register-avatar-crop-file",
-      );
+      ) as HTMLInputElement | null;
       const cropSelectBtn = document.getElementById(
         "register-avatar-crop-select-btn",
       );
       const cropApplyBtn = document.getElementById(
         "register-avatar-crop-apply-btn",
-      );
+      ) as HTMLButtonElement | null;
       const cropCancelBtn = document.getElementById(
         "register-avatar-crop-cancel-btn",
       );
       const cropZoomInput = document.getElementById(
         "register-avatar-crop-zoom",
-      );
+      ) as HTMLInputElement | null;
       const cropMsg = document.getElementById("register-avatar-crop-msg");
 
       if (
@@ -1040,7 +1134,7 @@ const registerI18n = {
       }
       form.setAttribute(DATA_BOUND, "1");
 
-      const setAvatarPreviewSrc = (input) => {
+      const setAvatarPreviewSrc = (input: string) => {
         const next = String(input || "").trim() || DEFAULT_AVATAR_SRC;
         avatarPreviewEl.dataset.fallbackApplied = "0";
         avatarPreviewEl.src = next;
@@ -1055,15 +1149,13 @@ const registerI18n = {
       setAvatarPreviewSrc(DEFAULT_AVATAR_SRC);
 
       let avatarFileId = "";
-      let pendingAvatarBlob = null;
+      let pendingAvatarBlob: Blob | null = null;
       let pendingAvatarPreviewUrl = "";
       let avatarUploading = false;
       let emailCheckSeq = 0;
       let usernameCheckSeq = 0;
       let emailCheckTimer = 0;
       let usernameCheckTimer = 0;
-      let emailCheckPassed = false;
-      let usernameCheckPassed = false;
       let passwordCheckPassed = false;
       let cropObjectUrl = "";
       let cropLoaded = false;
@@ -1074,11 +1166,12 @@ const registerI18n = {
       let cropScale = 1;
       let cropOffsetX = 0;
       let cropOffsetY = 0;
-      let cropPointerId = null;
+      let cropPointerId: number | null = null;
       let cropPointerX = 0;
       let cropPointerY = 0;
 
-      const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+      const clamp = (value: number, min: number, max: number): number =>
+        Math.min(max, Math.max(min, value));
 
       const revokePendingAvatarPreviewUrl = () => {
         if (!pendingAvatarPreviewUrl) {
@@ -1093,10 +1186,16 @@ const registerI18n = {
       const PASSWORD_PATTERN = /^[A-Za-z0-9@_]+$/;
       const PASSWORD_MIN_LENGTH = 8;
       const PASSWORD_MAX_LENGTH = 20;
+      const ACCOUNT_CHECK_DEBOUNCE_MS = 2000;
 
       const validateEmailField = async (force = false) => {
         const value = String(emailEl.value || "").trim();
-        emailCheckPassed = false;
+        // 邮箱变化时先清理待执行定时器，避免重复请求积压。
+        window.clearTimeout(emailCheckTimer);
+        if (!force) {
+          // 输入中的新值要使旧请求结果失效，防止旧提示覆盖新状态。
+          emailCheckSeq += 1;
+        }
         if (!value) {
           setFieldHint(emailHintEl, registerI18n.emailRequired, "default");
           return false;
@@ -1116,7 +1215,6 @@ const registerI18n = {
             }
             const result = data?.email;
             if (result?.valid && result?.available) {
-              emailCheckPassed = true;
               setFieldHint(emailHintEl, registerI18n.emailAvailable, "success");
               return true;
             }
@@ -1144,16 +1242,21 @@ const registerI18n = {
         if (force) {
           return await run();
         }
-        window.clearTimeout(emailCheckTimer);
         emailCheckTimer = window.setTimeout(() => {
+          emailCheckTimer = 0;
           void run();
-        }, 350);
+        }, ACCOUNT_CHECK_DEBOUNCE_MS);
         return false;
       };
 
       const validateUsernameField = async (force = false) => {
         const value = String(usernameEl.value || "").trim();
-        usernameCheckPassed = false;
+        // 用户名发生变化时立即清理待执行定时器，避免积压重复请求。
+        window.clearTimeout(usernameCheckTimer);
+        if (!force) {
+          // 输入中的值变化应让旧请求结果失效，防止旧值覆盖最新提示。
+          usernameCheckSeq += 1;
+        }
         if (!value) {
           setFieldHint(
             usernameHintEl,
@@ -1181,7 +1284,6 @@ const registerI18n = {
             }
             const result = data?.username;
             if (result?.valid && result?.available) {
-              usernameCheckPassed = true;
               setFieldHint(
                 usernameHintEl,
                 registerI18n.usernameAvailable,
@@ -1213,14 +1315,14 @@ const registerI18n = {
         if (force) {
           return await run();
         }
-        window.clearTimeout(usernameCheckTimer);
         usernameCheckTimer = window.setTimeout(() => {
+          usernameCheckTimer = 0;
           void run();
-        }, 350);
+        }, ACCOUNT_CHECK_DEBOUNCE_MS);
         return false;
       };
 
-      const setPasswordVisible = (visible) => {
+      const setPasswordVisible = (visible: boolean) => {
         const nextType = visible ? "text" : "password";
         try {
           passwordEl.type = nextType;
@@ -1306,7 +1408,7 @@ const registerI18n = {
         setPageMessage(registerI18n.reapplyDraftLoaded, "success");
       }
 
-      const setCropMessage = (message) => {
+      const setCropMessage = (message: string) => {
         cropMsg.textContent = String(message || "");
       };
 
@@ -1317,7 +1419,7 @@ const registerI18n = {
           : registerI18n.cropApply;
       };
 
-      const setCropEmptyVisible = (visible) => {
+      const setCropEmptyVisible = (visible: boolean) => {
         cropEmpty.classList.toggle("hidden", !visible);
       };
 
@@ -1399,7 +1501,11 @@ const registerI18n = {
         setCropEmptyVisible(false);
       };
 
-      const setCropScaleFromZoom = (zoomValue, anchorX, anchorY) => {
+      const setCropScaleFromZoom = (
+        zoomValue: number | string,
+        anchorX: number,
+        anchorY: number,
+      ) => {
         if (!cropLoaded || cropViewportSize <= 0) {
           return;
         }
@@ -1423,7 +1529,7 @@ const registerI18n = {
         cropZoomInput.value = String(Math.round(normalizedZoom));
       };
 
-      const loadCropFile = (file) => {
+      const loadCropFile = (file: File | null | undefined) => {
         if (!file) {
           setCropMessage(registerI18n.selectImage);
           return;
@@ -1459,7 +1565,7 @@ const registerI18n = {
         cropImage.src = nextObjectUrl;
       };
 
-      const buildCropBlob = async () => {
+      const buildCropBlob = async (): Promise<Blob | null> => {
         if (!cropLoaded || cropViewportSize <= 0) {
           return null;
         }
@@ -1481,12 +1587,12 @@ const registerI18n = {
           cropImageWidth * cropScale * ratio,
           cropImageHeight * cropScale * ratio,
         );
-        return await new Promise((resolve) => {
+        return await new Promise<Blob | null>((resolve) => {
           canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.92);
         });
       };
 
-      const uploadCroppedAvatar = async (blob) => {
+      const uploadCroppedAvatar = async (blob: Blob) => {
         const avatarTitleBase = `Avatar-${toSafeFileLabel(String(emailEl.value || "").trim() || "unknown")}`;
         const formData = new FormData();
         formData.append("file", blob, `${avatarTitleBase}.jpg`);
@@ -1617,7 +1723,7 @@ const registerI18n = {
         cropOffsetY += deltaY;
         renderCropImage();
       });
-      const releasePointer = (event) => {
+      const releasePointer = (event: PointerEvent) => {
         if (cropPointerId !== event.pointerId) {
           return;
         }
@@ -1660,10 +1766,8 @@ const registerI18n = {
           return;
         }
         const [emailAvailable, usernameAvailable] = await Promise.all([
-          emailCheckPassed ? Promise.resolve(true) : validateEmailField(true),
-          usernameCheckPassed
-            ? Promise.resolve(true)
-            : validateUsernameField(true),
+          validateEmailField(true),
+          validateUsernameField(true),
         ]);
         if (!emailAvailable || !usernameAvailable) {
           setPageMessage(registerI18n.fixAccountFieldFirst, "error");
@@ -1862,12 +1966,28 @@ const registerI18n = {
     }
 
     function initPage() {
+      readPageConfig();
+      DEFAULT_AVATAR_SRC = String(defaultAvatarPreviewSrc || "").trim();
+
+      const oldCropModal = document.body.querySelector(
+        ":scope > #register-avatar-crop-modal",
+      );
+      if (oldCropModal) {
+        oldCropModal.remove();
+      }
+      const cropModal = document.getElementById("register-avatar-crop-modal");
+      if (cropModal) {
+        document.body.appendChild(cropModal);
+      }
+
       bindCurrentAvatarFallback();
       initRegisterPage();
       initRegistrationStatusPage();
     }
 
-    initPage();
-    document.addEventListener("astro:after-swap", initPage);
+    setupPageInit({
+      key: "auth-register-page",
+      init: initPage,
+    });
   </script>
 </MainGridLayout>

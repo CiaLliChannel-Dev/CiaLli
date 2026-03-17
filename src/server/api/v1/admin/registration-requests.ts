@@ -126,7 +126,6 @@ async function createManagedUser(
     });
 
     const permissions = await createOne("app_user_permissions", {
-        status: "published",
         user_id: createdUser.id,
         app_role: normalizeAppRole(input.appRole || "member"),
         can_publish_articles: true,

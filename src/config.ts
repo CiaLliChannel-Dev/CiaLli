@@ -10,7 +10,7 @@ import {
 import { LinkPreset } from "./types/config";
 
 export const systemSiteConfig: SystemSiteConfig = {
-    siteURL: "https://cialli.mysqil.com/",
+    siteURL: "https://www.ciallichannel.com/",
     lang: "zh_CN",
     themeColor: {
         hue: 285,
@@ -19,15 +19,11 @@ export const systemSiteConfig: SystemSiteConfig = {
     font: {
         asciiFont: {
             fontFamily: "ZenMaruGothic-Medium",
-            fontWeight: "400",
-            localFonts: ["ZenMaruGothic-Medium.woff2"],
-            enableCompress: false,
+            fontWeight: "500",
         },
         cjkFont: {
             fontFamily: "LoliTi-SecondEdition",
-            fontWeight: "500",
-            localFonts: ["LoliTi-SecondEdition.woff2"],
-            enableCompress: false,
+            fontWeight: "400",
         },
     },
     pageScaling: {

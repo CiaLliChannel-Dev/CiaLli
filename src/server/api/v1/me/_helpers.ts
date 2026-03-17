@@ -24,7 +24,12 @@ export async function renderMeMarkdownPreview(
         return "";
     }
     try {
-        return await renderMarkdown(source, { target: "page", mode });
+        return await renderMarkdown(source, {
+            target: "page",
+            mode,
+            // 仅预览链路放开 blob，支持本地粘贴图在编辑阶段即时预览。
+            allowBlobImages: true,
+        });
     } catch (error) {
         console.error("[me] markdown preview failed:", error);
         return "";

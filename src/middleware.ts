@@ -72,8 +72,8 @@ export const onRequest = defineMiddleware(async (context, next) => {
         console.error("[middleware] failed to load site settings:", error);
     }
 
-    // 4. 确保 CSRF cookie 存在
-    ensureCsrfCookie(context);
+    // 4. 确保 CSRF cookie 存在，并把 token 传给 SSR 用于 <meta> 注入
+    context.locals.csrfToken = ensureCsrfCookie(context);
 
     // 5. 执行后续处理
     const response = await next();

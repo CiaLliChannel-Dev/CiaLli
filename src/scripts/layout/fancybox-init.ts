@@ -36,21 +36,10 @@ export function createFancyboxController(): FancyboxController {
             return;
         }
 
-        const albumImagesSelector =
+        const markdownImagesSelector =
             ".custom-md img, #post-cover img, .moment-images img";
-        const albumLinksSelector = ".moment-images a[data-fancybox]";
         const albumPhotoSelector = `.dc-album-gallery [data-fancybox='${ALBUM_PREVIEW_GROUP}']`;
-        const singleFancyboxSelector = `[data-fancybox]:not(.moment-images a):not([data-fancybox='${ALBUM_PREVIEW_GROUP}'])`;
-
-        const hasImages =
-            document.querySelector(albumImagesSelector) ||
-            document.querySelector(albumLinksSelector) ||
-            document.querySelector(albumPhotoSelector) ||
-            document.querySelector(singleFancyboxSelector);
-
-        if (!hasImages) {
-            return;
-        }
+        const genericFancyboxSelector = `[data-fancybox]:not([data-fancybox='${ALBUM_PREVIEW_GROUP}'])`;
 
         fancyboxInitializing = true;
         try {
@@ -123,7 +112,8 @@ export function createFancyboxController(): FancyboxController {
                 },
             };
 
-            fancybox.bind(albumImagesSelector, {
+            // 始终注册选择器代理，避免评论等异步渲染场景漏绑导致回退到浏览器原生预览。
+            fancybox.bind(markdownImagesSelector, {
                 ...commonConfig,
                 groupAll: true,
                 Carousel: {
@@ -131,9 +121,12 @@ export function createFancyboxController(): FancyboxController {
                     preload: 2,
                 },
             });
-            fancyboxSelectors.push(albumImagesSelector);
+            fancyboxSelectors.push(markdownImagesSelector);
 
-            fancybox.bind(albumLinksSelector, {
+            fancybox.bind(albumPhotoSelector, albumConfig);
+            fancyboxSelectors.push(albumPhotoSelector);
+
+            fancybox.bind(genericFancyboxSelector, {
                 ...commonConfig,
                 source: (el: Element) => {
                     return (
@@ -141,13 +134,7 @@ export function createFancyboxController(): FancyboxController {
                     );
                 },
             });
-            fancyboxSelectors.push(albumLinksSelector);
-
-            fancybox.bind(albumPhotoSelector, albumConfig);
-            fancyboxSelectors.push(albumPhotoSelector);
-
-            fancybox.bind(singleFancyboxSelector, commonConfig);
-            fancyboxSelectors.push(singleFancyboxSelector);
+            fancyboxSelectors.push(genericFancyboxSelector);
         } finally {
             fancyboxInitializing = false;
         }

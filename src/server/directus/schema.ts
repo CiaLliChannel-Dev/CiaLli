@@ -5,7 +5,6 @@ import type {
     AppArticleComment,
     AppArticleCommentLike,
     AppArticleLike,
-    AppContentReport,
     AppDiary,
     AppDiaryComment,
     AppDiaryCommentLike,
@@ -37,7 +36,6 @@ export type DirectusSchema = {
     app_album_photos: AppAlbumPhoto[];
     app_friends: AppFriend[];
     app_user_blocks: AppUserBlock[];
-    app_content_reports: AppContentReport[];
     app_user_registration_requests: AppUserRegistrationRequest[];
     app_site_settings: AppSiteSettings[];
     directus_users: AppUser[];

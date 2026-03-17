@@ -6,7 +6,6 @@ import { requireAccess } from "../shared";
 import { handleMeProfile } from "./profile";
 import { handleMePrivacy, handleMePermissions } from "./privacy";
 import { handleMeBlocks } from "./blocks";
-import { handleMeReports } from "./reports";
 import {
     handleMeArticleCommentLikes,
     handleMeArticleLikes,
@@ -38,9 +37,6 @@ export async function handleMe(
     }
     if (segments.length >= 1 && segments[0] === "blocks") {
         return await handleMeBlocks(context, access, segments);
-    }
-    if (segments.length >= 1 && segments[0] === "reports") {
-        return await handleMeReports(context, access, segments);
     }
     if (segments.length >= 1 && segments[0] === "article-likes") {
         return await handleMeArticleLikes(context, access, segments);

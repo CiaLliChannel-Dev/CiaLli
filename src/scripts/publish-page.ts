@@ -594,7 +594,7 @@ export function initPublishPage(): void {
         }
         try {
             for (const key of keys) {
-                localStorage.setItem(key, cleanPassword);
+                sessionStorage.setItem(key, cleanPassword);
             }
         } catch (error) {
             console.warn("[publish] persist owner password failed:", error);
@@ -1160,7 +1160,7 @@ export function initPublishPage(): void {
         const passwords = new Set<string>();
         try {
             for (const key of keys) {
-                const value = toStringValue(localStorage.getItem(key));
+                const value = toStringValue(sessionStorage.getItem(key));
                 if (value) {
                     passwords.add(value);
                 }

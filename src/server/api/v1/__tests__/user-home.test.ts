@@ -149,4 +149,25 @@ describe("handleUserHome route modules", () => {
         expect(body.ok).toBe(true);
         expect(Array.isArray(body.bangumi)).toBe(true);
     });
+
+    it("/users/:username/bangumi permission_denied -> 404", async () => {
+        mockedLoadUserBangumiList.mockResolvedValue({
+            status: "permission_denied",
+            reason: "bangumi_not_public",
+        });
+
+        const ctx = createMockAPIContext({
+            method: "GET",
+            url: "http://localhost:4321/api/v1/users/alice/bangumi",
+            params: { segments: "users/alice/bangumi" },
+        });
+
+        const response = await handleUserHome(ctx as unknown as APIContext, [
+            "users",
+            "alice",
+            "bangumi",
+        ]);
+
+        expect(response.status).toBe(404);
+    });
 });

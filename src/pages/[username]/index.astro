@@ -47,7 +47,7 @@ try {
       }
       Astro.response.status = 404;
     } else if (result.status === "permission_denied") {
-      Astro.response.status = 403;
+      Astro.response.status = 404;
     }
   }
 } catch (error) {
@@ -69,15 +69,7 @@ const sectionOrder =
   description={payload?.profile?.bio || ""}
 >
   {
-    result.status === "permission_denied" ? (
-      <ContentNotVisible
-        mode="permission_denied"
-        title={i18n(I18nKey.userHomePrivateTitle)}
-        description={i18n(I18nKey.userHomePrivateDescription)}
-        backHref="/"
-        backLabel={i18n(I18nKey.userBackToHome)}
-      />
-    ) : result.status === "not_found" ? (
+    result.status === "not_found" || result.status === "permission_denied" ? (
       <ContentNotVisible
         mode="not_found"
         title={i18n(I18nKey.userNotFoundTitle)}

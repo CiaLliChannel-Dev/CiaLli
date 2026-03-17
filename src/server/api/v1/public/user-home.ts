@@ -30,16 +30,11 @@ function statusFromQuery(value: string): BangumiCollectionStatus | undefined {
 }
 
 function failFromLoadResult(result: ContentLoadResult<unknown>): Response {
-    if (result.status === "not_found") {
-        return fail("用户主页不存在", 404);
+    if (result.status === "ok") {
+        return fail("未找到接口", 404);
     }
-    if (
-        result.status === "permission_denied" &&
-        result.reason === "profile_not_public"
-    ) {
-        return fail("用户主页不存在", 404);
-    }
-    return fail("内容未公开", 403);
+    // 统一 404，避免通过状态码或文案判断资源存在性。
+    return fail("资源不存在", 404);
 }
 
 export async function handleUserHome(

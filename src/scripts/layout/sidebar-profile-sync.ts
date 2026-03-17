@@ -1,16 +1,324 @@
+import { SOCIAL_PLATFORM_META } from "@constants/social-platforms";
+
+type SidebarSocialMode = "single" | "multi";
+
+type SidebarSocialLink = {
+    platform: string;
+    url: string;
+    label: string;
+    iconNodes: Node[];
+};
+
 export type SidebarProfilePatch = {
     uid: string;
     displayName: string;
     bio: string;
     profileLink: string;
     avatarUrl: string;
-    socialHtml: string;
+    socialMode: SidebarSocialMode;
+    socialLinks: SidebarSocialLink[];
 };
 
 const PROFILE_UPDATE_TIMEOUT_MS = 420;
+const SAFE_SOCIAL_URL_RE = /^(https?:\/\/|mailto:|tel:)/i;
+const SOCIAL_LINK_FALLBACK_LABEL = "Link";
+const SOCIAL_ICON_TAG_ALLOWLIST = new Set([
+    "svg",
+    "path",
+    "g",
+    "circle",
+    "rect",
+    "line",
+    "polyline",
+    "polygon",
+    "ellipse",
+    "defs",
+    "clippath",
+    "mask",
+    "title",
+    "desc",
+    "symbol",
+    "use",
+    "span",
+    "i",
+]);
 
 function clean(value: string | null | undefined): string {
     return String(value || "").trim();
+}
+
+function toRecord(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== "object") {
+        return null;
+    }
+    return value as Record<string, unknown>;
+}
+
+function isSafeSocialUrl(value: string): boolean {
+    return SAFE_SOCIAL_URL_RE.test(value);
+}
+
+function resolveSocialLabel(platform: string, label?: string): string {
+    const normalizedLabel = clean(label);
+    if (normalizedLabel) {
+        return normalizedLabel;
+    }
+
+    const meta = SOCIAL_PLATFORM_META[platform];
+    if (meta?.label) {
+        return meta.label;
+    }
+
+    return clean(platform) || SOCIAL_LINK_FALLBACK_LABEL;
+}
+
+function createSocialLink(
+    platform: string,
+    url: string,
+    label?: string,
+    iconNodes: Node[] = [],
+): SidebarSocialLink | null {
+    const normalizedUrl = clean(url);
+    if (!normalizedUrl || !isSafeSocialUrl(normalizedUrl)) {
+        return null;
+    }
+
+    const normalizedPlatform = clean(platform);
+    return {
+        platform: normalizedPlatform || "website",
+        url: normalizedUrl,
+        label: resolveSocialLabel(normalizedPlatform, label),
+        iconNodes,
+    };
+}
+
+function cloneSafeSocialNode(node: Node): Node | null {
+    if (node.nodeType === Node.TEXT_NODE) {
+        return document.createTextNode(node.textContent || "");
+    }
+
+    if (!(node instanceof Element)) {
+        return null;
+    }
+
+    const tagName = node.tagName.toLowerCase();
+    if (!SOCIAL_ICON_TAG_ALLOWLIST.has(tagName)) {
+        return null;
+    }
+
+    const namespace = node.namespaceURI || undefined;
+    const cloned = namespace
+        ? document.createElementNS(namespace, node.tagName)
+        : document.createElement(node.tagName);
+
+    for (const { name, value } of Array.from(node.attributes)) {
+        const lower = name.toLowerCase();
+        if (lower.startsWith("on") || lower === "style") {
+            continue;
+        }
+        if (lower === "href" || lower === "xlink:href") {
+            const normalizedHref = clean(value);
+            const safeRef =
+                normalizedHref.startsWith("#") ||
+                normalizedHref.startsWith("data:image/") ||
+                SAFE_SOCIAL_URL_RE.test(normalizedHref);
+            if (!safeRef) {
+                continue;
+            }
+        }
+        cloned.setAttribute(name, value);
+    }
+
+    for (const child of Array.from(node.childNodes)) {
+        const safeChild = cloneSafeSocialNode(child);
+        if (!safeChild) {
+            continue;
+        }
+        cloned.appendChild(safeChild);
+    }
+
+    return cloned;
+}
+
+function extractSocialIconNodes(anchor: HTMLAnchorElement): Node[] {
+    const iconNodes = Array.from(anchor.children)
+        .map((child) => cloneSafeSocialNode(child))
+        .filter((node): node is Node => node !== null);
+
+    return iconNodes;
+}
+
+function dedupeSocialLinks(links: SidebarSocialLink[]): SidebarSocialLink[] {
+    const indexMap = new Map<string, number>();
+    const deduped: SidebarSocialLink[] = [];
+
+    for (const link of links) {
+        const key = `${link.platform}::${link.url}`;
+        const existingIndex = indexMap.get(key);
+        if (typeof existingIndex === "number") {
+            if (
+                deduped[existingIndex] &&
+                deduped[existingIndex].iconNodes.length === 0 &&
+                link.iconNodes.length > 0
+            ) {
+                deduped[existingIndex] = {
+                    ...deduped[existingIndex],
+                    iconNodes: link.iconNodes,
+                };
+            }
+            continue;
+        }
+        indexMap.set(key, deduped.length);
+        deduped.push(link);
+    }
+
+    return deduped;
+}
+
+function parseSocialLinksFromDataset(
+    raw: string | undefined,
+): SidebarSocialLink[] {
+    const text = clean(raw);
+    if (!text) {
+        return [];
+    }
+
+    try {
+        const parsed = JSON.parse(text) as unknown;
+        if (!Array.isArray(parsed)) {
+            return [];
+        }
+
+        const links = parsed
+            .map((item) => {
+                const record = toRecord(item);
+                if (!record) {
+                    return null;
+                }
+                const platform = clean(String(record.platform || ""));
+                const url = clean(String(record.url || ""));
+                const label = clean(String(record.label || ""));
+                return createSocialLink(platform, url, label, []);
+            })
+            .filter((item): item is SidebarSocialLink => item !== null);
+
+        return dedupeSocialLinks(links);
+    } catch {
+        return [];
+    }
+}
+
+function parseSocialLinksFromAnchors(
+    social: HTMLElement | null,
+): SidebarSocialLink[] {
+    if (!(social instanceof HTMLElement)) {
+        return [];
+    }
+
+    const links = Array.from(social.querySelectorAll<HTMLAnchorElement>("a"))
+        .map((anchor) => {
+            const platform = clean(anchor.dataset.socialPlatform);
+            const url = clean(anchor.getAttribute("href"));
+            const label = clean(anchor.getAttribute("aria-label"));
+            const iconNodes = extractSocialIconNodes(anchor);
+            return createSocialLink(platform, url, label, iconNodes);
+        })
+        .filter((item): item is SidebarSocialLink => item !== null);
+
+    return dedupeSocialLinks(links);
+}
+
+function resolveSocialMode(
+    mode: string | undefined,
+    links: SidebarSocialLink[],
+): SidebarSocialMode {
+    if (mode === "single" || mode === "multi") {
+        return mode;
+    }
+    return links.length === 1 ? "single" : "multi";
+}
+
+function serializeSocialLinks(links: SidebarSocialLink[]): string {
+    return JSON.stringify(
+        links.map((link) => ({
+            platform: link.platform,
+            url: link.url,
+            label: link.label,
+        })),
+    );
+}
+
+function createSocialAnchor(
+    link: SidebarSocialLink,
+    socialMode: SidebarSocialMode,
+): HTMLAnchorElement {
+    const anchor = document.createElement("a");
+    const isSingle = socialMode === "single";
+
+    anchor.setAttribute("rel", "me noopener noreferrer");
+    anchor.setAttribute("aria-label", link.label);
+    anchor.setAttribute("href", link.url);
+    anchor.setAttribute("target", "_blank");
+    anchor.dataset.socialPlatform = link.platform;
+    const hasSafeIcon = link.iconNodes.length > 0;
+
+    if (isSingle) {
+        anchor.className =
+            "btn-regular rounded-lg h-10 gap-2 px-3 font-bold active:scale-95 inline-flex items-center";
+        if (hasSafeIcon) {
+            for (const iconNode of link.iconNodes) {
+                anchor.appendChild(iconNode.cloneNode(true));
+            }
+        } else {
+            const icon = document.createElement("span");
+            icon.className = "text-sm leading-none";
+            icon.textContent = "↗";
+            anchor.appendChild(icon);
+        }
+        const text = document.createElement("span");
+        text.textContent = link.label;
+        anchor.appendChild(text);
+        return anchor;
+    }
+
+    anchor.className =
+        "btn-regular rounded-lg h-10 w-10 active:scale-90 inline-flex items-center justify-center text-xs font-semibold uppercase";
+    if (hasSafeIcon) {
+        for (const iconNode of link.iconNodes) {
+            anchor.appendChild(iconNode.cloneNode(true));
+        }
+        return anchor;
+    }
+
+    const compactLabel = clean(link.label)
+        .replace(/[^A-Za-z0-9]/g, "")
+        .slice(0, 2)
+        .toUpperCase();
+    anchor.textContent = compactLabel || "↗";
+    return anchor;
+}
+
+/**
+ * 社交链接使用结构化白名单重建，避免把旧 DOM 的 innerHTML 回放到新页面。
+ */
+function renderSocialLinks(
+    social: HTMLElement,
+    links: SidebarSocialLink[],
+    mode: SidebarSocialMode,
+): void {
+    social.replaceChildren();
+
+    if (links.length === 0) {
+        return;
+    }
+
+    const socialMode: SidebarSocialMode =
+        mode === "single" && links.length === 1 ? "single" : "multi";
+    const renderLinks = socialMode === "single" ? [links[0]] : links;
+
+    for (const link of renderLinks) {
+        social.appendChild(createSocialAnchor(link, socialMode));
+    }
 }
 
 function readProfileRoot(scope: ParentNode | null): HTMLElement | null {
@@ -152,6 +460,18 @@ export function extractSidebarProfilePatch(
         clean(avatar?.getAttribute("src"));
     const bioText =
         clean(root.dataset.sidebarProfileBio) || clean(bio?.textContent);
+    const socialLinksFromAnchors = parseSocialLinksFromAnchors(social);
+    const socialLinksFromDataset = parseSocialLinksFromDataset(
+        root.dataset.sidebarProfileSocialLinks,
+    );
+    const normalizedSocialLinks =
+        socialLinksFromAnchors.length > 0
+            ? socialLinksFromAnchors
+            : socialLinksFromDataset;
+    const socialMode = resolveSocialMode(
+        root.dataset.sidebarProfileSocialMode,
+        normalizedSocialLinks,
+    );
 
     return {
         uid,
@@ -159,7 +479,8 @@ export function extractSidebarProfilePatch(
         bio: bioText,
         profileLink,
         avatarUrl,
-        socialHtml: social?.innerHTML || "",
+        socialMode,
+        socialLinks: normalizedSocialLinks,
     };
 }
 
@@ -202,8 +523,8 @@ export function applySidebarProfilePatch(patch: SidebarProfilePatch): void {
         if (bio) {
             bio.textContent = patch.bio;
         }
-        if (social && social.innerHTML !== patch.socialHtml) {
-            social.innerHTML = patch.socialHtml;
+        if (social) {
+            renderSocialLinks(social, patch.socialLinks, patch.socialMode);
         }
         if (avatar) {
             avatars.push(avatar);
@@ -214,6 +535,10 @@ export function applySidebarProfilePatch(patch: SidebarProfilePatch): void {
         root.dataset.sidebarProfileBio = patch.bio;
         root.dataset.sidebarProfileAvatar = patch.avatarUrl;
         root.dataset.sidebarProfileLink = patch.profileLink || "/about";
+        root.dataset.sidebarProfileSocialMode = patch.socialMode;
+        root.dataset.sidebarProfileSocialLinks = serializeSocialLinks(
+            patch.socialLinks,
+        );
     });
 
     sidebar.dataset.sidebarUid = patch.uid || "__official__";

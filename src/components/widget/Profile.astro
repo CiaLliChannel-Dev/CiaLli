@@ -50,6 +50,10 @@ const profileLink = sidebarData.username
 const enabledLinks = (sidebarData.social_links || []).filter(
   (link: SocialLink) => link.enabled,
 );
+const socialLinkPayload = enabledLinks.map((link: SocialLink) => ({
+  platform: String(link.platform || "").trim(),
+  url: String(link.url || "").trim(),
+}));
 ---
 
 <div
@@ -60,6 +64,10 @@ const enabledLinks = (sidebarData.social_links || []).filter(
   data-sidebar-profile-bio={bio}
   data-sidebar-profile-avatar={avatarUrl}
   data-sidebar-profile-link={profileLink}
+  data-sidebar-profile-social-links={JSON.stringify(socialLinkPayload)}
+  data-sidebar-profile-social-mode={enabledLinks.length === 1
+    ? "single"
+    : "multi"}
 >
   <a
     aria-label="Go to Profile Page"
@@ -131,10 +139,11 @@ const enabledLinks = (sidebarData.social_links || []).filter(
             const label = meta?.label || item.platform;
             return (
               <a
-                rel="me"
+                rel="me noopener noreferrer"
                 aria-label={label}
                 href={item.url}
                 target="_blank"
+                data-social-platform={item.platform}
                 class="btn-regular rounded-lg h-10 w-10 active:scale-90"
               >
                 <Icon name={icon} class="text-[1.5rem]" />
@@ -151,10 +160,11 @@ const enabledLinks = (sidebarData.social_links || []).filter(
             const label = meta?.label || item.platform;
             return (
               <a
-                rel="me"
+                rel="me noopener noreferrer"
                 aria-label={label}
                 href={item.url}
                 target="_blank"
+                data-social-platform={item.platform}
                 class="btn-regular rounded-lg h-10 gap-2 px-3 font-bold active:scale-95"
               >
                 <Icon name={icon} class="text-[1.5rem]" />

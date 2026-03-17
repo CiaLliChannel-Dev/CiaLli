@@ -13,6 +13,27 @@ import { AppError } from "@/server/api/errors";
 import { createRequestLogger } from "@/server/api/logger";
 import { fail } from "@/server/api/response";
 
+function toPublicAppError(error: AppError): AppError {
+    // Directus 相关错误对外统一脱敏，避免泄露内部集合名/字段/错误码细节。
+    if (!error.code.startsWith("DIRECTUS_")) {
+        return error;
+    }
+
+    if (error.status === 403) {
+        return new AppError("DIRECTUS_FORBIDDEN", "权限不足", 403);
+    }
+
+    if (error.status === 404) {
+        return new AppError("DIRECTUS_NOT_FOUND", "资源不存在", 404);
+    }
+
+    if (error.status >= 500) {
+        return new AppError("DIRECTUS_ERROR", "服务端错误", error.status);
+    }
+
+    return new AppError("DIRECTUS_ERROR", "请求参数无效", error.status);
+}
+
 export function withErrorHandler(
     handler: (context: APIContext) => Promise<Response>,
 ): (context: APIContext) => Promise<Response> {
@@ -35,7 +56,12 @@ export function withErrorHandler(
             let response: Response;
 
             if (error instanceof AppError) {
-                response = fail(error.message, error.status, error.code);
+                const publicError = toPublicAppError(error);
+                response = fail(
+                    publicError.message,
+                    publicError.status,
+                    publicError.code,
+                );
 
                 logger.error("request failed", error, {
                     status: error.status,

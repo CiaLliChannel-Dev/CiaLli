@@ -31,6 +31,7 @@ export type RenderMarkdownOptions = {
     target?: MarkdownRenderTarget;
     site?: URL;
     mode?: MarkdownRenderMode;
+    allowBlobImages?: boolean;
 };
 
 const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
@@ -224,7 +225,12 @@ export async function renderMarkdown(
     options: RenderMarkdownOptions = {},
 ): Promise<string> {
     const totalStart = performance.now();
-    const { target = "page", site, mode = "full" } = options;
+    const {
+        target = "page",
+        site,
+        mode = "full",
+        allowBlobImages = false,
+    } = options;
     const source = String(markdown || "");
     if (!source.trim()) {
         return "";
@@ -232,7 +238,7 @@ export async function renderMarkdown(
 
     const hashInput = target === "feed" && site ? source + site.href : source;
     const hash = createHash("sha256").update(hashInput).digest("hex");
-    const cacheKey = `${target}:${mode}:${hash}`;
+    const cacheKey = `${target}:${mode}:${allowBlobImages ? "blob" : "strict"}:${hash}`;
 
     const cached = await cacheManager.get<string>("markdown", cacheKey);
     if (cached !== null) {
@@ -256,7 +262,9 @@ export async function renderMarkdown(
     const parseTransformMs = performance.now() - parseTransformStart;
 
     const sanitizeStart = performance.now();
-    const sanitizedHtml = sanitizeMarkdownHtml(String(rendered.value || ""));
+    const sanitizedHtml = sanitizeMarkdownHtml(String(rendered.value || ""), {
+        allowBlobImages,
+    });
     const sanitizeMs = performance.now() - sanitizeStart;
     if (!sanitizedHtml) {
         logRenderMetrics({

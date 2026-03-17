@@ -2,8 +2,6 @@ import type {
     AppRole,
     AppStatus,
     CommentStatus,
-    ContentReportReason,
-    ContentReportTargetType,
     RegistrationRequestStatus,
 } from "@/types/app";
 
@@ -48,34 +46,6 @@ export function normalizeCommentStatus(
         return input;
     }
     return fallback;
-}
-
-export function normalizeReportTargetType(
-    input: string,
-): ContentReportTargetType | null {
-    if (
-        input === "article" ||
-        input === "diary" ||
-        input === "article_comment" ||
-        input === "diary_comment"
-    ) {
-        return input;
-    }
-    return null;
-}
-
-export function normalizeReportReason(input: string): ContentReportReason {
-    if (
-        input === "spam" ||
-        input === "abuse" ||
-        input === "hate" ||
-        input === "violence" ||
-        input === "copyright" ||
-        input === "other"
-    ) {
-        return input;
-    }
-    return "other";
 }
 
 export function normalizeRegistrationRequestStatus(

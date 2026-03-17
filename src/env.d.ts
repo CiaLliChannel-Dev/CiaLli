@@ -8,6 +8,7 @@ declare namespace App {
         sidebarProfile?: import("./types/app").SidebarProfileData;
         siteSettings?: import("./types/site-settings").ResolvedSiteSettings;
         requestId?: string;
+        csrfToken?: string;
     }
 }
 

@@ -9,6 +9,7 @@ import {
     type MarkdownRenderMode,
 } from "@/server/markdown/render";
 import {
+    countItems,
     createOne,
     deleteOne,
     readMany,
@@ -44,9 +45,35 @@ type CommentLikeCollection =
     | "app_article_comment_likes"
     | "app_diary_comment_likes";
 type CommentLikeField = "article_comment_id" | "diary_comment_id";
+type CommentRelationField = "article_id" | "diary_id";
+
+const COMMENT_PAGE_SIZE_DEFAULT = 20;
+const COMMENT_PAGE_SIZE_MAX = 50;
 
 export function canCreateReplyAtDepth(parentDepth: number): boolean {
     return parentDepth < 2;
+}
+
+export function parseCommentPagination(url: URL): {
+    page: number;
+    limit: number;
+    offset: number;
+} {
+    const pageRaw = Number(url.searchParams.get("page") || "1");
+    const limitRaw = Number(
+        url.searchParams.get("limit") || String(COMMENT_PAGE_SIZE_DEFAULT),
+    );
+    const page =
+        Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
+    const limit =
+        Number.isFinite(limitRaw) && limitRaw > 0
+            ? Math.min(COMMENT_PAGE_SIZE_MAX, Math.floor(limitRaw))
+            : COMMENT_PAGE_SIZE_DEFAULT;
+    return {
+        page,
+        limit,
+        offset: (page - 1) * limit,
+    };
 }
 
 function resolveCommentLikeField(
@@ -245,13 +272,20 @@ async function deleteCommentWithDescendants(
 async function renderCommentBodyHtml(
     markdown: string,
     mode: MarkdownRenderMode = "full",
+    options?: {
+        allowBlobImages?: boolean;
+    },
 ): Promise<string> {
     const source = String(markdown || "");
     if (!source.trim()) {
         return "";
     }
     try {
-        return await renderMarkdown(source, { target: "page", mode });
+        return await renderMarkdown(source, {
+            target: "page",
+            mode,
+            allowBlobImages: options?.allowBlobImages ?? false,
+        });
     } catch (error) {
         console.error("[comments] markdown render failed:", error);
         return "";
@@ -337,6 +371,81 @@ async function buildDecoratedCommentTree(
     );
 }
 
+async function loadPaginatedComments(
+    collection: CommentCollection,
+    relationField: CommentRelationField,
+    relationId: string,
+    pagination: { page: number; limit: number; offset: number },
+): Promise<{
+    comments: CommentRecord[];
+    page: number;
+    limit: number;
+    totalTopLevel: number;
+    hasMore: boolean;
+}> {
+    const baseFilters: JsonObject[] = [
+        { [relationField]: { _eq: relationId } },
+        { status: { _eq: "published" } },
+        { is_public: { _eq: true } },
+    ];
+    const topLevelFilter = {
+        _and: [...baseFilters, { parent_id: { _null: true } }],
+    } as JsonObject;
+
+    const [topLevelRows, totalTopLevel] = await Promise.all([
+        readMany(collection, {
+            filter: topLevelFilter,
+            sort: ["date_created"],
+            limit: pagination.limit,
+            offset: pagination.offset,
+        }) as Promise<CommentRecord[]>,
+        countItems(collection, topLevelFilter),
+    ]);
+
+    const topLevelIds = topLevelRows
+        .map((item) => String(item.id || "").trim())
+        .filter(Boolean);
+    if (topLevelIds.length === 0) {
+        return {
+            comments: [],
+            page: pagination.page,
+            limit: pagination.limit,
+            totalTopLevel,
+            hasMore: pagination.offset < totalTopLevel,
+        };
+    }
+
+    const levelOneRows = (await readMany(collection, {
+        filter: {
+            _and: [...baseFilters, { parent_id: { _in: topLevelIds } }],
+        } as JsonObject,
+        sort: ["date_created"],
+        limit: -1,
+    })) as CommentRecord[];
+    const levelOneIds = levelOneRows
+        .map((item) => String(item.id || "").trim())
+        .filter(Boolean);
+
+    let levelTwoRows: CommentRecord[] = [];
+    if (levelOneIds.length > 0) {
+        levelTwoRows = (await readMany(collection, {
+            filter: {
+                _and: [...baseFilters, { parent_id: { _in: levelOneIds } }],
+            } as JsonObject,
+            sort: ["date_created"],
+            limit: -1,
+        })) as CommentRecord[];
+    }
+
+    return {
+        comments: [...topLevelRows, ...levelOneRows, ...levelTwoRows],
+        page: pagination.page,
+        limit: pagination.limit,
+        totalTopLevel,
+        hasMore: pagination.offset + topLevelRows.length < totalTopLevel,
+    };
+}
+
 async function renderCommentItem<T extends Record<string, unknown>>(
     item: T,
 ): Promise<T & { body: string; body_html: string }> {
@@ -390,7 +499,14 @@ async function handleCommentPreview(
     const body = await parseJsonBody(context.request);
     const input = validateBody(CommentPreviewSchema, body);
     const renderStart = performance.now();
-    const bodyHtml = await renderCommentBodyHtml(input.body, input.render_mode);
+    const bodyHtml = await renderCommentBodyHtml(
+        input.body,
+        input.render_mode,
+        {
+            // 仅评论预览放开 blob，落库/展示链路仍走严格策略。
+            allowBlobImages: true,
+        },
+    );
     const renderDuration = performance.now() - renderStart;
     return ok(
         {
@@ -435,27 +551,28 @@ async function handleArticleComments(
                 return fail("文章不可见", 404);
             }
 
-            const comments = await readMany("app_article_comments", {
-                filter: {
-                    _and: [
-                        { article_id: { _eq: articleId } },
-                        { status: { _eq: "published" } },
-                        { is_public: { _eq: true } },
-                    ],
-                } as JsonObject,
-                sort: ["date_created"],
-                limit: 200,
-            });
+            // 评论分页以顶层评论为基准，避免一次性全量读取。
+            const pagination = parseCommentPagination(context.url);
+            const pagedComments = await loadPaginatedComments(
+                "app_article_comments",
+                "article_id",
+                articleId,
+                pagination,
+            );
 
             const tree = await buildDecoratedCommentTree(
                 context,
-                comments,
+                pagedComments.comments,
                 "app_article_comment_likes",
                 "article",
             );
             return ok({
                 items: tree,
-                total: comments.length,
+                total: pagedComments.totalTopLevel,
+                total_top_level: pagedComments.totalTopLevel,
+                page: pagedComments.page,
+                limit: pagedComments.limit,
+                has_more: pagedComments.hasMore,
             });
         }
 
@@ -581,27 +698,28 @@ async function handleDiaryComments(
                 return fail("日记不可见", 404);
             }
 
-            const comments = await readMany("app_diary_comments", {
-                filter: {
-                    _and: [
-                        { diary_id: { _eq: diaryId } },
-                        { status: { _eq: "published" } },
-                        { is_public: { _eq: true } },
-                    ],
-                } as JsonObject,
-                sort: ["date_created"],
-                limit: 200,
-            });
+            // 评论分页以顶层评论为基准，避免一次性全量读取。
+            const pagination = parseCommentPagination(context.url);
+            const pagedComments = await loadPaginatedComments(
+                "app_diary_comments",
+                "diary_id",
+                diaryId,
+                pagination,
+            );
 
             const tree = await buildDecoratedCommentTree(
                 context,
-                comments,
+                pagedComments.comments,
                 "app_diary_comment_likes",
                 "diary",
             );
             return ok({
                 items: tree,
-                total: comments.length,
+                total: pagedComments.totalTopLevel,
+                total_top_level: pagedComments.totalTopLevel,
+                page: pagedComments.page,
+                limit: pagedComments.limit,
+                has_more: pagedComments.hasMore,
             });
         }
 

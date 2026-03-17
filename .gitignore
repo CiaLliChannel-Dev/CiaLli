@@ -1,5 +1,6 @@
 # 构建产物
 dist/
+public/assets/font/
 
 # Astro 生成目录
 .astro/
@@ -51,7 +52,7 @@ yarn.lock
 .vscode/mcp.json
 
 # Wiki 仓库
-# CiaLli.wiki/
+CiaLli.wiki/
 
 # 项目检查报告
 report/

@@ -131,7 +131,7 @@ if (!username || !id) {
         Astro.locals.sidebarProfile = profileToSidebarData(sidebarProfile);
       }
     } else if (result.status === "permission_denied") {
-      Astro.response.status = 403;
+      Astro.response.status = 404;
     } else {
       Astro.response.status = 404;
     }
@@ -181,15 +181,7 @@ const diaryMetaText = formatDiaryMetaDate(diary?.date_created);
   description={diary?.content || ""}
 >
   {
-    result.status === "permission_denied" ? (
-      <ContentNotVisible
-        mode="permission_denied"
-        title={i18n(I18nKey.diaryNotVisibleTitle)}
-        description={i18n(I18nKey.diaryNotVisibleDescription)}
-        backHref={`/${username}/diary`}
-        backLabel={i18n(I18nKey.diaryBackToList)}
-      />
-    ) : !diary ? (
+    !diary ? (
       <ContentNotVisible
         mode="not_found"
         title={i18n(I18nKey.diaryNotFoundTitle)}

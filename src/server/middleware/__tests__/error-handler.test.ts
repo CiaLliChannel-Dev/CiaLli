@@ -57,4 +57,27 @@ describe("withErrorHandler", () => {
             error: { code: "INTERNAL_ERROR", message: "服务端错误" },
         });
     });
+
+    it("DIRECTUS_* 错误响应脱敏", async () => {
+        const handler = vi
+            .fn()
+            .mockRejectedValue(
+                new AppError(
+                    "DIRECTUS_ERROR",
+                    "[directus/client] 读取集合 app_articles 列表失败 (400) codes=INVALID_QUERY",
+                    400,
+                ),
+            );
+        const wrapped = withErrorHandler(handler);
+        const res = await wrapped(makeMockContext());
+        expect(res.status).toBe(400);
+        const body = await res.json();
+        expect(body).toEqual({
+            ok: false,
+            error: {
+                code: "DIRECTUS_ERROR",
+                message: "请求参数无效",
+            },
+        });
+    });
 });

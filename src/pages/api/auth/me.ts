@@ -55,17 +55,13 @@ export async function GET(context: APIContext): Promise<Response> {
             is_admin: access.isAdmin,
         });
     } catch (error) {
-        const message = String((error as Error)?.message ?? error);
-        const status = message.includes("SUSPENDED") ? 403 : 500;
+        void error;
         return json(
             {
                 ok: false,
-                message:
-                    status === 403
-                        ? i18n(I18nKey.apiAuthSuspended)
-                        : i18n(I18nKey.apiAuthGetUserFailed),
+                message: i18n(I18nKey.apiAuthGetUserFailed),
             },
-            { status },
+            { status: 500 },
         );
     }
 }

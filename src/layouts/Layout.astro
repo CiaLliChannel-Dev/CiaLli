@@ -1,9 +1,13 @@
 ---
+import Analytics from "@vercel/analytics/astro";
+import SpeedInsights from "@vercel/speed-insights/astro";
 import ConfigCarrier from "@components/ConfigCarrier.astro";
 import MusicPlayer from "@components/widget/MusicPlayer.svelte";
 import DesktopOnlyNotice from "@components/misc/DesktopOnlyNotice.astro";
 import { buildLegacySiteConfig } from "@/config";
+import { generatedFontManifest } from "@/generated/font-manifest";
 import { getResolvedSiteSettings } from "@/server/site-settings/service";
+import { readCsrfToken } from "@/server/security/csrf";
 import type { ResolvedSiteSettings } from "@/types/site-settings";
 
 const BANNER_HEIGHT = 35;
@@ -56,16 +60,19 @@ const analyticsConfig = {
     resolvedSiteSettings.settings.analytics.clarityId || "",
   ).trim(),
 };
+const csrfTokenFromLocals =
+  typeof Astro.locals.csrfToken === "string" ? Astro.locals.csrfToken : "";
+const csrfToken = csrfTokenFromLocals || readCsrfToken(Astro);
 
-// 在首屏渲染时先为 body 打上类名，用于决定 banner 高度。
-// 虽然 Swup 会在切页后更新 body，但时机在动画之后，会造成高度切换延迟。
-// 因此仍需在点击链接时通过 Swup hooks 立即切换布局态。
+// 在首屏渲染时先为 body 打上类名，用于决定 banner 高度
+// 虽然 Swup 会在切页后更新 body，但时机在动画之后，会造成高度切换延迟
+// 因此仍需在点击链接时通过 Swup hooks 立即切换布局态
 const isHomePage = pathsEqual(Astro.url.pathname, url("/"));
 const normalizedPathname = Astro.url.pathname.replace(/\/+$/, "").toLowerCase();
 const isArchivePage =
   normalizedPathname === "/posts" || normalizedPathname.endsWith("/posts");
 
-// 定义全局 CSS 变量。
+// 定义全局 CSS 变量
 // 放在 Layout 而非 GlobalStyles 的原因见：
 // https://github.com/withastro/astro/issues/6728#issuecomment-1502203757
 const configHue = siteConfig.themeColor.hue;
@@ -183,6 +190,123 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
   data-overlayscrollbars-initialize
 >
   <head>
+    <link rel="stylesheet" href={generatedFontManifest.cssHref} />
+    {
+      generatedFontManifest.preloadFonts.map((font) => (
+        <link
+          rel="preload"
+          href={font.href}
+          as="font"
+          type={font.type}
+          crossorigin={font.crossorigin}
+          fetchpriority={font.fetchpriority}
+        />
+      ))
+    }
+    <script
+      is:inline
+      define:vars={{
+        deferredFonts: generatedFontManifest.deferredFonts,
+        deferredWarmup: generatedFontManifest.deferredWarmup,
+      }}
+    >
+      (() => {
+        if (
+          typeof window === "undefined" ||
+          !deferredWarmup?.enabled ||
+          !Array.isArray(deferredFonts) ||
+          deferredFonts.length === 0
+        ) {
+          return;
+        }
+
+        const sessionKey = String(deferredWarmup.sessionKey || "").trim();
+        const hasWarmupFinished = () => {
+          if (!sessionKey) {
+            return false;
+          }
+          try {
+            return sessionStorage.getItem(sessionKey) === "1";
+          } catch (error) {
+            console.warn("[layout] 读取字体预热状态失败:", error);
+            return false;
+          }
+        };
+        const markWarmupFinished = () => {
+          if (!sessionKey) {
+            return;
+          }
+          try {
+            sessionStorage.setItem(sessionKey, "1");
+          } catch (error) {
+            console.warn("[layout] 写入字体预热状态失败:", error);
+          }
+        };
+
+        if (hasWarmupFinished()) {
+          return;
+        }
+
+        const warmupDeferredFonts = () => {
+          for (const font of deferredFonts) {
+            if (!font?.href) {
+              continue;
+            }
+
+            const link = document.createElement("link");
+            link.rel = "preload";
+            link.as = "font";
+            link.href = String(font.href);
+            link.type = String(font.type || "font/woff2");
+            link.crossOrigin = String(font.crossorigin || "anonymous");
+            link.setAttribute(
+              "fetchpriority",
+              String(
+                font.fetchpriority || deferredWarmup.fetchpriority || "low",
+              ),
+            );
+            link.dataset.fontDeferredWarmup = "true";
+            document.head.appendChild(link);
+          }
+
+          markWarmupFinished();
+        };
+
+        const scheduleWarmup = () => {
+          if (typeof window.requestIdleCallback === "function") {
+            window.requestIdleCallback(
+              () => {
+                warmupDeferredFonts();
+              },
+              { timeout: 4000 },
+            );
+            return;
+          }
+
+          window.setTimeout(() => {
+            warmupDeferredFonts();
+          }, 0);
+        };
+
+        if (deferredWarmup.trigger === "window-load-idle") {
+          if (document.readyState === "complete") {
+            scheduleWarmup();
+            return;
+          }
+          window.addEventListener(
+            "load",
+            () => {
+              scheduleWarmup();
+            },
+            { once: true },
+          );
+          return;
+        }
+
+        scheduleWarmup();
+      })();
+    </script>
+
     <script is:inline>
       (() => {
         if (typeof window === "undefined" || typeof Node === "undefined") {
@@ -360,6 +484,7 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
     <meta name="twitter:title" content={pageTitle} />
     <meta name="twitter:description" content={description || pageTitle} />
     <meta name="viewport" content="width=device-width" />
+    <meta name="cialli-csrf-token" content={csrfToken} />
     <meta name="generator" content={Astro.generator} />
     {
       favicons.map((favicon) => (
@@ -498,6 +623,9 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
       <!-- 切页时临时增加页面高度，避免滚动动画跳变 -->
       <div id="page-height-extend" class="hidden h-[300vh]"></div>
     </div>
+    <!-- Vercel 可观测性 -->
+    <Analytics />
+    <SpeedInsights />
     <DesktopOnlyNotice />
   </body>
 </html>

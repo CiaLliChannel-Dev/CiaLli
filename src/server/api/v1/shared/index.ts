@@ -21,8 +21,6 @@ export {
     normalizeWatchStatus,
     normalizeAlbumLayout,
     normalizeCommentStatus,
-    normalizeReportTargetType,
-    normalizeReportReason,
     normalizeRegistrationRequestStatus,
 } from "./normalize";
 

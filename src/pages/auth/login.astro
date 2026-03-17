@@ -251,8 +251,13 @@ const loginI18n = {
     (function () {
       const API_LOGIN = "/api/auth/login";
       function getCsrfToken() {
-        const m = document.cookie.match(/(?:^|;\s*)cialli_csrf=([^;]*)/);
-        return m ? decodeURIComponent(m[1]) : "";
+        const element = document.querySelector(
+          'meta[name="cialli-csrf-token"]',
+        );
+        if (!(element instanceof HTMLMetaElement)) {
+          return "";
+        }
+        return element.content || "";
       }
 
       function normalizeRedirectTarget(redirect) {

@@ -3,6 +3,7 @@ import type { APIContext } from "astro";
 import { readDirectusAssetResponse } from "@/server/directus/client";
 import { AppError } from "@/server/api/errors";
 import { fail } from "@/server/api/response";
+import { isUuid } from "@/server/utils/short-id";
 
 import { parseRouteId, toDirectusAssetQuery } from "../shared";
 
@@ -22,11 +23,25 @@ export async function handlePublicAsset(
     if (!fileId) {
         return fail("缺少文件 ID", 400);
     }
+    if (!isUuid(fileId)) {
+        return fail("资源不存在", 404);
+    }
 
-    const response = await readDirectusAssetResponse({
-        fileId,
-        query: toDirectusAssetQuery(context.url.searchParams),
-    });
+    let response: Response;
+    try {
+        response = await readDirectusAssetResponse({
+            fileId,
+            query: toDirectusAssetQuery(context.url.searchParams),
+        });
+    } catch (error) {
+        if (
+            error instanceof AppError &&
+            (error.status === 403 || error.status === 404)
+        ) {
+            return fail("资源不存在", 404);
+        }
+        throw error;
+    }
 
     if (!response.ok) {
         if (response.status === 404 || response.status === 403) {

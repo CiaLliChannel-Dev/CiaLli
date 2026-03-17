@@ -855,7 +855,6 @@ const bindSettings = (s: SettingsObj): void => {
     );
     setVal("ss-start-date", String(site.siteStartDate ?? ""));
     setVal("ss-profile-name", String(profile.name ?? ""));
-    setVal("ss-profile-avatar", String(profile.avatar ?? ""));
     setChecked("ss-umami-enabled", Boolean(umami.enabled));
     setVal("ss-umami-url", String(umami.baseUrl ?? ""));
     setVal("ss-umami-scripts", String(umami.scripts ?? ""));
@@ -982,7 +981,6 @@ const collectSitePayload = (current: SettingsObj): SettingsObj => ({
     profile: {
         ...((current.profile ?? {}) as SettingsObj),
         name: inputVal("ss-profile-name"),
-        avatar: inputVal("ss-profile-avatar"),
     },
     umami: {
         enabled: checked("ss-umami-enabled"),

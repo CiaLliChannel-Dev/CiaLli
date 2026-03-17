@@ -12,6 +12,7 @@ import { internal } from "@/server/api/errors";
 /** 限流分类 */
 export type RateLimitCategory =
     | "auth"
+    | "registration-check"
     | "write"
     | "upload"
     | "comment"
@@ -32,8 +33,13 @@ type CategoryConfig = {
 
 const CATEGORY_CONFIG: Record<RateLimitCategory, CategoryConfig> = {
     auth: { limit: 10, windowSeconds: 300, prefix: "cialli:rl:auth" },
+    "registration-check": {
+        limit: 20,
+        windowSeconds: 60,
+        prefix: "cialli:rl:registration-check",
+    },
     write: { limit: 60, windowSeconds: 60, prefix: "cialli:rl:write" },
-    upload: { limit: 20, windowSeconds: 60, prefix: "cialli:rl:upload" },
+    upload: { limit: 60, windowSeconds: 60, prefix: "cialli:rl:upload" },
     comment: { limit: 15, windowSeconds: 60, prefix: "cialli:rl:comment" },
     "admin-write": {
         limit: 120,

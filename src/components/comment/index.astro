@@ -9,12 +9,20 @@ interface Props {
   contentShortId?: string;
   contentAuthorId?: string;
   allowComments?: boolean;
+  loadStrategy?: "nearby" | "eager";
+  pageSize?: number;
 }
 
 const moduleName = Astro.props.module;
 const contentId = Astro.props.contentId;
 const contentShortId = Astro.props.contentShortId;
 const contentAuthorId = Astro.props.contentAuthorId;
+const loadStrategy = Astro.props.loadStrategy === "eager" ? "eager" : "nearby";
+const pageSizeRaw = Number(Astro.props.pageSize);
+const pageSize =
+  Number.isFinite(pageSizeRaw) && pageSizeRaw > 0
+    ? Math.min(50, Math.floor(pageSizeRaw))
+    : 20;
 const enabled =
   typeof Astro.props.allowComments === "boolean"
     ? Astro.props.allowComments
@@ -27,12 +35,14 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
   enabled && (
     <div
       class="card-base p-6 mb-4 relative overflow-visible"
-      id="directus-comment-root"
+      id="comment-root"
       data-module={moduleName || ""}
       data-content-id={contentId || ""}
       data-content-short-id={contentShortId || ""}
       data-content-author-id={contentAuthorId || ""}
       data-directus-enabled={hasDirectusTarget ? "1" : "0"}
+      data-load-strategy={loadStrategy}
+      data-page-size={String(pageSize)}
     >
       <div class="flex items-center justify-between mb-4 gap-3">
         <h3 class="text-xl font-semibold text-90">评论</h3>
@@ -52,7 +62,7 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
               class="px-3 py-1.5 rounded-lg text-xs border border-(--line-divider) text-60"
               aria-pressed="false"
             >
-              点赞数
+              最多点赞
             </button>
           </div>
         )}
@@ -82,6 +92,15 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
             class="hidden text-sm text-60 rounded-xl border border-(--line-divider) px-4 py-3"
           >
             暂无评论，来抢沙发吧。
+          </div>
+          <div class="mt-4 hidden" id="comment-load-more-wrapper">
+            <button
+              type="button"
+              id="comment-load-more"
+              class="px-4 py-2 rounded-lg border border-(--line-divider) text-75 text-sm hover:text-90"
+            >
+              加载更多
+            </button>
           </div>
 
           <div
@@ -341,6 +360,7 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
       _directusCommentApplyAuth?: (state: AuthState) => void;
       _directusCommentMenuOutsideBound?: boolean;
       _directusCommentOverlayPortalEl?: HTMLDivElement;
+      _directusCommentNearObserver?: IntersectionObserver;
       renderMermaidDiagrams?: () => Promise<void>;
       codeBlockCollapser?: {
         setupCodeBlocks?: () => void;
@@ -349,8 +369,10 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
     };
 
   function initComments() {
-    const root = document.getElementById("directus-comment-root");
+    const root = document.getElementById("comment-root");
     if (!root) return;
+    runtimeWindow._directusCommentNearObserver?.disconnect();
+    runtimeWindow._directusCommentNearObserver = undefined;
     document.body.classList.remove("dc-comment-editor-overlay-lock");
 
     const moduleName = String(root.dataset.module || "").trim();
@@ -358,6 +380,13 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
     const contentShortId = String(root.dataset.contentShortId || "").trim();
     const contentAuthorId = String(root.dataset.contentAuthorId || "").trim();
     const directusEnabled = root.dataset.directusEnabled === "1";
+    const loadStrategy =
+      root.dataset.loadStrategy === "eager" ? "eager" : "nearby";
+    const pageSizeRaw = Number(root.dataset.pageSize || "20");
+    const commentPageSize =
+      Number.isFinite(pageSizeRaw) && pageSizeRaw > 0
+        ? Math.min(50, Math.floor(pageSizeRaw))
+        : 20;
 
     function getProgressOverlay() {
       return window.__CIALLI_PROGRESS_OVERLAY__;
@@ -391,6 +420,12 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
 
     const commentListEl = document.getElementById("comment-list");
     const commentEmptyEl = document.getElementById("comment-empty");
+    const commentLoadMoreWrapperEl = document.getElementById(
+      "comment-load-more-wrapper",
+    );
+    const commentLoadMoreEl = document.getElementById(
+      "comment-load-more",
+    ) as HTMLButtonElement | null;
     const openEditorEl = document.getElementById(
       "comment-open-editor",
     ) as HTMLButtonElement | null;
@@ -451,6 +486,16 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
     let isAdmin = false;
     let isEditorOverlayOpen = false;
     let comments: CommentItem[] = [];
+    // 控制评论列表是否显示骨架屏。
+    let isCommentsLoading = false;
+    // 区分“加载更多”与“首屏/刷新加载”，用于按钮态与骨架策略。
+    let isLoadingMoreComments = false;
+    // 递增请求编号，避免并发请求时旧响应覆盖新结果。
+    let commentLoadRequestId = 0;
+    let hasMoreComments = false;
+    let currentCommentPage = 0;
+    let hasLoadedInitialComments = false;
+    let hasDispatchedFirstLoadDone = false;
     const pendingLikeCommentIds = new Set<string>();
     let commentMode: CommentMode = "edit";
     let previewSource = "";
@@ -510,6 +555,15 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
       return `/api/v1/articles/${encodeURIComponent(contentId)}/comments`;
     };
 
+    const commentApiListUrl = (page: number): string => {
+      const normalizedPage = Math.max(1, Math.floor(page || 1));
+      const query = new URLSearchParams({
+        page: String(normalizedPage),
+        limit: String(commentPageSize),
+      });
+      return `${commentApiBase()}?${query.toString()}`;
+    };
+
     const commentItemApi = (commentId: string): string => {
       if (moduleName === "diaries") {
         return `/api/v1/diaries/comments/${encodeURIComponent(commentId)}`;
@@ -538,6 +592,34 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
         return { diary_comment_id: commentId };
       }
       return { article_comment_id: commentId };
+    };
+
+    const shouldUseEagerCommentLoading = (): boolean => {
+      if (loadStrategy === "eager") {
+        return true;
+      }
+      const searchParams = new URLSearchParams(window.location.search);
+      if (searchParams.get("focus") === "comments") {
+        return true;
+      }
+      const hash = String(window.location.hash || "").trim();
+      return hash === "#comment-root";
+    };
+
+    const dispatchFirstCommentLoadDone = (ok: boolean): void => {
+      if (hasDispatchedFirstLoadDone) {
+        return;
+      }
+      hasDispatchedFirstLoadDone = true;
+      document.dispatchEvent(
+        new CustomEvent("cialli:comments:first-load-done", {
+          detail: {
+            ok,
+            module: moduleName,
+            contentId,
+          },
+        }),
+      );
     };
 
     const hasHtmlTag = (value: string): boolean => {
@@ -873,6 +955,28 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
         }
       }
       topLevelReplyExpandedMap = nextState;
+    };
+
+    const appendTopLevelComments = (
+      source: CommentItem[],
+      incoming: CommentItem[],
+    ): CommentItem[] => {
+      if (source.length === 0) {
+        return incoming;
+      }
+      const exists = new Set(
+        source.map((item) => String(item.id || "").trim()),
+      );
+      const next = [...source];
+      for (const item of incoming) {
+        const id = String(item.id || "").trim();
+        if (!id || exists.has(id)) {
+          continue;
+        }
+        exists.add(id);
+        next.push(item);
+      }
+      return next;
     };
 
     const renderPreview = (): void => {
@@ -1293,12 +1397,61 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
 				`;
     };
 
+    const renderCommentSkeletonList = (count = 3): string => {
+      return Array.from({ length: count }, (_, index) => {
+        const primaryLineWidth =
+          index % 3 === 0 ? "92%" : index % 3 === 1 ? "86%" : "95%";
+        const secondaryLineWidth =
+          index % 2 === 0 ? "74%" : index % 2 === 1 ? "68%" : "72%";
+        const tertiaryLineWidth =
+          index % 2 === 0 ? "62%" : index % 2 === 1 ? "58%" : "64%";
+        return `
+          <div class="rounded-xl border border-(--line-divider) p-4 space-y-3" aria-hidden="true">
+            <div class="flex items-start justify-between gap-3">
+              <div class="flex items-center gap-3 min-w-0 flex-1">
+                <div class="md3-skeleton-circle w-8 h-8 shrink-0"></div>
+                <div class="min-w-0 flex-1 space-y-2">
+                  <div class="md3-skeleton-text" style="--skeleton-width: 8rem; --skeleton-height: 0.95rem;"></div>
+                  <div class="md3-skeleton-text" style="--skeleton-width: 6.5rem; --skeleton-height: 0.75rem;"></div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <div class="md3-skeleton-block h-8 w-14 rounded-lg"></div>
+                <div class="md3-skeleton-block h-8 w-14 rounded-lg"></div>
+              </div>
+            </div>
+            <div class="space-y-2">
+              <div class="md3-skeleton-text" style="--skeleton-width: ${primaryLineWidth};"></div>
+              <div class="md3-skeleton-text" style="--skeleton-width: ${secondaryLineWidth};"></div>
+              <div class="md3-skeleton-text" style="--skeleton-width: ${tertiaryLineWidth};"></div>
+            </div>
+          </div>
+        `;
+      }).join("");
+    };
+
     const renderComments = (): void => {
       if (!commentListEl || !commentEmptyEl) return;
       renderSortControls();
+      if (isCommentsLoading && !isLoadingMoreComments) {
+        root.setAttribute("aria-busy", "true");
+        commentEmptyEl.classList.add("hidden");
+        commentListEl.innerHTML = renderCommentSkeletonList(3);
+        commentLoadMoreWrapperEl?.classList.add("hidden");
+        return;
+      }
+      if (!hasLoadedInitialComments) {
+        root.setAttribute("aria-busy", "false");
+        commentListEl.innerHTML = "";
+        commentEmptyEl.classList.add("hidden");
+        commentLoadMoreWrapperEl?.classList.add("hidden");
+        return;
+      }
+      root.setAttribute("aria-busy", "false");
       if (!Array.isArray(comments) || comments.length === 0) {
         commentListEl.innerHTML = "";
         commentEmptyEl.classList.remove("hidden");
+        commentLoadMoreWrapperEl?.classList.add("hidden");
         return;
       }
       commentEmptyEl.classList.add("hidden");
@@ -1306,6 +1459,14 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
       commentListEl.innerHTML = topLevelComments
         .map((item) => renderCommentNode(item, 0))
         .join("");
+      if (commentLoadMoreWrapperEl && commentLoadMoreEl) {
+        const showLoadMore = hasMoreComments;
+        commentLoadMoreWrapperEl.classList.toggle("hidden", !showLoadMore);
+        commentLoadMoreEl.disabled = isCommentsLoading;
+        commentLoadMoreEl.textContent = isLoadingMoreComments
+          ? "加载中..."
+          : "加载更多";
+      }
       void refreshMarkdownRuntime();
       collapseCommentCodeBlocks();
     };
@@ -1321,30 +1482,121 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
 
     runtimeWindow._directusCommentApplyAuth = applyAuthState;
 
-    const loadComments = async (): Promise<void> => {
+    const loadComments = async (options?: {
+      reset?: boolean;
+      page?: number;
+    }): Promise<void> => {
       if (!directusEnabled) return;
+      const reset = options?.reset ?? false;
+      const targetPage =
+        typeof options?.page === "number" && options.page > 0
+          ? Math.floor(options.page)
+          : reset
+            ? 1
+            : Math.max(1, currentCommentPage + 1);
+      const requestId = ++commentLoadRequestId;
+      const isFirstPageRequest = targetPage === 1;
+
+      isCommentsLoading = true;
+      isLoadingMoreComments = targetPage > 1;
+      if (reset) {
+        hasMoreComments = false;
+      }
+      renderComments();
+
+      let isLoadSuccessful = false;
       try {
-        const response = await fetch(commentApiBase(), {
+        const response = await fetch(commentApiListUrl(targetPage), {
           headers: { Accept: "application/json" },
           credentials: "include",
         });
         const data = await response.json().catch(() => null);
-        if (!response.ok || !data?.ok) {
-          comments = [];
-          renderComments();
+        if (requestId !== commentLoadRequestId) {
           return;
         }
-        comments = Array.isArray(data.items)
+        if (!response.ok || !data?.ok) {
+          if (reset || !hasLoadedInitialComments) {
+            comments = [];
+            topLevelReplyExpandedMap = {};
+            currentCommentPage = 0;
+            hasMoreComments = false;
+          }
+          return;
+        }
+        const incomingItems = Array.isArray(data.items)
           ? (data.items as CommentItem[])
           : [];
+        comments = reset
+          ? incomingItems
+          : appendTopLevelComments(comments, incomingItems);
+        currentCommentPage = Number.isFinite(Number(data.page))
+          ? Math.max(1, Number(data.page))
+          : targetPage;
+        hasMoreComments = Boolean(data.has_more);
         syncTopLevelReplyExpandedState(comments);
-        renderComments();
+        isLoadSuccessful = true;
       } catch (error) {
         console.error("[comment] load comments failed:", error);
-        comments = [];
-        topLevelReplyExpandedMap = {};
-        renderComments();
+        if (requestId !== commentLoadRequestId) {
+          return;
+        }
+        if (reset || !hasLoadedInitialComments) {
+          comments = [];
+          topLevelReplyExpandedMap = {};
+          currentCommentPage = 0;
+          hasMoreComments = false;
+        }
+      } finally {
+        if (requestId === commentLoadRequestId) {
+          if (isFirstPageRequest) {
+            hasLoadedInitialComments = true;
+            dispatchFirstCommentLoadDone(isLoadSuccessful);
+          }
+          isCommentsLoading = false;
+          isLoadingMoreComments = false;
+          renderComments();
+        }
       }
+    };
+
+    const triggerInitialCommentLoad = (): void => {
+      if (isCommentsLoading || hasLoadedInitialComments) {
+        return;
+      }
+      void loadComments({
+        reset: true,
+        page: 1,
+      });
+    };
+
+    const setupCommentLoadStrategy = (): void => {
+      if (shouldUseEagerCommentLoading()) {
+        triggerInitialCommentLoad();
+        return;
+      }
+      if (typeof IntersectionObserver === "undefined") {
+        triggerInitialCommentLoad();
+        return;
+      }
+
+      const observer = new IntersectionObserver(
+        (entries) => {
+          const shouldLoad = entries.some((entry) => entry.isIntersecting);
+          if (!shouldLoad) {
+            return;
+          }
+          observer.disconnect();
+          runtimeWindow._directusCommentNearObserver = undefined;
+          triggerInitialCommentLoad();
+        },
+        {
+          root: null,
+          rootMargin: "700px 0px",
+          threshold: 0.01,
+        },
+      );
+      observer.observe(root);
+      runtimeWindow._directusCommentNearObserver = observer;
     };
 
     const resetPreviewState = (): void => {
@@ -1416,7 +1668,10 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
         updateOverlayTask(overlayHandle, {
           text: "提交成功，正在刷新评论...",
         });
-        await loadComments();
+        await loadComments({
+          reset: true,
+          page: 1,
+        });
         closeCommentEditorOverlay();
       } catch (error) {
         console.error("[comment] submit failed:", error);
@@ -1520,7 +1775,10 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
         });
         return;
       }
-      await loadComments();
+      await loadComments({
+        reset: true,
+        page: 1,
+      });
     };
 
     if (modeEditEl && !modeEditEl.dataset.bound) {
@@ -1625,6 +1883,19 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
       });
     }
 
+    if (commentLoadMoreEl && !commentLoadMoreEl.dataset.bound) {
+      commentLoadMoreEl.dataset.bound = "1";
+      commentLoadMoreEl.addEventListener("click", () => {
+        if (isCommentsLoading || !hasMoreComments) {
+          return;
+        }
+        void loadComments({
+          reset: false,
+          page: Math.max(1, currentCommentPage + 1),
+        });
+      });
+    }
+
     if (commentListEl && !commentListEl.dataset.bound) {
       commentListEl.dataset.bound = "1";
       commentListEl.addEventListener("click", async (event) => {
@@ -1693,7 +1964,7 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
     setReplyState("", "");
     setFormError("");
     applyAuthState(getAuthState());
-    void loadComments();
+    setupCommentLoadStrategy();
   }
 
   initComments();
@@ -1729,13 +2000,13 @@ const hasDirectusTarget = Boolean(moduleName && contentId);
     border-radius: clamp(1rem, 2vw, var(--radius-large));
   }
 
-  #directus-comment-root .custom-md img {
+  #comment-root .custom-md img {
     width: 30%;
     max-width: 30%;
     height: auto;
   }
 
-  #directus-comment-root .comment-node-child {
+  #comment-root .comment-node-child {
     margin-top: 0.75rem;
     margin-left: 2rem;
     padding-left: 1rem;

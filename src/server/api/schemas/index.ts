@@ -8,5 +8,4 @@ export * from "./diary";
 export * from "./album";
 export * from "./comment";
 export * from "./profile";
-export * from "./report";
 export * from "./admin";

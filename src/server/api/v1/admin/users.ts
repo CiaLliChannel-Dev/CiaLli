@@ -116,7 +116,6 @@ async function ensureUserPermissions(userId: string): Promise<AppPermissions> {
     }
 
     return await createOne("app_user_permissions", {
-        status: "published",
         user_id: userId,
         app_role: "member",
         can_publish_articles: true,

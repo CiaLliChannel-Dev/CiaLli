@@ -32,11 +32,13 @@ const {
 const url = getPostUrl(entry);
 const hasCover = typeof image === "string" && image.trim().length > 0;
 const coverWidth = "28%";
-const bodyText = String(entry.body || "")
-  .replace(/<[^>]+>/g, " ")
-  .replace(/\s+/g, " ")
-  .trim();
-const excerpt = description || bodyText.slice(0, 140) || "";
+const bodyText = entry.data.encrypted
+  ? ""
+  : String(entry.body || "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+const excerpt = description || bodyText.slice(0, 30) || "";
 const { displayName: authorDisplayName, username: authorHandle } =
   resolveAuthorIdentity(
     {
@@ -143,7 +145,7 @@ const publishedDate = !Number.isNaN(publishedDateSource.getTime())
           <span data-like-count>{like_count}</span>
         </button>
         <a
-          href={`${url}#directus-comment-root`}
+          href={`${url}#comment-root`}
           class="inline-flex h-6 items-center gap-1.5 text-50 text-base font-medium hover:text-(--primary) transition-colors"
         >
           <Icon name="material-symbols:comment-rounded" class="text-xl" />
@@ -179,13 +181,6 @@ const publishedDate = !Number.isNaN(publishedDateSource.getTime())
               data-action="block-user"
             >
               屏蔽用户
-            </button>
-            <button
-              type="button"
-              class="w-full text-left px-3 py-2 text-sm rounded-lg text-amber-600 dark:text-amber-400 hover:bg-(--btn-plain-bg-hover) post-card-action-btn transition-colors"
-              data-action="report-content"
-            >
-              举报内容
             </button>
           </div>
         </details>

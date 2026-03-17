@@ -38,8 +38,11 @@ const ALBUM_TITLE_MAX = 20;
 const CJK_RE = /[\u2E80-\u9FFF\uF900-\uFAFF\uFE30-\uFE4F\uFF00-\uFFEF]/;
 
 function getCsrfToken(): string {
-    const match = document.cookie.match(/(?:^|;\s*)cialli_csrf=([^;]*)/);
-    return match ? decodeURIComponent(match[1]) : "";
+    const element = document.querySelector('meta[name="cialli-csrf-token"]');
+    if (!(element instanceof HTMLMetaElement)) {
+        return "";
+    }
+    return element.content || "";
 }
 
 function wordLength(value: string): number {

@@ -8,6 +8,7 @@ export type CacheDomain =
     | "diary-list"
     | "diary-detail"
     | "home-feed"
+    | "home-feed-candidates"
     | "album-list"
     | "album-detail"
     | "bangumi-list"

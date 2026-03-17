@@ -16,14 +16,31 @@ import {
     remarkPlugins,
 } from "./src/server/markdown/pipeline.ts";
 
+const _siteHostname = new URL(systemSiteConfig.siteURL).hostname;
+
 // https://astro.build/config
 export default defineConfig({
     site: systemSiteConfig.siteURL,
     base: "/",
     trailingSlash: "never",
 
+    security: {
+        allowedDomains: [{ hostname: _siteHostname }],
+    },
+
     output: "static",
-    adapter: vercel(),
+    adapter: vercel({
+        // 启用 Vercel Image Optimization
+        imageService: true,
+        imagesConfig: {
+            sizes: [
+                48, 72, 96, 128, 160, 192, 256, 320, 400, 480, 640, 720, 800,
+                960, 1200, 1536, 1920, 2560,
+            ],
+            formats: ["image/avif", "image/webp"],
+            minimumCacheTTL: 60 * 60 * 24 * 30,
+        },
+    }),
 
     integrations: [
         swup({
@@ -31,7 +48,7 @@ export default defineConfig({
             animationClass: "transition-swup-",
             containers: ["main", "#right-sidebar-slot", "#sidebar"],
             smoothScrolling: false, // 禁用平滑滚动以提升性能，避免与锚点导航冲突
-            cache: true,
+            cache: false, // 关闭 Swup 页面快照缓存，避免旧页面 DOM 在客户端被回放。
             preload: true, // swup 默认鼠标悬停预加载
             accessibility: true,
             updateHead: true,

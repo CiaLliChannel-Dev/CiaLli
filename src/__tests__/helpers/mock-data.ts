@@ -51,7 +51,6 @@ export function mockPermissions(
         can_manage_anime: true,
         can_manage_albums: true,
         can_upload_files: true,
-        status: "published",
         ...overrides,
     };
 }
