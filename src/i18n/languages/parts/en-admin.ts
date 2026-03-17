@@ -190,6 +190,10 @@ export const enAdmin: Record<string, string> = {
     [Key.adminSiteSettingsShowBannerCopy]: "Show banner copyright",
     [Key.adminSiteSettingsSiteKeywords]: "Site keywords",
     [Key.adminSiteSettingsSiteLanguage]: "Site language",
+    [Key.adminSiteSettingsSiteTimeZone]: "Site time zone",
+    [Key.adminSiteSettingsTimeZoneFollowEnvironment]: "Follow environment",
+    [Key.adminSiteSettingsTimeZoneHint]:
+        "Controls how system timestamps are shown across the site.",
     [Key.adminSiteSettingsLanguageZhCN]: "Simplified Chinese",
     [Key.adminSiteSettingsLanguageZhTW]: "Traditional Chinese",
     [Key.adminSiteSettingsLanguageEn]: "English",

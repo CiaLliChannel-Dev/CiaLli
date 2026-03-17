@@ -38,7 +38,7 @@ export type RenderMarkdownOptions = {
  * Markdown 渲染缓存版本：
  * 当 sanitize 或渲染策略发生行为变化时递增，主动淘汰旧缓存，避免命中历史 HTML。
  */
-const MARKDOWN_CACHE_VERSION = "v1";
+const MARKDOWN_CACHE_VERSION = "v2";
 
 const expressiveCodeOptions: RehypeExpressiveCodeOptions = {
     themes: ["github-light", "github-dark"],

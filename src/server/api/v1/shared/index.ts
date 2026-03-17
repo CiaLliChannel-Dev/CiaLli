@@ -4,6 +4,7 @@ export {
     DEFAULT_LIST_LIMIT,
     ADMIN_MODULE_COLLECTION,
     ARTICLE_FIELDS,
+    FRIEND_FIELDS,
     DIARY_FIELDS,
 } from "./constants";
 

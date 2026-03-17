@@ -8,6 +8,7 @@ import ArticleCardCompact from "@components/home/ArticleCardCompact.astro";
 import BangumiCardCompact from "@components/home/BangumiCardCompact.astro";
 import AlbumCardCompact from "@components/home/AlbumCardCompact.astro";
 import DiaryCardCompact from "@components/home/DiaryCardCompact.astro";
+import ExternalImage from "@components/misc/ExternalImage.astro";
 import {
   loadProfileForViewer,
   loadUserHomeData,
@@ -139,7 +140,7 @@ const sectionOrder =
               )}
               {payload!.owner?.header_url ? (
                 <div class="relative h-66">
-                  <img
+                  <ExternalImage
                     src={payload!.owner.header_url}
                     alt="header image"
                     class="w-full h-full object-cover"
@@ -154,7 +155,7 @@ const sectionOrder =
               <div class="px-6 pb-6 -mt-10 relative">
                 <div class="flex items-end gap-4">
                   {payload!.owner?.avatar_url ? (
-                    <img
+                    <ExternalImage
                       src={payload!.owner.avatar_url}
                       alt="avatar"
                       class="w-20 h-20 rounded-full object-cover border-3 border-(--card-bg) shadow-sm"

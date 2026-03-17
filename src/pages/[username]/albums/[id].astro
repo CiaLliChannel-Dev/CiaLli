@@ -1,5 +1,6 @@
 ---
 import ContentNotVisible from "@components/misc/ContentNotVisible.astro";
+import ExternalImage from "@components/misc/ExternalImage.astro";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
 import AlbumDetailEditor from "@components/album/AlbumDetailEditor.svelte";
 import I18nKey from "@i18n/i18nKey";
@@ -265,7 +266,7 @@ const enrichedPhotos = album
                     data-caption={photo.captionText || undefined}
                     class="block relative"
                   >
-                    <img
+                    <ExternalImage
                       src={photo.thumbSrc ?? ""}
                       alt={photo.title || "album photo"}
                       class="w-full h-auto object-cover"

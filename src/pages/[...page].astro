@@ -10,10 +10,12 @@ import {
 } from "@/server/directus-auth";
 import { buildHomeFeed } from "@/server/recommendation/home-feed";
 import type { HomeFeedItem } from "@/server/recommendation/home-feed.types";
+import { buildSiteDateFormatContext } from "@/utils/date-utils";
 
 export const prerender = false;
 
 const rawPagePath = Astro.params.page || "";
+const siteDateContext = buildSiteDateFormatContext(Astro.locals.siteSettings);
 
 // 重定向旧分页 URL
 if (rawPagePath) {
@@ -79,6 +81,7 @@ if (!invalidPath) {
           id="home-feed-runtime-config"
           class="hidden"
           data-delete-admin-label={deleteAdminLabelI18n}
+          data-time-zone={siteDateContext.timeZone}
         />
         <div class="min-w-0">
           {homeFeedItems.length === 0 ? (
@@ -177,6 +180,14 @@ if (!invalidPath) {
   }
 
   const deleteAdminLabel = resolveDeleteAdminLabel();
+  const siteTimeZone =
+    String(
+      (
+        document.getElementById(
+          "home-feed-runtime-config",
+        ) as HTMLElement | null
+      )?.dataset.timeZone || "",
+    ).trim() || "UTC";
 
   function escapeHtml(input: string): string {
     return input
@@ -218,9 +229,16 @@ if (!invalidPath) {
   } {
     const parsed = new Date(value || "");
     const safeDate = Number.isNaN(parsed.getTime()) ? new Date(0) : parsed;
-    const year = String(safeDate.getFullYear());
-    const month = String(safeDate.getMonth() + 1).padStart(2, "0");
-    const day = String(safeDate.getDate()).padStart(2, "0");
+    const formatter = new Intl.DateTimeFormat("en-US", {
+      timeZone: siteTimeZone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    });
+    const parts = formatter.formatToParts(safeDate);
+    const year = parts.find((part) => part.type === "year")?.value || "1970";
+    const month = parts.find((part) => part.type === "month")?.value || "01";
+    const day = parts.find((part) => part.type === "day")?.value || "01";
     return {
       display: `${year}/${month}/${day}`,
       year,

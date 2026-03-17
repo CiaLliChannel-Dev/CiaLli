@@ -347,15 +347,15 @@ const {
     </div>
     <TransitionProxySkeletonTemplates />
     <div
-      class:list={[
-        "main-panel-content-layer",
-        {
-          "post-editor-content-layer": isPostEditorPage,
-        },
-      ]}
+      class={`relative pointer-events-auto ${isPostEditorPage ? "w-full px-4 post-editor-workbench-inner" : "max-w-(--page-width) mx-auto"}`}
     >
       <div
-        class={`relative pointer-events-auto ${isPostEditorPage ? "w-full px-4 post-editor-workbench-inner" : "max-w-(--page-width) mx-auto"}`}
+        class:list={[
+          "main-panel-content-layer",
+          {
+            "post-editor-content-layer": isPostEditorPage,
+          },
+        ]}
       >
         <div
           id="main-grid"
@@ -491,10 +491,14 @@ const {
             </div>
           </main>
         </div>
-
-        <BackToTop />
-        {siteConfig.toc.enable && isFloatTOC && <FloatingTOC />}
       </div>
+      <!--
+        固定浮层统一挂载到内容滤镜层外，且与旧版一样处于可点击的相对定位宿主内，
+        避免被 filter/transform 捕获或被 overlay 事件策略影响。
+      -->
+      <div id="detail-action-float-anchor" aria-hidden="true"></div>
+      <BackToTop />
+      {siteConfig.toc.enable && isFloatTOC && <FloatingTOC />}
     </div>
   </div>
 

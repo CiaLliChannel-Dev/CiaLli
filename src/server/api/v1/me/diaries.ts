@@ -30,8 +30,10 @@ import type { AppAccess } from "../shared";
 import { DIARY_FIELDS, hasOwn, parseRouteId } from "../shared";
 import {
     cleanupOwnedOrphanDirectusFiles,
+    collectDiaryCommentCleanupCandidates,
     collectDiaryFileIds,
     extractDirectusAssetIdsFromMarkdown,
+    mergeDirectusFileCleanupCandidates,
     normalizeDirectusFileId,
 } from "../shared/file-cleanup";
 import { bindFileOwnerToUser, renderMeMarkdownPreview } from "./_helpers";
@@ -285,11 +287,18 @@ async function handleDiaryDelete(
     const contentFileIds = extractDirectusAssetIdsFromMarkdown(
         String(target.content ?? ""),
     );
+    const relatedCommentCandidates =
+        await collectDiaryCommentCleanupCandidates(diaryId);
     await deleteOne("app_diaries", diaryId);
-    await cleanupOwnedOrphanDirectusFiles({
-        candidateFileIds: [...imageFileIds, ...contentFileIds],
-        ownerUserId: target.author_id,
-    });
+    await cleanupOwnedOrphanDirectusFiles(
+        mergeDirectusFileCleanupCandidates(
+            {
+                candidateFileIds: [...imageFileIds, ...contentFileIds],
+                ownerUserIds: [target.author_id],
+            },
+            relatedCommentCandidates,
+        ),
+    );
     await awaitCacheInvalidations(
         [
             cacheManager.invalidateByDomain("diary-list"),
@@ -462,7 +471,7 @@ async function handleDiaryImagePatch(
     if (hasOwn(body, "file_id") && prevFileId && prevFileId !== nextFileId) {
         await cleanupOwnedOrphanDirectusFiles({
             candidateFileIds: [prevFileId],
-            ownerUserId: String(diary.author_id ?? access.user.id),
+            ownerUserIds: [String(diary.author_id ?? access.user.id)],
         });
     }
     await awaitCacheInvalidations(
@@ -488,7 +497,7 @@ async function handleDiaryImageDelete(
     if (fileId) {
         await cleanupOwnedOrphanDirectusFiles({
             candidateFileIds: [fileId],
-            ownerUserId: String(diary.author_id ?? ""),
+            ownerUserIds: [String(diary.author_id ?? "")],
         });
     }
     await awaitCacheInvalidations(

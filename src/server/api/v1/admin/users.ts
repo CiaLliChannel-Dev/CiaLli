@@ -250,7 +250,7 @@ async function applyAvatarFileChange(
     if (hasAvatarPatch && prevAvatarFile && prevAvatarFile !== nextAvatarFile) {
         await cleanupOwnedOrphanDirectusFiles({
             candidateFileIds: [prevAvatarFile],
-            ownerUserId: userId,
+            ownerUserIds: [userId],
         });
     }
 }
@@ -663,7 +663,7 @@ async function handleUserDelete(
     await deleteDirectusUser(userId);
     await cleanupOwnedOrphanDirectusFiles({
         candidateFileIds: removableFileIds,
-        ownerUserId: userId,
+        ownerUserIds: [userId],
     });
     invalidateAuthorCache(userId);
     invalidateOfficialSidebarCache();

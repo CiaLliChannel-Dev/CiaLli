@@ -3,6 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/server/directus/client", () => ({
     deleteDirectusFile: vi.fn().mockResolvedValue(undefined),
     readMany: vi.fn(),
+    runWithDirectusServiceAccess: vi.fn(
+        async (task: () => Promise<unknown>) => await task(),
+    ),
 }));
 
 import {
@@ -11,10 +14,17 @@ import {
     extractDirectusAssetIdsFromMarkdown,
     normalizeDirectusFileId,
 } from "@/server/api/v1/shared/file-cleanup";
-import { deleteDirectusFile, readMany } from "@/server/directus/client";
+import {
+    deleteDirectusFile,
+    readMany,
+    runWithDirectusServiceAccess,
+} from "@/server/directus/client";
 
 const mockedReadMany = vi.mocked(readMany);
 const mockedDeleteDirectusFile = vi.mocked(deleteDirectusFile);
+const mockedRunWithDirectusServiceAccess = vi.mocked(
+    runWithDirectusServiceAccess,
+);
 
 const UUID_A = "a1b2c3d4-e5f6-1234-9abc-def012345678";
 const UUID_B = "f1e2d3c4-b5a6-4234-8abc-fedcba987654";
@@ -128,7 +138,7 @@ describe("cleanupOwnedOrphanDirectusFiles", () => {
 
         const deleted = await cleanupOwnedOrphanDirectusFiles({
             candidateFileIds: [UUID_A],
-            ownerUserId: "current-user",
+            ownerUserIds: ["current-user"],
         });
 
         expect(deleted).toEqual([]);
@@ -160,10 +170,50 @@ describe("cleanupOwnedOrphanDirectusFiles", () => {
 
         const deleted = await cleanupOwnedOrphanDirectusFiles({
             candidateFileIds: [UUID_A],
-            ownerUserId: "user-1",
+            ownerUserIds: ["user-1"],
         });
 
         expect(deleted).toEqual([UUID_A]);
         expect(mockedDeleteDirectusFile).toHaveBeenCalledWith(UUID_A);
+        expect(mockedRunWithDirectusServiceAccess).toHaveBeenCalled();
+    });
+
+    it("支持多 owner 候选并在 service 作用域中执行扫描", async () => {
+        mockedReadMany.mockImplementation((async (
+            collection: string,
+            query?: { fields?: string[]; filter?: Record<string, unknown> },
+        ) => {
+            if (
+                collection === "directus_files" &&
+                query?.fields?.includes("app_owner_user_id")
+            ) {
+                return [
+                    {
+                        id: UUID_A,
+                        app_owner_user_id: "user-1",
+                        uploaded_by: "user-1",
+                    },
+                    {
+                        id: UUID_B,
+                        app_owner_user_id: "user-2",
+                        uploaded_by: "user-2",
+                    },
+                ] as never;
+            }
+            if (collection === "app_site_settings") {
+                return [] as never;
+            }
+            return [] as never;
+        }) as typeof readMany);
+
+        const deleted = await cleanupOwnedOrphanDirectusFiles({
+            candidateFileIds: [UUID_A, UUID_B],
+            ownerUserIds: ["user-1", "user-2"],
+        });
+
+        expect(deleted).toEqual([UUID_A, UUID_B]);
+        expect(mockedDeleteDirectusFile).toHaveBeenNthCalledWith(1, UUID_A);
+        expect(mockedDeleteDirectusFile).toHaveBeenNthCalledWith(2, UUID_B);
+        expect(mockedRunWithDirectusServiceAccess).toHaveBeenCalled();
     });
 });

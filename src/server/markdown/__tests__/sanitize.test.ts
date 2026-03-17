@@ -122,6 +122,40 @@ describe("sanitizeMarkdownHtml 样式白名单", () => {
         expect(html).toContain("<img");
     });
 
+    it("绝对外链图片自动补 no-referrer", () => {
+        const html = sanitizeMarkdownHtml(
+            '<img src="https://example.com/image.png" alt="x" />',
+        );
+
+        expect(html).toContain('src="https://example.com/image.png"');
+        expect(html).toContain('referrerpolicy="no-referrer"');
+        expect(html).toContain('data-referrer-policy="no-referrer"');
+        expect(html).not.toContain("crossorigin=");
+    });
+
+    it("站内相对路径图片不追加外链属性", () => {
+        const html = sanitizeMarkdownHtml(
+            '<img src="/images/example.png" alt="x" referrerpolicy="unsafe-url" crossorigin="use-credentials" />',
+        );
+
+        expect(html).toContain('src="/images/example.png"');
+        expect(html).not.toContain("referrerpolicy=");
+        expect(html).not.toContain("crossorigin=");
+        expect(html).not.toContain("data-referrer-policy=");
+        expect(html).not.toContain("data-cross-origin=");
+    });
+
+    it("已知高风险域名图片追加 anonymous CORS 兼容", () => {
+        const html = sanitizeMarkdownHtml(
+            '<img src="https://i0.hdslb.com/bfs/archive/demo.png" alt="x" />',
+        );
+
+        expect(html).toContain('referrerpolicy="no-referrer"');
+        expect(html).toContain('crossorigin="anonymous"');
+        expect(html).toContain('data-referrer-policy="no-referrer"');
+        expect(html).toContain('data-cross-origin="anonymous"');
+    });
+
     it("iframe 排版样式（width/max-width/overflow/background）被保留", () => {
         const html = sanitizeMarkdownHtml(
             '<iframe src="https://embed.music.apple.com/cn/album/1" style="width:100%;max-width:660px;overflow:hidden;background:transparent;"></iframe>',

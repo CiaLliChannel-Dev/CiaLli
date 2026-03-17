@@ -1,5 +1,6 @@
 ---
 import type { AppAlbum } from "@/types/app";
+import ExternalImage from "@components/misc/ExternalImage.astro";
 import { buildPublicAssetUrl } from "@/server/directus-auth";
 import { formatDateToYYYYMMDD } from "@/utils/date-utils";
 
@@ -41,7 +42,7 @@ const dateStr = album.date
       hasCover ? (
         album.layout === "masonry" ? (
           <div class="w-full h-full bg-black flex items-center justify-center">
-            <img
+            <ExternalImage
               src={coverUrl}
               alt={album.title}
               class="w-full h-full object-contain"
@@ -49,7 +50,7 @@ const dateStr = album.date
             />
           </div>
         ) : (
-          <img
+          <ExternalImage
             src={coverUrl}
             alt={album.title}
             class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

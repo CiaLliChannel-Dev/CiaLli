@@ -1,5 +1,10 @@
 import sanitizeHtml from "sanitize-html";
 
+import {
+    resolveExternalImageRequestAttributes,
+    toExternalImageDataAttributes,
+} from "@/utils/external-image-policy";
+
 const ALLOWED_TAGS = sanitizeHtml.defaults.allowedTags.concat([
     "img",
     "figure",
@@ -44,6 +49,8 @@ const ALLOWED_ATTRIBUTES: sanitizeHtml.IOptions["allowedAttributes"] = {
         "height",
         "loading",
         "decoding",
+        "referrerpolicy",
+        "crossorigin",
         "style",
     ],
     iframe: [
@@ -218,6 +225,39 @@ export function sanitizeMarkdownHtml(
                         ? `${rel} noopener noreferrer`.trim()
                         : "noopener noreferrer";
                 }
+                return { tagName, attribs: output };
+            },
+            img: (tagName, attribs) => {
+                const output = { ...attribs };
+                // 外链图片统一补 no-referrer，降低第三方图床防盗链 403 的概率。
+                delete output.referrerpolicy;
+                delete output.crossorigin;
+                delete output["data-referrer-policy"];
+                delete output["data-cross-origin"];
+
+                const imageRequestAttributes =
+                    resolveExternalImageRequestAttributes(
+                        String(output.src || ""),
+                    );
+                const imageDataAttributes = toExternalImageDataAttributes(
+                    imageRequestAttributes,
+                );
+                if (imageRequestAttributes.referrerPolicy) {
+                    output.referrerpolicy =
+                        imageRequestAttributes.referrerPolicy;
+                }
+                if (imageRequestAttributes.crossOrigin) {
+                    output.crossorigin = imageRequestAttributes.crossOrigin;
+                }
+                if (imageDataAttributes["data-referrer-policy"]) {
+                    output["data-referrer-policy"] =
+                        imageDataAttributes["data-referrer-policy"];
+                }
+                if (imageDataAttributes["data-cross-origin"]) {
+                    output["data-cross-origin"] =
+                        imageDataAttributes["data-cross-origin"];
+                }
+
                 return { tagName, attribs: output };
             },
             iframe: (tagName, attribs) => {

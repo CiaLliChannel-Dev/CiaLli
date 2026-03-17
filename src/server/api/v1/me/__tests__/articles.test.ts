@@ -40,6 +40,21 @@ vi.mock("@/server/api/v1/shared/file-cleanup", () => ({
         return null;
     }),
     extractDirectusAssetIdsFromMarkdown: vi.fn(() => []),
+    collectArticleCommentCleanupCandidates: vi.fn().mockResolvedValue({
+        candidateFileIds: [],
+        ownerUserIds: [],
+    }),
+    mergeDirectusFileCleanupCandidates: vi.fn(
+        (
+            ...groups: Array<{
+                candidateFileIds: string[];
+                ownerUserIds: string[];
+            }>
+        ) => ({
+            candidateFileIds: groups.flatMap((group) => group.candidateFileIds),
+            ownerUserIds: groups.flatMap((group) => group.ownerUserIds),
+        }),
+    ),
     cleanupOwnedOrphanDirectusFiles: vi.fn().mockResolvedValue([]),
 }));
 
@@ -394,7 +409,7 @@ describe("PATCH /me/articles/:id", () => {
         expect(mockedUpdateOne).toHaveBeenCalledWith(
             "app_articles",
             "article-1",
-            { title: "Updated Title", tags: [] },
+            { title: "Updated Title" },
             { fields: [...ARTICLE_FIELDS] },
         );
     });
@@ -552,7 +567,7 @@ describe("PATCH /me/articles/:id", () => {
         expect(res.status).toBe(200);
         expect(mockedCleanupOwnedOrphanDirectusFiles).toHaveBeenCalledWith({
             candidateFileIds: [fileId],
-            ownerUserId: access.user.id,
+            ownerUserIds: [access.user.id],
         });
     });
 });

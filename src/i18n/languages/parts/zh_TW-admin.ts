@@ -171,6 +171,10 @@ export const zhTWAdmin: Record<string, string> = {
     [Key.adminSiteSettingsShowBannerCopy]: "顯示橫幅版權",
     [Key.adminSiteSettingsSiteKeywords]: "網站關鍵字",
     [Key.adminSiteSettingsSiteLanguage]: "網站語言",
+    [Key.adminSiteSettingsSiteTimeZone]: "網站時區",
+    [Key.adminSiteSettingsTimeZoneFollowEnvironment]: "跟隨環境",
+    [Key.adminSiteSettingsTimeZoneHint]:
+        "用於控制文章、日記、留言等系統時間的顯示時區。",
     [Key.adminSiteSettingsLanguageZhCN]: "簡體中文",
     [Key.adminSiteSettingsLanguageZhTW]: "繁體中文",
     [Key.adminSiteSettingsLanguageEn]: "英文",

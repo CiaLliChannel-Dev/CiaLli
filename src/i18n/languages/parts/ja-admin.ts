@@ -188,6 +188,10 @@ export const jaAdmin: Record<string, string> = {
     [Key.adminSiteSettingsShowBannerCopy]: "バナー著作権を表示",
     [Key.adminSiteSettingsSiteKeywords]: "サイトキーワード",
     [Key.adminSiteSettingsSiteLanguage]: "サイト言語",
+    [Key.adminSiteSettingsSiteTimeZone]: "サイトタイムゾーン",
+    [Key.adminSiteSettingsTimeZoneFollowEnvironment]: "環境設定に従う",
+    [Key.adminSiteSettingsTimeZoneHint]:
+        "記事、日記、コメントなどのシステム時刻表示に使用します。",
     [Key.adminSiteSettingsLanguageZhCN]: "簡体字中国語",
     [Key.adminSiteSettingsLanguageZhTW]: "繁体字中国語",
     [Key.adminSiteSettingsLanguageEn]: "英語",

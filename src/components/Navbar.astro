@@ -1,6 +1,7 @@
 ---
 import { Image } from "astro:assets";
 import { Icon } from "astro-icon/components";
+import ExternalImage from "@components/misc/ExternalImage.astro";
 import { getResolvedSiteSettings } from "@/server/site-settings/service";
 import defaultNavIconImage from "@assets/home/home.png";
 import defaultNavLogoImage from "@assets/home/default-logo.png";
@@ -122,7 +123,7 @@ const links: NavBarLink[] = navBarConfig.links
                   sizes="(max-width: 1024px) 10rem, 14rem"
                 />
               ) : (
-                <img
+                <ExternalImage
                   src={resolvedNavbarLogoSrc}
                   alt={siteSettings.navbarTitle.text}
                   class="h-[3.25rem] w-auto in-[.enable-banner]:h-[2.5rem]! in-[.enable-banner]:group-[.scrolled]:h-[3.25rem]! max-w-full object-contain transition-[height] duration-920"
@@ -143,7 +144,7 @@ const links: NavBarLink[] = navBarConfig.links
                     sizes="1.75rem"
                   />
                 ) : (
-                  <img
+                  <ExternalImage
                     src={resolvedNavbarIconSrc}
                     alt={siteSettings.navbarTitle.text}
                     class="h-[1.75rem] w-[1.75rem] mr-2 object-contain"

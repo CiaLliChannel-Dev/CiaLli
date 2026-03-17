@@ -104,6 +104,8 @@ describe("renderMarkdown mode", () => {
         expect(html).toContain("<figure");
         expect(html).toContain("md-image-figure");
         expect(html).toContain('alt="这是图片描述"');
+        expect(html).toContain('referrerpolicy="no-referrer"');
+        expect(html).toContain('data-referrer-policy="no-referrer"');
         expect(html).toContain("<figcaption");
         expect(html).toContain("md-image-caption");
         expect(html).toContain("这是图片描述</figcaption>");
@@ -120,6 +122,8 @@ describe("renderMarkdown mode", () => {
 
         expect(html).toContain("<figure");
         expect(html).toContain('<a href="https://example.com"');
+        expect(html).toContain('referrerpolicy="no-referrer"');
+        expect(html).toContain('data-referrer-policy="no-referrer"');
         expect(html).toContain("跳转图注</figcaption>");
     });
 
@@ -147,7 +151,97 @@ describe("renderMarkdown mode", () => {
 
         expect(html).toContain('width="60%"');
         expect(html).toContain('alt="示例图片"');
+        expect(html).toContain('referrerpolicy="no-referrer"');
+        expect(html).toContain('data-referrer-policy="no-referrer"');
         expect(html).toContain("示例图片</figcaption>");
         expect(html).not.toContain("w-60%");
+    });
+
+    it("声明 {center} 时为独立图片块追加居中类", async () => {
+        const html = await renderMarkdown(
+            "![居中图片 {center}](https://example.com/image.png)",
+            {
+                target: "page",
+                mode: "full",
+            },
+        );
+
+        expect(html).toContain("md-image-figure");
+        expect(html).toContain("md-image-figure--center");
+        expect(html).toContain('alt="居中图片"');
+        expect(html).toContain("居中图片</figcaption>");
+        expect(html).not.toContain("{center}");
+    });
+
+    it("居中标记与宽度语法可同时生效，且顺序不影响解析", async () => {
+        const html = await renderMarkdown(
+            "![示例图片 w-60% {center}](https://example.com/image.png)",
+            {
+                target: "page",
+                mode: "full",
+            },
+        );
+
+        expect(html).toContain("md-image-figure--center");
+        expect(html).toContain('width="60%"');
+        expect(html).toContain('alt="示例图片"');
+        expect(html).toContain("示例图片</figcaption>");
+        expect(html).not.toContain("{center}");
+        expect(html).not.toContain("w-60%");
+    });
+
+    it("链接包裹图片时仍支持 {center} 居中标记", async () => {
+        const html = await renderMarkdown(
+            "[![跳转图注 {center}](https://example.com/image.png)](https://example.com)",
+            {
+                target: "page",
+                mode: "full",
+            },
+        );
+
+        expect(html).toContain("md-image-figure--center");
+        expect(html).toContain('<a href="https://example.com"');
+        expect(html).toContain("跳转图注</figcaption>");
+        expect(html).not.toContain("{center}");
+    });
+
+    it("未声明 {center} 时保持默认左对齐输出", async () => {
+        const html = await renderMarkdown(
+            "![普通图片](https://example.com/x.png)",
+            {
+                target: "page",
+                mode: "full",
+            },
+        );
+
+        expect(html).toContain("md-image-figure");
+        expect(html).not.toContain("md-image-figure--center");
+    });
+
+    it("站内相对路径图片不追加外链防盗链属性", async () => {
+        const html = await renderMarkdown("![站内图](/images/example.png)", {
+            target: "page",
+            mode: "full",
+        });
+
+        expect(html).toContain('src="/images/example.png"');
+        expect(html).not.toContain("referrerpolicy=");
+        expect(html).not.toContain("crossorigin=");
+        expect(html).not.toContain("data-referrer-policy=");
+    });
+
+    it("已知高风险图床图片追加定向兼容属性", async () => {
+        const html = await renderMarkdown(
+            "![B 站图](https://i0.hdslb.com/bfs/archive/demo.png)",
+            {
+                target: "page",
+                mode: "full",
+            },
+        );
+
+        expect(html).toContain('referrerpolicy="no-referrer"');
+        expect(html).toContain('crossorigin="anonymous"');
+        expect(html).toContain('data-referrer-policy="no-referrer"');
+        expect(html).toContain('data-cross-origin="anonymous"');
     });
 });

@@ -19,6 +19,19 @@ export const ARTICLE_FIELDS = [
     "date_updated",
 ] as const;
 
+export const FRIEND_FIELDS = [
+    "id",
+    "sort",
+    "title",
+    "description",
+    "site_url",
+    "avatar_file",
+    "tags",
+    "is_public",
+    "date_created",
+    "date_updated",
+] as const;
+
 export const DIARY_FIELDS = [
     "id",
     "short_id",

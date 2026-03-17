@@ -14,6 +14,10 @@ import {
     TOP_LEVEL_REPLY_VISIBLE_LIMIT,
     REPLY_COLLAPSE_SCOPE,
 } from "@/scripts/comments-types";
+import {
+    buildSiteDateFormatContext,
+    formatSiteDateTime,
+} from "@/utils/date-utils";
 
 // ---------- 纯工具函数 ----------
 
@@ -27,10 +31,13 @@ export function escapeHtml(raw: unknown): string {
 }
 
 export function formatDate(iso: string | null | undefined): string {
-    if (!iso) return "";
-    const time = new Date(iso);
-    if (Number.isNaN(time.getTime())) return "";
-    return time.toLocaleString();
+    if (typeof window === "undefined") {
+        return "";
+    }
+    const siteDateContext = buildSiteDateFormatContext(
+        window.__CIALLI_RUNTIME_SETTINGS__,
+    );
+    return formatSiteDateTime(iso, siteDateContext);
 }
 
 export function getAuthorName(

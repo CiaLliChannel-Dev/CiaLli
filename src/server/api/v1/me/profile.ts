@@ -154,7 +154,7 @@ async function applyAvatarFileBindings(
     ) {
         await cleanupOwnedOrphanDirectusFiles({
             candidateFileIds: [prevAvatarFile],
-            ownerUserId: access.user.id,
+            ownerUserIds: [access.user.id],
         });
     }
 }
@@ -187,7 +187,7 @@ async function applyHeaderFileBindings(
     ) {
         await cleanupOwnedOrphanDirectusFiles({
             candidateFileIds: [prevHeaderFile],
-            ownerUserId: userId,
+            ownerUserIds: [userId],
         });
     }
 }

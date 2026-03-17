@@ -352,6 +352,12 @@ body[data-layout-mode="collapsed"] #content-wrapper {
   overflow-anchor: none;
 }
 
+#detail-action-float-anchor {
+  position: relative;
+  width: 0;
+  height: 0;
+}
+
 #top-row {
   position: fixed;
   top: 0;

@@ -2,8 +2,9 @@
 import PostCard from "@components/PostCard.astro";
 import DiaryCard from "@/components/DiaryCard.astro";
 import type { HomeFeedItem } from "@/server/recommendation/home-feed.types";
+import { getResolvedSiteSettings } from "@/server/site-settings/service";
 import { resolveAuthorIdentity } from "@/utils/author-identity";
-import { formatDateToYYYYMMDD } from "@utils/date-utils";
+import { buildSiteDateFormatContext, formatSiteDate } from "@utils/date-utils";
 import { widgetManager } from "@utils/widget-manager";
 
 interface Props {
@@ -12,6 +13,9 @@ interface Props {
 }
 
 const { items, maxAnimationIndex } = Astro.props;
+const resolvedSiteSettings =
+  Astro.locals.siteSettings ?? (await getResolvedSiteSettings());
+const siteDateContext = buildSiteDateFormatContext(resolvedSiteSettings);
 
 const hasRightSidebars =
   widgetManager.getComponentsByPosition("top", "right").length > 0 ||
@@ -25,8 +29,10 @@ const hasRightSidebars =
 >
   {
     items.map((item, index) => {
-      const date = formatDateToYYYYMMDD(item.publishedAt);
-      const [year, month] = date.split("-");
+      const formattedDate =
+        formatSiteDate(item.publishedAt, siteDateContext) || "1970/01/01";
+      const normalizedDate = formattedDate.replace(/\//g, "-");
+      const [year, month] = normalizedDate.split("-");
       const monthKey = `${year}-${month}`;
       const authorSource =
         item.type === "article" ? item.entry.data.author : item.entry.author;
@@ -63,7 +69,7 @@ const hasRightSidebars =
           style={`--i: ${animationIndex}; --interval: 50ms;`}
           data-year={year}
           data-month={monthKey}
-          data-day={date}
+          data-day={normalizedDate}
           data-tags={JSON.stringify(tags)}
           data-category={category}
           data-author-id={authorId}

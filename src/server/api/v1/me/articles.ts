@@ -40,7 +40,9 @@ import {
 } from "../shared";
 import {
     cleanupOwnedOrphanDirectusFiles,
+    collectArticleCommentCleanupCandidates,
     extractDirectusAssetIdsFromMarkdown,
+    mergeDirectusFileCleanupCandidates,
     normalizeDirectusFileId,
 } from "../shared/file-cleanup";
 import {
@@ -421,7 +423,7 @@ async function cleanupPatchedArticleFiles(
     ) {
         await cleanupOwnedOrphanDirectusFiles({
             candidateFileIds: [prevCoverFile],
-            ownerUserId: access.user.id,
+            ownerUserIds: [access.user.id],
         });
     }
     if (input.body_markdown !== undefined && prevBodyFileIds.length > 0) {
@@ -434,7 +436,7 @@ async function cleanupPatchedArticleFiles(
         if (removedBodyFileIds.length > 0) {
             await cleanupOwnedOrphanDirectusFiles({
                 candidateFileIds: removedBodyFileIds,
-                ownerUserId: access.user.id,
+                ownerUserIds: [access.user.id],
             });
         }
     }
@@ -689,20 +691,27 @@ async function handleMeArticlesPatch(
 
 async function handleMeArticlesDelete(
     target: OwnedArticleRecord,
-    access: AppAccess,
 ): Promise<Response> {
     const id = target.id;
     const coverFile = normalizeDirectusFileId(target.cover_file);
     const bodyFileIds = extractDirectusAssetIdsFromMarkdown(
         String(target.body_markdown ?? ""),
     );
+    const relatedCommentCandidates =
+        await collectArticleCommentCleanupCandidates(id);
     await deleteOne("app_articles", id);
-    const allFileIds = [...(coverFile ? [coverFile] : []), ...bodyFileIds];
-    if (allFileIds.length > 0) {
-        await cleanupOwnedOrphanDirectusFiles({
-            candidateFileIds: allFileIds,
-            ownerUserId: access.user.id,
-        });
+    const cleanupCandidates = mergeDirectusFileCleanupCandidates(
+        {
+            candidateFileIds: [
+                ...(coverFile ? [coverFile] : []),
+                ...bodyFileIds,
+            ],
+            ownerUserIds: [target.author_id],
+        },
+        relatedCommentCandidates,
+    );
+    if (cleanupCandidates.candidateFileIds.length > 0) {
+        await cleanupOwnedOrphanDirectusFiles(cleanupCandidates);
     }
     await awaitCacheInvalidations(
         [
@@ -744,7 +753,7 @@ async function handleMeArticleById(
         return handleMeArticlesPatch(context, access, target);
     }
     if (context.request.method === "DELETE") {
-        return handleMeArticlesDelete(target, access);
+        return handleMeArticlesDelete(target);
     }
 
     return fail("方法不允许", 405);

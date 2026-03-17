@@ -173,7 +173,7 @@ async function handleArticleCommentPatch(
     if (input.body !== undefined || input.is_public !== undefined) {
         await syncMarkdownFilesToVisibility(
             input.body ?? updated.body,
-            access.user.id,
+            comment.author_id,
             (input.is_public ?? updated.is_public) ? "public" : "private",
         );
     }
@@ -187,7 +187,7 @@ async function handleArticleCommentPatch(
         if (removedBodyFileIds.length > 0) {
             await cleanupOwnedOrphanDirectusFiles({
                 candidateFileIds: removedBodyFileIds,
-                ownerUserId: access.user.id,
+                ownerUserIds: [comment.author_id],
             });
         }
     }
@@ -219,11 +219,7 @@ async function handleArticleCommentDelete(
     }
     assertOwnerOrAdmin(access, comment.author_id);
 
-    await deleteCommentWithDescendants(
-        "app_article_comments",
-        commentId,
-        comment.author_id,
-    );
+    await deleteCommentWithDescendants("app_article_comments", commentId);
     await awaitCacheInvalidations(
         [
             cacheManager.invalidate("article-detail", comment.article_id),

@@ -1,5 +1,12 @@
 ---
 import path from "node:path";
+import { Image } from "astro:assets";
+
+import {
+  resolveExternalImageRequestAttributes,
+  toExternalImageDataAttributes,
+} from "@/utils/external-image-policy";
+import { url } from "@utils/url-utils";
 
 interface Props {
   id?: string;
@@ -10,9 +17,6 @@ interface Props {
   basePath?: string;
   loading?: "eager" | "lazy";
 }
-
-import { Image } from "astro:assets";
-import { url } from "@utils/url-utils";
 
 const {
   id,
@@ -55,10 +59,12 @@ if (isLocal) {
 const imageClass = "w-full h-full object-cover";
 const imageStyle = `object-position: ${position}`;
 
-// 检查是否是 Bilibili 图片
-const isBilibiliImage = !isLocal && src.includes("hdslb.com");
-// 对于外部图片（特别是Bilibili），需要设置referrerpolicy避免403错误
-const referrerPolicy = !isLocal && isBilibiliImage ? "no-referrer" : undefined;
+const imageRequestAttributes = !isLocal
+  ? resolveExternalImageRequestAttributes(src)
+  : {};
+const imageDataAttributes = toExternalImageDataAttributes(
+  imageRequestAttributes,
+);
 ---
 
 <div id={id} class:list={[className, "overflow-hidden relative"]}>
@@ -85,8 +91,10 @@ const referrerPolicy = !isLocal && isBilibiliImage ? "no-referrer" : undefined;
         class={imageClass}
         style={imageStyle}
         loading={loading}
-        referrerpolicy={referrerPolicy}
-        crossorigin={isBilibiliImage ? "anonymous" : undefined}
+        referrerpolicy={imageRequestAttributes.referrerPolicy}
+        crossorigin={imageRequestAttributes.crossOrigin}
+        data-referrer-policy={imageDataAttributes["data-referrer-policy"]}
+        data-cross-origin={imageDataAttributes["data-cross-origin"]}
       />
     )
   }

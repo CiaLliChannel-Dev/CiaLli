@@ -4,7 +4,7 @@ import { conflict } from "@/server/api/errors";
 import { cacheManager } from "@/server/cache/manager";
 import { readMany } from "@/server/directus/client";
 
-import { DIARY_FIELDS } from "./constants";
+import { ARTICLE_FIELDS, DIARY_FIELDS, FRIEND_FIELDS } from "./constants";
 import { filterPublicStatus } from "./auth";
 
 function buildArticlePublicCacheKey(
@@ -39,6 +39,7 @@ async function loadPublicArticleWithCache(
                 filterPublicStatus(),
             ],
         } as JsonObject,
+        fields: [...ARTICLE_FIELDS],
         limit: 1,
     });
     const article = rows[0] || null;
@@ -71,8 +72,8 @@ export async function loadPublicArticleBySlug(
 
 export async function loadPublicFriends(): Promise<AppFriend[]> {
     return await readMany("app_friends", {
-        filter: filterPublicStatus(),
         sort: ["sort", "-date_created"],
+        fields: [...FRIEND_FIELDS],
         limit: 500,
     });
 }

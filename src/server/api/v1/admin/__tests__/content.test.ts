@@ -34,8 +34,27 @@ vi.mock("@/server/cache/manager", () => ({
 vi.mock("@/server/api/v1/shared/file-cleanup", () => ({
     cleanupOwnedOrphanDirectusFiles: vi.fn(),
     collectAlbumFileIds: vi.fn().mockResolvedValue([]),
+    collectArticleCommentCleanupCandidates: vi.fn().mockResolvedValue({
+        candidateFileIds: [],
+        ownerUserIds: [],
+    }),
+    collectDiaryCommentCleanupCandidates: vi.fn().mockResolvedValue({
+        candidateFileIds: [],
+        ownerUserIds: [],
+    }),
     collectDiaryFileIds: vi.fn().mockResolvedValue([]),
     extractDirectusAssetIdsFromMarkdown: vi.fn(() => []),
+    mergeDirectusFileCleanupCandidates: vi.fn(
+        (
+            ...groups: Array<{
+                candidateFileIds: string[];
+                ownerUserIds: string[];
+            }>
+        ) => ({
+            candidateFileIds: groups.flatMap((group) => group.candidateFileIds),
+            ownerUserIds: groups.flatMap((group) => group.ownerUserIds),
+        }),
+    ),
     normalizeDirectusFileId: vi
         .fn()
         .mockImplementation((value: unknown) =>
@@ -43,9 +62,14 @@ vi.mock("@/server/api/v1/shared/file-cleanup", () => ({
         ),
 }));
 
+vi.mock("@/server/api/v1/comments-shared", () => ({
+    deleteCommentWithDescendants: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { requireAdmin } from "@/server/api/v1/shared";
 import { deleteOne, readMany, updateOne } from "@/server/directus/client";
 import { collectDiaryFileIds } from "@/server/api/v1/shared/file-cleanup";
+import { deleteCommentWithDescendants } from "@/server/api/v1/comments-shared";
 import { handleAdminContent } from "@/server/api/v1/admin/content";
 
 const mockedRequireAdmin = vi.mocked(requireAdmin);
@@ -53,6 +77,9 @@ const mockedReadMany = vi.mocked(readMany);
 const mockedUpdateOne = vi.mocked(updateOne);
 const mockedDeleteOne = vi.mocked(deleteOne);
 const mockedCollectDiaryFileIds = vi.mocked(collectDiaryFileIds);
+const mockedDeleteCommentWithDescendants = vi.mocked(
+    deleteCommentWithDescendants,
+);
 
 function makeCtx(
     path: string,
@@ -170,5 +197,30 @@ describe("handleAdminContent diaries 权限收敛", () => {
 
         expect(response.status).toBe(200);
         expect(mockedUpdateOne).toHaveBeenCalledTimes(1);
+    });
+
+    it("DELETE 评论时走递归评论删除链路", async () => {
+        mockedReadMany.mockResolvedValueOnce([
+            {
+                id: "comment-1",
+                article_id: "article-1",
+            },
+        ] as never);
+
+        const ctx = makeCtx(
+            "admin/content/article-comments/comment-1",
+            "DELETE",
+        );
+        const response = await handleAdminContent(
+            ctx as unknown as APIContext,
+            ["content", "article-comments", "comment-1"],
+        );
+
+        expect(response.status).toBe(200);
+        expect(mockedDeleteCommentWithDescendants).toHaveBeenCalledWith(
+            "app_article_comments",
+            "comment-1",
+        );
+        expect(mockedDeleteOne).not.toHaveBeenCalled();
     });
 });

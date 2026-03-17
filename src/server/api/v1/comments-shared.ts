@@ -375,9 +375,13 @@ export async function validateReplyParent(
 async function collectDescendantCommentIds(
     collection: CommentCollection,
     rootId: string,
-): Promise<Array<{ id: string; body?: unknown }>> {
+): Promise<Array<{ id: string; body?: unknown; author_id?: unknown }>> {
     const visited = new Set<string>([rootId]);
-    const descendants: Array<{ id: string; body?: unknown }> = [];
+    const descendants: Array<{
+        id: string;
+        body?: unknown;
+        author_id?: unknown;
+    }> = [];
     let frontier: string[] = [rootId];
 
     while (frontier.length > 0) {
@@ -385,7 +389,7 @@ async function collectDescendantCommentIds(
             filter: {
                 parent_id: { _in: frontier },
             } as JsonObject,
-            fields: ["id", "body"],
+            fields: ["id", "body", "author_id"],
             limit: -1,
         });
 
@@ -399,6 +403,7 @@ async function collectDescendantCommentIds(
             descendants.push({
                 id: childId,
                 body: child.body,
+                author_id: child.author_id,
             });
             nextFrontier.push(childId);
         }
@@ -411,17 +416,21 @@ async function collectDescendantCommentIds(
 export async function deleteCommentWithDescendants(
     collection: CommentCollection,
     commentId: string,
-    ownerUserId: string,
 ): Promise<void> {
     const descendants = await collectDescendantCommentIds(
         collection,
         commentId,
     );
     const rootComment = await readOneById(collection, commentId, {
-        fields: ["id", "body"],
+        fields: ["id", "body", "author_id"],
     });
     const candidateFileIds = new Set<string>();
+    const ownerUserIds = new Set<string>();
     if (rootComment) {
+        const rootAuthorId = String(rootComment.author_id ?? "").trim();
+        if (rootAuthorId) {
+            ownerUserIds.add(rootAuthorId);
+        }
         for (const fileId of extractDirectusAssetIdsFromMarkdown(
             String(rootComment.body ?? ""),
         )) {
@@ -429,6 +438,10 @@ export async function deleteCommentWithDescendants(
         }
     }
     for (const descendant of descendants) {
+        const ownerUserId = String(descendant.author_id ?? "").trim();
+        if (ownerUserId) {
+            ownerUserIds.add(ownerUserId);
+        }
         for (const fileId of extractDirectusAssetIdsFromMarkdown(
             String(descendant.body ?? ""),
         )) {
@@ -442,7 +455,7 @@ export async function deleteCommentWithDescendants(
     await deleteOne(collection, commentId);
     await cleanupOwnedOrphanDirectusFiles({
         candidateFileIds: [...candidateFileIds],
-        ownerUserId,
+        ownerUserIds: [...ownerUserIds],
     });
 }
 

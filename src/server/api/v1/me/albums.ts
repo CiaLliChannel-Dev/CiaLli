@@ -288,7 +288,7 @@ async function handleAlbumPatch(
     ) {
         await cleanupOwnedOrphanDirectusFiles({
             candidateFileIds: [prevCoverFile],
-            ownerUserId: target.author_id,
+            ownerUserIds: [target.author_id],
         });
     }
     if (
@@ -340,7 +340,7 @@ async function handleAlbumDelete(
     await deleteOne("app_albums", id);
     await cleanupOwnedOrphanDirectusFiles({
         candidateFileIds: fileIds,
-        ownerUserId: target.author_id,
+        ownerUserIds: [target.author_id],
     });
     await awaitCacheInvalidations(
         [
@@ -528,7 +528,7 @@ async function handlePhotoPatch(
     ) {
         await cleanupOwnedOrphanDirectusFiles({
             candidateFileIds: [prevFileId],
-            ownerUserId: album?.author_id ?? access.user.id,
+            ownerUserIds: [album?.author_id ?? access.user.id],
         });
     }
     await awaitCacheInvalidations(
@@ -548,7 +548,7 @@ async function handlePhotoDelete(
     if (fileId) {
         await cleanupOwnedOrphanDirectusFiles({
             candidateFileIds: [fileId],
-            ownerUserId,
+            ownerUserIds: [ownerUserId],
         });
     }
     await awaitCacheInvalidations(

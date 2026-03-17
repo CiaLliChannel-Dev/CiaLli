@@ -161,7 +161,6 @@ async function runSaveDiaryCore(
     options: ExecuteSaveDiaryOptions,
 ): Promise<boolean> {
     let content = sourceContent.trim();
-    let materializedUploads: MaterializedDiaryUpload[] = [];
     let uploadStageFailed = false;
 
     try {
@@ -174,7 +173,7 @@ async function runSaveDiaryCore(
             throw error;
         });
         content = materialized.content;
-        materializedUploads = materialized.uploads;
+        const materializedUploads = materialized.uploads;
 
         const taskHandle = ctx.getSaveTaskHandle();
         if (taskHandle !== null) {

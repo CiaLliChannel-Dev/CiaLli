@@ -114,13 +114,11 @@ export type AppDiaryImage = {
 
 export type AppFriend = {
     id: string;
-    status: AppStatus;
     sort: number | null;
     title: string;
     description: string | null;
     site_url: string;
     avatar_file: string | null;
-    avatar_url: string | null;
     tags: string[] | null;
     is_public: boolean;
     date_created: string | null;

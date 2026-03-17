@@ -83,7 +83,7 @@
   let mLayout: "grid" | "masonry" = album.layout || "grid";
   let mStatus: AlbumStatus = album.status as AlbumStatus;
   let mIsPublic = album.is_public;
-  let displayTags: string[] = [];
+  let displayTags: string[];
 
   // Photos (saved)
   let mPhotos = [...photos];

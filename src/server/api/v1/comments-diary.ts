@@ -209,7 +209,7 @@ async function handleDiaryCommentPatch(
     if (input.body !== undefined || input.is_public !== undefined) {
         await syncMarkdownFilesToVisibility(
             input.body ?? updated.body,
-            access.user.id,
+            comment.author_id,
             (input.is_public ?? updated.is_public) ? "public" : "private",
         );
     }
@@ -223,7 +223,7 @@ async function handleDiaryCommentPatch(
         if (removedBodyFileIds.length > 0) {
             await cleanupOwnedOrphanDirectusFiles({
                 candidateFileIds: removedBodyFileIds,
-                ownerUserId: access.user.id,
+                ownerUserIds: [comment.author_id],
             });
         }
     }
@@ -254,11 +254,7 @@ async function handleDiaryCommentDelete(
     }
     assertOwnerOrAdmin(access, comment.author_id);
 
-    await deleteCommentWithDescendants(
-        "app_diary_comments",
-        commentId,
-        comment.author_id,
-    );
+    await deleteCommentWithDescendants("app_diary_comments", commentId);
     await awaitCacheInvalidations(
         [
             invalidateDiaryDetailCacheByDiaryId(comment.diary_id),

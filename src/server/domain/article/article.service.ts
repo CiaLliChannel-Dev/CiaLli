@@ -10,6 +10,9 @@ import type { JsonObject } from "@/types/json";
 import { forbidden, badRequest } from "@/server/api/errors";
 import {
     cleanupOwnedOrphanDirectusFiles,
+    collectArticleCommentCleanupCandidates,
+    mergeDirectusFileCleanupCandidates,
+    extractDirectusAssetIdsFromMarkdown,
     normalizeDirectusFileId,
 } from "@/server/api/v1/shared/file-cleanup";
 
@@ -95,7 +98,7 @@ async function cleanupOldCoverIfNeeded(
     ) {
         await cleanupOwnedOrphanDirectusFiles({
             candidateFileIds: [prevCoverFile],
-            ownerUserId: articleAuthorId,
+            ownerUserIds: [articleAuthorId],
         });
     }
 }
@@ -163,12 +166,24 @@ export async function deleteArticle(
     }
 
     const coverFileId = normalizeDirectusFileId(article.cover_file);
+    const bodyFileIds = extractDirectusAssetIdsFromMarkdown(
+        String(article.body_markdown ?? ""),
+    );
+    const relatedCommentCandidates =
+        await collectArticleCommentCleanupCandidates(articleId);
     await articleRepo.remove(articleId);
-    if (coverFileId) {
-        await cleanupOwnedOrphanDirectusFiles({
-            candidateFileIds: [coverFileId],
-            ownerUserId: article.author_id,
-        });
+    const cleanupCandidates = mergeDirectusFileCleanupCandidates(
+        {
+            candidateFileIds: [
+                ...(coverFileId ? [coverFileId] : []),
+                ...bodyFileIds,
+            ],
+            ownerUserIds: [article.author_id],
+        },
+        relatedCommentCandidates,
+    );
+    if (cleanupCandidates.candidateFileIds.length > 0) {
+        await cleanupOwnedOrphanDirectusFiles(cleanupCandidates);
     }
 }
 

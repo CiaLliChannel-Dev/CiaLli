@@ -1,5 +1,9 @@
 import type { JsonObject } from "@/types/json";
-import { deleteDirectusFile, readMany } from "@/server/directus/client";
+import {
+    deleteDirectusFile,
+    readMany,
+    runWithDirectusServiceAccess,
+} from "@/server/directus/client";
 import {
     extractDirectusAssetIdsFromMarkdown,
     normalizeDirectusFileId,
@@ -39,8 +43,12 @@ type MarkdownReferenceTarget = {
 
 export type DirectusFileCleanupRequest = {
     candidateFileIds: string[];
-    ownerUserId?: string;
-    allowAdminOverrideUserId?: string;
+    ownerUserIds?: string[];
+};
+
+export type DirectusFileCleanupCandidates = {
+    candidateFileIds: string[];
+    ownerUserIds: string[];
 };
 
 const STRUCTURED_REFERENCE_TARGETS: StructuredReferenceTarget[] = [
@@ -71,6 +79,38 @@ function normalizeOwnerId(value: unknown): string | null {
         return normalizeOwnerId(record.id);
     }
     return null;
+}
+
+function normalizeOwnerIds(values: unknown[]): string[] {
+    const ownerIds = new Set<string>();
+    for (const value of values) {
+        const ownerId = normalizeOwnerId(value);
+        if (ownerId) {
+            ownerIds.add(ownerId);
+        }
+    }
+    return [...ownerIds];
+}
+
+export function mergeDirectusFileCleanupCandidates(
+    ...groups: DirectusFileCleanupCandidates[]
+): DirectusFileCleanupCandidates {
+    const candidateFileIds = new Set<string>();
+    const ownerUserIds = new Set<string>();
+
+    for (const group of groups) {
+        for (const fileId of toUniqueFileIds(group.candidateFileIds)) {
+            candidateFileIds.add(fileId);
+        }
+        for (const ownerUserId of normalizeOwnerIds(group.ownerUserIds)) {
+            ownerUserIds.add(ownerUserId);
+        }
+    }
+
+    return {
+        candidateFileIds: [...candidateFileIds],
+        ownerUserIds: [...ownerUserIds],
+    };
 }
 
 function collectReferencedAssetIdsFromUnknown(
@@ -326,7 +366,7 @@ async function collectDeletableOwnedFileIds(
     return candidateFileIds.filter((fileId) => deletable.has(fileId));
 }
 
-export async function collectReferencedDirectusFileIds(
+async function collectReferencedDirectusFileIdsInternal(
     candidateFileIds: string[],
 ): Promise<Set<string>> {
     const normalizedCandidateIds = toUniqueFileIds(candidateFileIds);
@@ -362,6 +402,14 @@ export async function collectReferencedDirectusFileIds(
     return referencedSet;
 }
 
+export async function collectReferencedDirectusFileIds(
+    candidateFileIds: string[],
+): Promise<Set<string>> {
+    return await runWithDirectusServiceAccess(async () =>
+        collectReferencedDirectusFileIdsInternal(candidateFileIds),
+    );
+}
+
 export async function cleanupOwnedOrphanDirectusFiles(
     request: DirectusFileCleanupRequest,
 ): Promise<string[]> {
@@ -370,111 +418,165 @@ export async function cleanupOwnedOrphanDirectusFiles(
         return [];
     }
 
-    const allowedOwnerIds = new Set(
-        [request.ownerUserId, request.allowAdminOverrideUserId]
-            .map((value) => String(value ?? "").trim())
-            .filter(Boolean),
-    );
-    // 仅允许删除归属明确且属于当前业务主体的文件。
-    const ownedCandidateIds = await collectDeletableOwnedFileIds(
-        candidateFileIds,
-        allowedOwnerIds,
-    );
-    if (ownedCandidateIds.length === 0) {
-        return [];
-    }
+    return await runWithDirectusServiceAccess(async () => {
+        const allowedOwnerIds = new Set(
+            normalizeOwnerIds(request.ownerUserIds ?? []),
+        );
+        // 文件清理需要访问 directus_files 并执行物理删除，统一提升到 service 作用域。
+        const ownedCandidateIds = await collectDeletableOwnedFileIds(
+            candidateFileIds,
+            allowedOwnerIds,
+        );
+        if (ownedCandidateIds.length === 0) {
+            return [];
+        }
 
-    const referencedSet =
-        await collectReferencedDirectusFileIds(ownedCandidateIds);
-    const orphanFileIds = ownedCandidateIds.filter(
-        (id) => !referencedSet.has(id),
-    );
+        const referencedSet =
+            await collectReferencedDirectusFileIdsInternal(ownedCandidateIds);
+        const orphanFileIds = ownedCandidateIds.filter(
+            (id) => !referencedSet.has(id),
+        );
 
-    for (const fileId of orphanFileIds) {
-        await deleteDirectusFile(fileId);
-    }
-    return orphanFileIds;
+        for (const fileId of orphanFileIds) {
+            await deleteDirectusFile(fileId);
+        }
+        return orphanFileIds;
+    });
 }
 
 export async function collectDiaryFileIds(diaryId: string): Promise<string[]> {
-    const imageRows = await readMany("app_diary_images", {
-        filter: { diary_id: { _eq: diaryId } } as JsonObject,
-        fields: ["file_id"],
-        limit: 5000,
+    return await runWithDirectusServiceAccess(async () => {
+        const imageRows = await readMany("app_diary_images", {
+            filter: { diary_id: { _eq: diaryId } } as JsonObject,
+            fields: ["file_id"],
+            limit: 5000,
+        });
+        const values = (imageRows as Array<Record<string, unknown>>).map(
+            (row) => row.file_id,
+        );
+        return toUniqueFileIds(values);
     });
-    const values = (imageRows as Array<Record<string, unknown>>).map(
-        (row) => row.file_id,
-    );
-    return toUniqueFileIds(values);
 }
 
 export async function collectAlbumFileIds(
     albumId: string,
     coverFile?: unknown,
 ): Promise<string[]> {
-    const rows = await readMany("app_album_photos", {
-        filter: { album_id: { _eq: albumId } } as JsonObject,
-        fields: ["file_id"],
-        limit: 5000,
+    return await runWithDirectusServiceAccess(async () => {
+        const rows = await readMany("app_album_photos", {
+            filter: { album_id: { _eq: albumId } } as JsonObject,
+            fields: ["file_id"],
+            limit: 5000,
+        });
+        const values = (rows as Array<Record<string, unknown>>).map(
+            (row) => row.file_id,
+        );
+        if (coverFile !== undefined) {
+            values.push(coverFile);
+        }
+        return toUniqueFileIds(values);
     });
-    const values = (rows as Array<Record<string, unknown>>).map(
-        (row) => row.file_id,
-    );
-    if (coverFile !== undefined) {
-        values.push(coverFile);
-    }
-    return toUniqueFileIds(values);
 }
 
 export async function collectUserOwnedFileIds(
     userId: string,
 ): Promise<string[]> {
-    const [
-        profileHeaderFiles,
-        directusAvatarFiles,
-        articleCoverFiles,
-        albumCoverFiles,
-    ] = await Promise.all([
-        collectFileIdsFromCollection("app_user_profiles", "header_file", {
-            user_id: { _eq: userId },
-        } as JsonObject),
-        collectDirectusUserAvatarFileIds(userId),
-        collectFileIdsFromCollection("app_articles", "cover_file", {
-            author_id: { _eq: userId },
-        } as JsonObject),
-        collectFileIdsFromCollection("app_albums", "cover_file", {
-            author_id: { _eq: userId },
-        } as JsonObject),
-    ]);
-    const [registrationAvatarFiles, uploadedByFiles] = await Promise.all([
-        collectFileIdsFromCollection(
-            "app_user_registration_requests",
-            "avatar_file",
-            {
-                approved_user_id: { _eq: userId },
-            } as JsonObject,
-        ),
-        collectOwnedDirectusFileIds(userId),
-    ]);
+    return await runWithDirectusServiceAccess(async () => {
+        const [
+            profileHeaderFiles,
+            directusAvatarFiles,
+            articleCoverFiles,
+            albumCoverFiles,
+        ] = await Promise.all([
+            collectFileIdsFromCollection("app_user_profiles", "header_file", {
+                user_id: { _eq: userId },
+            } as JsonObject),
+            collectDirectusUserAvatarFileIds(userId),
+            collectFileIdsFromCollection("app_articles", "cover_file", {
+                author_id: { _eq: userId },
+            } as JsonObject),
+            collectFileIdsFromCollection("app_albums", "cover_file", {
+                author_id: { _eq: userId },
+            } as JsonObject),
+        ]);
+        const [registrationAvatarFiles, uploadedByFiles] = await Promise.all([
+            collectFileIdsFromCollection(
+                "app_user_registration_requests",
+                "avatar_file",
+                {
+                    approved_user_id: { _eq: userId },
+                } as JsonObject,
+            ),
+            collectOwnedDirectusFileIds(userId),
+        ]);
 
-    const [albumIds, diaryIds] = await Promise.all([
-        collectOwnerIds("app_albums", "author_id", userId),
-        collectOwnerIds("app_diaries", "author_id", userId),
-    ]);
+        const [albumIds, diaryIds] = await Promise.all([
+            collectOwnerIds("app_albums", "author_id", userId),
+            collectOwnerIds("app_diaries", "author_id", userId),
+        ]);
 
-    const [albumPhotoFiles, diaryImageFiles] = await Promise.all([
-        collectRelationFileIds("app_album_photos", "album_id", albumIds),
-        collectRelationFileIds("app_diary_images", "diary_id", diaryIds),
-    ]);
+        const [albumPhotoFiles, diaryImageFiles] = await Promise.all([
+            collectRelationFileIds("app_album_photos", "album_id", albumIds),
+            collectRelationFileIds("app_diary_images", "diary_id", diaryIds),
+        ]);
 
-    return toUniqueFileIds([
-        ...profileHeaderFiles,
-        ...directusAvatarFiles,
-        ...articleCoverFiles,
-        ...albumCoverFiles,
-        ...registrationAvatarFiles,
-        ...uploadedByFiles,
-        ...albumPhotoFiles,
-        ...diaryImageFiles,
-    ]);
+        return toUniqueFileIds([
+            ...profileHeaderFiles,
+            ...directusAvatarFiles,
+            ...articleCoverFiles,
+            ...albumCoverFiles,
+            ...registrationAvatarFiles,
+            ...uploadedByFiles,
+            ...albumPhotoFiles,
+            ...diaryImageFiles,
+        ]);
+    });
+}
+
+async function collectCommentCleanupCandidatesByRelation(
+    collection: "app_article_comments" | "app_diary_comments",
+    relationField: "article_id" | "diary_id",
+    relationId: string,
+): Promise<DirectusFileCleanupCandidates> {
+    return await runWithDirectusServiceAccess(async () => {
+        const rows = await readMany(collection, {
+            filter: { [relationField]: { _eq: relationId } } as JsonObject,
+            fields: ["body", "author_id"],
+            limit: 5000,
+        });
+        const candidateFileIds: string[] = [];
+        const ownerUserIds: string[] = [];
+
+        for (const row of rows as Array<Record<string, unknown>>) {
+            candidateFileIds.push(
+                ...extractDirectusAssetIdsFromMarkdown(String(row.body ?? "")),
+            );
+            ownerUserIds.push(String(row.author_id ?? ""));
+        }
+
+        return {
+            candidateFileIds: toUniqueFileIds(candidateFileIds),
+            ownerUserIds: normalizeOwnerIds(ownerUserIds),
+        };
+    });
+}
+
+export async function collectArticleCommentCleanupCandidates(
+    articleId: string,
+): Promise<DirectusFileCleanupCandidates> {
+    return await collectCommentCleanupCandidatesByRelation(
+        "app_article_comments",
+        "article_id",
+        articleId,
+    );
+}
+
+export async function collectDiaryCommentCleanupCandidates(
+    diaryId: string,
+): Promise<DirectusFileCleanupCandidates> {
+    return await collectCommentCleanupCandidatesByRelation(
+        "app_diary_comments",
+        "diary_id",
+        diaryId,
+    );
 }

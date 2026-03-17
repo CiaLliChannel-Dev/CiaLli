@@ -1,4 +1,5 @@
 ---
+import ExternalImage from "@components/misc/ExternalImage.astro";
 import Markdown from "@components/misc/Markdown.astro";
 import { renderMarkdown } from "@/server/markdown/render";
 import {
@@ -37,13 +38,14 @@ function getSiteHostname(siteurl: string): string {
   }
 }
 
-function shuffleList<T>(list: T[]): T[] {
-  const shuffled = [...list];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+function buildFriendFaviconUrl(siteurl: string): string {
+  const hostname = getSiteHostname(siteurl).trim();
+  if (!hostname) {
+    return "";
   }
-  return shuffled;
+
+  // 友链图标统一按站点域名自动获取，避免依赖后台残留的旧头像链接。
+  return `https://www.google.com/s2/favicons?sz=128&domain=${encodeURIComponent(hostname)}`;
 }
 
 function normalizeFriendTags(tags: string[]): string[] {
@@ -103,7 +105,7 @@ try {
             height: 128,
             fit: "cover",
           })
-        : String(item.avatar_url || "").trim();
+        : buildFriendFaviconUrl(siteurl);
 
       return {
         id: item.id,
@@ -117,7 +119,7 @@ try {
     })
     .filter((item): item is FriendCardItem => Boolean(item));
 
-  friendsList = shuffleList(mapped);
+  friendsList = mapped;
 } catch (error) {
   console.error("[friends] failed to load friends list:", error);
 }
@@ -184,7 +186,7 @@ const allTags = collectAllTags(friendsList);
           <!-- 友链卡片网格 -->
           <div
             id="friends-grid"
-            class="grid grid-cols-1 grid-cols-2 xl:grid-cols-3 gap-6 mb-6"
+            class="grid grid-cols-2 xl:grid-cols-3 gap-6 mb-6"
           >
             {
               friendsList.map((item) => (
@@ -206,7 +208,7 @@ const allTags = collectAllTags(friendsList);
 												transition-all duration-300"
                       >
                         {item.imgurl ? (
-                          <img
+                          <ExternalImage
                             src={item.imgurl}
                             alt={item.title}
                             class="w-full h-full object-cover transform group-hover:scale-110 transition-transform duration-300"
@@ -312,7 +314,7 @@ const allTags = collectAllTags(friendsList);
 
                   {/* 悬停装饰效果 */}
                   <div
-                    class="absolute inset-0 bg-gradient-to-br from-(--primary)/5 to-transparent 
+                    class="absolute inset-0 bg-linear-to-br from-(--primary)/5 to-transparent 
 										opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none"
                   />
                 </div>
@@ -375,7 +377,7 @@ const allTags = collectAllTags(friendsList);
             }
           </div>
         </div>
-        <div class="grid grid-cols-1 grid-cols-2 xl:grid-cols-3 gap-6">
+        <div class="grid grid-cols-2 xl:grid-cols-3 gap-6">
           {
             Array.from({ length: 6 }).map(() => (
               <div class="rounded-xl border border-black/10 dark:border-white/10 p-6 space-y-4">

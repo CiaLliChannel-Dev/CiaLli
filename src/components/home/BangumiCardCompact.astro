@@ -1,5 +1,6 @@
 ---
 import type { BangumiCollectionItem } from "@/server/bangumi/types";
+import ExternalImage from "@components/misc/ExternalImage.astro";
 
 interface Props {
   bangumi: BangumiCollectionItem;
@@ -38,7 +39,7 @@ const linkProps = bangumi.link
   <div class="h-48 overflow-hidden relative">
     {
       hasCover ? (
-        <img
+        <ExternalImage
           src={bangumi.cover_url || ""}
           alt={bangumi.title}
           class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"

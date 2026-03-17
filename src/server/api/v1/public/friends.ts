@@ -5,7 +5,7 @@ import { countItems, readMany } from "@/server/directus/client";
 import { fail, ok } from "@/server/api/response";
 import { parsePagination } from "@/server/api/utils";
 
-import { filterPublicStatus, safeCsv } from "../shared";
+import { FRIEND_FIELDS, safeCsv } from "../shared";
 
 export async function handlePublicFriends(
     context: APIContext,
@@ -25,7 +25,7 @@ export async function handlePublicFriends(
     );
     const q = (context.url.searchParams.get("q")?.trim() || "").slice(0, 200);
 
-    const andFilters: JsonObject[] = [filterPublicStatus()];
+    const andFilters: JsonObject[] = [];
     if (tag) {
         andFilters.push({ tags: { _contains: tag } });
     }
@@ -39,11 +39,15 @@ export async function handlePublicFriends(
         });
     }
 
-    const filter = { _and: andFilters } as JsonObject;
+    const filter =
+        andFilters.length > 0
+            ? ({ _and: andFilters } as JsonObject)
+            : undefined;
     const [rows, total] = await Promise.all([
         readMany("app_friends", {
             filter,
             sort: ["sort", "-date_created"],
+            fields: [...FRIEND_FIELDS],
             limit,
             offset,
         }),

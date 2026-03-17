@@ -75,12 +75,13 @@ function writeClipboardWithExecCommand(text: string): boolean {
     textArea.select();
     textArea.setSelectionRange(0, textArea.value.length);
 
-    let copied = false;
-    try {
-        copied = execCommand.call(document, "copy") === true;
-    } catch {
-        copied = false;
-    }
+    const copied = (() => {
+        try {
+            return execCommand.call(document, "copy") === true;
+        } catch {
+            return false;
+        }
+    })();
 
     textArea.remove();
 

@@ -1,5 +1,6 @@
 ---
 import ContentNotVisible from "@components/misc/ContentNotVisible.astro";
+import ExternalImage from "@components/misc/ExternalImage.astro";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
@@ -216,7 +217,7 @@ const hasSidebarContent = tagList.length > 0 || categoryList.length > 0;
                     {item.coverSrc &&
                       (item.layout === "masonry" ? (
                         <div class="w-full h-56 bg-black flex items-center justify-center">
-                          <img
+                          <ExternalImage
                             src={item.coverSrc}
                             alt={item.title}
                             class="w-full h-full object-contain"
@@ -224,7 +225,7 @@ const hasSidebarContent = tagList.length > 0 || categoryList.length > 0;
                           />
                         </div>
                       ) : (
-                        <img
+                        <ExternalImage
                           src={item.coverSrc}
                           alt={item.title}
                           class="w-full h-56 object-cover"

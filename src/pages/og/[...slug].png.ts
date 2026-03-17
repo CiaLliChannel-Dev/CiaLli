@@ -152,13 +152,14 @@ async function fetchNotoSansSCFonts(): Promise<{
     }
 }
 
-function resolvePublishedDate(post: OgPost): string {
+function resolvePublishedDate(post: OgPost, timeZone: string): string {
     const raw = post.date_updated || post.date_created;
     const date = raw ? new Date(raw) : new Date();
     if (Number.isNaN(date.getTime())) {
         return "";
     }
     return date.toLocaleDateString("en-US", {
+        timeZone,
         year: "numeric",
         month: "short",
         day: "numeric",
@@ -477,7 +478,7 @@ export async function GET({
         profileName: settings.profile.name,
         avatarBase64,
         iconBase64,
-        pubDate: resolvePublishedDate(post),
+        pubDate: resolvePublishedDate(post, system.timeZone),
         primaryColor: `hsl(${hue}, 90%, 65%)`,
         textColor: "hsl(0, 0%, 95%)",
         subtleTextColor: `hsl(${hue}, 10%, 75%)`,

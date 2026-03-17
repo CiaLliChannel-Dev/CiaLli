@@ -106,7 +106,6 @@ export function createAutoScrollAnimation(params: AnimateScrollParams): number {
     const startTime = performance.now();
     const easeOutCubic = (t: number): number => 1 - (1 - t) ** 3;
 
-    let frameId = -1;
     const step = (now: number): void => {
         const progress = Math.min(1, (now - startTime) / duration);
         const eased = easeOutCubic(progress);
@@ -114,16 +113,14 @@ export function createAutoScrollAnimation(params: AnimateScrollParams): number {
         onFrame(newScrollTop);
 
         if (progress < 1) {
-            frameId = requestFrame(step);
+            requestFrame(step);
             return;
         }
 
         onComplete(targetTop);
-        frameId = -1;
     };
 
-    frameId = requestFrame(step);
-    void frameId;
+    requestFrame(step);
     return duration;
 }
 

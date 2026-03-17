@@ -1,6 +1,7 @@
 ---
 import { Icon } from "astro-icon/components";
 
+import ExternalImage from "@components/misc/ExternalImage.astro";
 import type { DirectusPostEntry } from "@/utils/content-utils";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
@@ -207,7 +208,7 @@ const adminDeleteLabel = i18n(I18nKey.interactionCommonDeleteAdmin);
             class="transition opacity-0 group-hover:opacity-100 scale-50 group-hover:scale-100 text-white text-5xl"
           />
         </div>
-        <img
+        <ExternalImage
           src={image || ""}
           alt={`Cover image of ${title}`}
           class="w-full h-full object-cover"

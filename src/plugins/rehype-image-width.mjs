@@ -1,6 +1,7 @@
 import { visit } from "unist-util-visit";
 
-const WIDTH_TOKEN_REGEX = /\s+w-([0-9]+)%/i;
+const WIDTH_TOKEN_REGEX = /(^|\s)w-([0-9]+)%(?=\s|$)/gi;
+const CENTER_TOKEN_REGEX = /(^|\s)\{center\}(?=\s|$)/gi;
 
 function isWhitespaceTextNode(node) {
     return (
@@ -77,21 +78,38 @@ function appendClassName(properties, className) {
     return output;
 }
 
-function normalizeImageAltAndWidth(imageNode) {
+function normalizeImageMetadata(imageNode) {
     const properties = imageNode.properties || {};
     imageNode.properties = properties;
 
     const rawAlt = String(properties.alt || "");
-    const widthMatch = rawAlt.match(WIDTH_TOKEN_REGEX);
-    const normalizedAlt = rawAlt.replace(WIDTH_TOKEN_REGEX, "").trim();
+    let parsedWidth = null;
+    let centered = false;
+
+    const normalizedAlt = rawAlt
+        .replace(WIDTH_TOKEN_REGEX, (_match, leadingSpace, width) => {
+            if (parsedWidth === null) {
+                parsedWidth = `${width}%`;
+            }
+            return leadingSpace || "";
+        })
+        .replace(CENTER_TOKEN_REGEX, (_match, leadingSpace) => {
+            centered = true;
+            return leadingSpace || "";
+        })
+        .replace(/\s{2,}/g, " ")
+        .trim();
 
     // 支持 alt 中的 `w-60%` 宽度语法，并将其从说明文本中剥离。
-    if (widthMatch) {
-        properties.width = `${widthMatch[1]}%`;
+    if (parsedWidth !== null) {
+        properties.width = parsedWidth;
     }
     properties.alt = normalizedAlt;
 
-    return normalizedAlt;
+    return {
+        captionText: normalizedAlt,
+        centered,
+    };
 }
 
 function createCaptionNode(text) {
@@ -123,7 +141,7 @@ export function rehypeImageWidth() {
             }
 
             const { containerNode, imageNode } = matched;
-            const captionText = normalizeImageAltAndWidth(imageNode);
+            const { captionText, centered } = normalizeImageMetadata(imageNode);
             const nextChildren = [containerNode];
 
             // 仅当 `![text](url)` 的 text 非空时才渲染图注。
@@ -136,6 +154,13 @@ export function rehypeImageWidth() {
                 node.properties,
                 "md-image-figure",
             );
+            // 使用显式 modifier 控制布局，默认不声明时继续保持左对齐。
+            if (centered) {
+                node.properties = appendClassName(
+                    node.properties,
+                    "md-image-figure--center",
+                );
+            }
             node.children = nextChildren;
         });
     };

@@ -1,6 +1,14 @@
 ---
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
+import {
+  getSupportedSiteTimeZones,
+  resolveEnvironmentTimeZone,
+  SITE_TIME_ZONE_AUTO_VALUE,
+} from "@/utils/date-utils";
+
+const environmentTimeZone = resolveEnvironmentTimeZone();
+const supportedTimeZones = getSupportedSiteTimeZones();
 ---
 
 <!-- ===== Section 1: 站点信息 ===== -->
@@ -49,6 +57,26 @@ import { i18n } from "@i18n/translation";
     </label>
     <label class="space-y-1.5">
       <span class="text-sm text-60">
+        {i18n(I18nKey.adminSiteSettingsSiteTimeZone)}
+      </span>
+      <select
+        id="ss-timezone"
+        class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75"
+      >
+        <option value={SITE_TIME_ZONE_AUTO_VALUE}>
+          {i18n(I18nKey.adminSiteSettingsTimeZoneFollowEnvironment)}（当前：
+          {environmentTimeZone}）
+        </option>
+        <option value="UTC">UTC</option>
+        {
+          supportedTimeZones
+            .filter((timeZone) => timeZone !== "UTC")
+            .map((timeZone) => <option value={timeZone}>{timeZone}</option>)
+        }
+      </select>
+    </label>
+    <label class="space-y-1.5">
+      <span class="text-sm text-60">
         {i18n(I18nKey.adminSiteSettingsSiteKeywords)}
       </span>
       <input
@@ -57,6 +85,9 @@ import { i18n } from "@i18n/translation";
         placeholder="blog, tech, life"
       />
     </label>
+    <p class="col-span-2 text-xs text-50">
+      {i18n(I18nKey.adminSiteSettingsTimeZoneHint)}
+    </p>
     <label class="space-y-1.5">
       <span class="text-sm text-60">
         {i18n(I18nKey.adminSiteSettingsSiteStartDate)}

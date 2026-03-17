@@ -1,5 +1,6 @@
 ---
 import ContentNotVisible from "@components/misc/ContentNotVisible.astro";
+import ExternalImage from "@components/misc/ExternalImage.astro";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import MainGridLayout from "@layouts/MainGridLayout.astro";
@@ -187,7 +188,7 @@ const hasSidebarContent = categoryList.length > 0 || tagList.length > 0;
                   >
                     <div class="flex gap-4 h-full">
                       {item.cover_url && (
-                        <img
+                        <ExternalImage
                           src={item.cover_url}
                           alt={item.title}
                           class="w-24 h-32 rounded-lg object-cover border border-(--line-divider) shrink-0"

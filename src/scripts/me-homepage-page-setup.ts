@@ -351,12 +351,14 @@ async function doHeaderSave(
     state: PageState,
     handles: TaskHandles,
 ): Promise<void> {
-    let fileId: string | null = state.currentHeaderFileId || null;
     if (state.pendingHeaderUpload) {
-        fileId = await uploadHeaderImage(refs, state, handles);
+        const fileId = await uploadHeaderImage(refs, state, handles);
         if (fileId === null) return;
+        await patchHeaderFile(fileId, refs, state, handles);
+        return;
     } else if (state.headerRemoved) {
-        fileId = null;
+        await patchHeaderFile(null, refs, state, handles);
+        return;
     } else {
         if (refs.headerMsg)
             refs.headerMsg.textContent = t(
@@ -364,7 +366,6 @@ async function doHeaderSave(
             );
         return;
     }
-    await patchHeaderFile(fileId, refs, state, handles);
 }
 
 async function handleHeaderSave(
