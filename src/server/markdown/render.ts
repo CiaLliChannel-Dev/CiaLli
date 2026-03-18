@@ -388,4 +388,3 @@ export async function renderMarkdownForFeed(
 ): Promise<string> {
     return renderMarkdown(markdown, { target: "feed", site });
 }
-

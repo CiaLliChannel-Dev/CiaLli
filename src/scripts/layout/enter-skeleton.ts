@@ -45,6 +45,9 @@ type SkeletonPathRule = {
 const ACTIVE_CLASS = "enter-skeleton-active";
 const MODE_ATTR = "data-enter-skeleton-mode";
 const MIN_VISIBLE_MS = 120;
+const RUNTIME_MIN_HEIGHT_ATTR = "data-enter-skeleton-runtime-min-height";
+const RUNTIME_MIN_HEIGHT_PREV_ATTR =
+    "data-enter-skeleton-runtime-min-height-prev";
 
 let activatedAt = 0;
 let deactivationTimer: number | null = null;
@@ -62,6 +65,79 @@ function clearDeactivationTimer(): void {
         window.clearTimeout(deactivationTimer);
         deactivationTimer = null;
     }
+}
+
+function resolveRuntimeSkeletonMinHeightPx(): number {
+    if (typeof window === "undefined") {
+        return 0;
+    }
+    return Math.max(0, Math.ceil(window.scrollY + window.innerHeight));
+}
+
+function markRuntimeMinHeight(
+    element: HTMLElement,
+    runtimeMinHeightPx: number,
+): void {
+    if (runtimeMinHeightPx <= 0) {
+        return;
+    }
+    if (!element.hasAttribute(RUNTIME_MIN_HEIGHT_ATTR)) {
+        const previousMinHeight = element.style.minHeight;
+        if (previousMinHeight.length > 0) {
+            element.setAttribute(
+                RUNTIME_MIN_HEIGHT_PREV_ATTR,
+                previousMinHeight,
+            );
+        }
+    }
+    element.style.minHeight = `${runtimeMinHeightPx}px`;
+    element.setAttribute(RUNTIME_MIN_HEIGHT_ATTR, "true");
+}
+
+function applyRuntimeSkeletonMinHeight(
+    targetDocument: Document = document,
+): void {
+    const runtimeMinHeightPx = resolveRuntimeSkeletonMinHeightPx();
+    if (runtimeMinHeightPx <= 0) {
+        return;
+    }
+
+    const targets = new Set<HTMLElement>();
+    const pageTarget = targetDocument.querySelector<HTMLElement>(
+        "[data-enter-skeleton-page][data-enter-skeleton-target]",
+    );
+    if (pageTarget instanceof HTMLElement) {
+        targets.add(pageTarget);
+    }
+
+    const mainContainer = targetDocument.getElementById("main-container");
+    if (mainContainer instanceof HTMLElement) {
+        targets.add(mainContainer);
+    }
+
+    targets.forEach((target) => {
+        // 进入骨架阶段要覆盖“当前滚动位 + 当前视口”，否则高滚动位会直接落到骨架底部之外。
+        markRuntimeMinHeight(target, runtimeMinHeightPx);
+    });
+}
+
+function clearRuntimeSkeletonMinHeight(
+    targetDocument: Document = document,
+): void {
+    const targets = targetDocument.querySelectorAll<HTMLElement>(
+        `[${RUNTIME_MIN_HEIGHT_ATTR}]`,
+    );
+    targets.forEach((target) => {
+        const previousMinHeight =
+            target.getAttribute(RUNTIME_MIN_HEIGHT_PREV_ATTR) ?? "";
+        if (previousMinHeight.length > 0) {
+            target.style.minHeight = previousMinHeight;
+        } else {
+            target.style.removeProperty("min-height");
+        }
+        target.removeAttribute(RUNTIME_MIN_HEIGHT_ATTR);
+        target.removeAttribute(RUNTIME_MIN_HEIGHT_PREV_ATTR);
+    });
 }
 
 type SkeletonDetectRule = {
@@ -227,6 +303,7 @@ function clearMode(): void {
         return;
     }
 
+    clearRuntimeSkeletonMinHeight();
     root.classList.remove(ACTIVE_CLASS);
     root.removeAttribute(MODE_ATTR);
 }
@@ -254,6 +331,7 @@ export function prepareEnterSkeletonForIncomingDocument(
     activationToken += 1;
     clearDeactivationTimer();
     activatedAt = performance.now();
+    applyRuntimeSkeletonMinHeight(targetDocument);
     applyMode(
         detectEnterSkeletonMode(targetDocument),
         targetDocument.documentElement,

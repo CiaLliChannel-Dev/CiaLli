@@ -230,10 +230,9 @@ function clearTransitionProxyEnterScheduling(state: TransitionState): void {
 
 function scheduleTransitionProxyEnter(state: TransitionState): void {
     clearTransitionProxyEnterScheduling(state);
-    mountTransitionProxy();
+    startTransitionProxyEnter();
     state.proxyEnterFrameId = window.requestAnimationFrame(() => {
         state.proxyEnterFrameId = null;
-        startTransitionProxyEnter();
         const prefersReducedMotion = window.matchMedia(
             "(prefers-reduced-motion: reduce)",
         ).matches;
@@ -246,6 +245,13 @@ function scheduleTransitionProxyEnter(state: TransitionState): void {
             settleTransitionProxyEnter();
         }, BANNER_TO_SPEC_PROXY_ENTER_DURATION_MS);
     });
+}
+
+function resetViewportForIncomingPage(): void {
+    if (window.scrollY <= 0) {
+        return;
+    }
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
 }
 
 export function resolvePreparationTransitionProxyPayload(
@@ -438,6 +444,8 @@ function handleBeforePreparation(
     }
 
     // 整页骨架只打到 incoming 文档，避免 outgoing 页面先闪成骨架。
+    // 代理壳与骨架已经准备就绪后，立即回到顶部，确保用户看到的是骨架而不是高滚动位的留白区域。
+    resetViewportForIncomingPage();
 }
 
 // ===== Before-swap event handler =====

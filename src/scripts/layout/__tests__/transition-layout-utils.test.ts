@@ -365,6 +365,10 @@ describe("transition layout DOM helpers", () => {
         class MockTemplateElement {}
         vi.stubGlobal("HTMLElement", MockHtmlElement);
         vi.stubGlobal("HTMLTemplateElement", MockTemplateElement);
+        vi.stubGlobal("window", {
+            innerHeight: 720,
+            scrollY: 640,
+        });
 
         const appendedNodes: unknown[] = [];
         const mainSlot = Object.assign(new MockHtmlElement(), {
@@ -379,11 +383,23 @@ describe("transition layout DOM helpers", () => {
         };
         const proxyHost = Object.assign(new MockHtmlElement(), {
             firstChild: null,
+            hasAttribute: vi.fn(() => false),
             removeChild: vi.fn(),
             appendChild: vi.fn((node: unknown) => {
                 appendedNodes.push(node);
                 return node;
             }),
+            setAttribute: vi.fn(),
+            style: {
+                minHeight: "",
+            },
+        });
+        const mainPanelWrapper = Object.assign(new MockHtmlElement(), {
+            hasAttribute: vi.fn(() => false),
+            setAttribute: vi.fn(),
+            style: {
+                minHeight: "",
+            },
         });
         const contentFragment = { marker: "proxy-content-fragment" };
         const shellTemplate = Object.assign(new MockTemplateElement(), {
@@ -405,13 +421,15 @@ describe("transition layout DOM helpers", () => {
             getElementById: (id: string) =>
                 id === "main-panel-transition-proxy" ? proxyHost : null,
             querySelector: (selector: string) =>
-                selector ===
-                '[data-transition-proxy-shell="sidebar-main-right-default"]'
-                    ? shellTemplate
+                selector === ".main-panel-wrapper"
+                    ? mainPanelWrapper
                     : selector ===
-                        '[data-transition-proxy-template="post-detail"]'
-                      ? contentTemplate
-                      : null,
+                        '[data-transition-proxy-shell="sidebar-main-right-default"]'
+                      ? shellTemplate
+                      : selector ===
+                          '[data-transition-proxy-template="post-detail"]'
+                        ? contentTemplate
+                        : null,
         } as unknown as Document;
 
         const didApply = applyTransitionProxySkeleton(
@@ -435,6 +453,8 @@ describe("transition layout DOM helpers", () => {
             TRANSITION_PROXY_LAYOUT_ATTR,
             "sidebar-main-right-default",
         );
+        expect(proxyHost.style.minHeight).toBe("1360px");
+        expect(mainPanelWrapper.style.minHeight).toBe("1360px");
     });
 
     it("代理骨架显隐 helper 会按 mount -> enter -> reveal -> clear 四阶段切换状态", () => {
@@ -456,6 +476,7 @@ describe("transition layout DOM helpers", () => {
             },
             getElementById: (id: string) =>
                 id === "main-panel-transition-proxy" ? proxyHost : null,
+            querySelectorAll: () => [],
         } as unknown as Document;
 
         mountTransitionProxy(targetDocument);

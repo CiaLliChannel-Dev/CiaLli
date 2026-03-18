@@ -85,6 +85,10 @@ export const ROOT_RUNTIME_DATA_ATTRIBUTES_TO_PRESERVE = [
     BANNER_TO_SPEC_PROXY_MODE_ATTR,
     TRANSITION_PROXY_LAYOUT_ATTR,
 ] as const;
+const RUNTIME_PROXY_MIN_HEIGHT_ATTR =
+    "data-transition-proxy-runtime-min-height";
+const RUNTIME_PROXY_MIN_HEIGHT_PREV_ATTR =
+    "data-transition-proxy-runtime-min-height-prev";
 
 export type BannerWaveLayerSnapshot = {
     currentTimeMs: number | null;
@@ -259,6 +263,74 @@ function getProxyHost(targetDocument: Document = document): HTMLElement | null {
     ) as HTMLElement | null;
 }
 
+function resolveRuntimeProxyMinHeightPx(): number {
+    if (typeof window === "undefined") {
+        return 0;
+    }
+    return Math.max(0, Math.ceil(window.scrollY + window.innerHeight));
+}
+
+function markRuntimeProxyMinHeight(
+    element: HTMLElement,
+    runtimeMinHeightPx: number,
+): void {
+    if (runtimeMinHeightPx <= 0) {
+        return;
+    }
+    if (!element.hasAttribute(RUNTIME_PROXY_MIN_HEIGHT_ATTR)) {
+        const previousMinHeight = element.style.minHeight;
+        if (previousMinHeight.length > 0) {
+            element.setAttribute(
+                RUNTIME_PROXY_MIN_HEIGHT_PREV_ATTR,
+                previousMinHeight,
+            );
+        }
+    }
+    element.style.minHeight = `${runtimeMinHeightPx}px`;
+    element.setAttribute(RUNTIME_PROXY_MIN_HEIGHT_ATTR, "true");
+}
+
+function applyRuntimeProxyMinHeight(targetDocument: Document = document): void {
+    const runtimeMinHeightPx = resolveRuntimeProxyMinHeightPx();
+    if (runtimeMinHeightPx <= 0) {
+        return;
+    }
+
+    const targets = new Set<HTMLElement>();
+    const proxyHost = getProxyHost(targetDocument);
+    if (proxyHost instanceof HTMLElement) {
+        targets.add(proxyHost);
+    }
+
+    const mainPanelWrapper = targetDocument.querySelector<HTMLElement>(
+        ".main-panel-wrapper",
+    );
+    if (mainPanelWrapper instanceof HTMLElement) {
+        targets.add(mainPanelWrapper);
+    }
+
+    targets.forEach((target) => {
+        markRuntimeProxyMinHeight(target, runtimeMinHeightPx);
+    });
+}
+
+function clearRuntimeProxyMinHeight(targetDocument: Document = document): void {
+    const targets = targetDocument.querySelectorAll<HTMLElement>(
+        `[${RUNTIME_PROXY_MIN_HEIGHT_ATTR}]`,
+    );
+    targets.forEach((target) => {
+        const previousMinHeight =
+            target.getAttribute(RUNTIME_PROXY_MIN_HEIGHT_PREV_ATTR) ?? "";
+        if (previousMinHeight.length > 0) {
+            target.style.minHeight = previousMinHeight;
+        } else {
+            target.style.removeProperty("min-height");
+        }
+        target.removeAttribute(RUNTIME_PROXY_MIN_HEIGHT_ATTR);
+        target.removeAttribute(RUNTIME_PROXY_MIN_HEIGHT_PREV_ATTR);
+    });
+}
+
 function getProxyContentTemplate(
     mode: EnterSkeletonMode,
     targetDocument: Document = document,
@@ -389,6 +461,7 @@ export function applyTransitionProxySkeleton(
 
     clearChildNodes(host);
     host.appendChild(shellFragment);
+    applyRuntimeProxyMinHeight(targetDocument);
     targetDocument.documentElement.setAttribute(
         BANNER_TO_SPEC_PROXY_MODE_ATTR,
         payload.mode,
@@ -407,6 +480,7 @@ export function clearTransitionProxySkeleton(
     if (host instanceof HTMLElement) {
         clearChildNodes(host);
     }
+    clearRuntimeProxyMinHeight(targetDocument);
     targetDocument.documentElement.removeAttribute(
         BANNER_TO_SPEC_PROXY_MODE_ATTR,
     );
