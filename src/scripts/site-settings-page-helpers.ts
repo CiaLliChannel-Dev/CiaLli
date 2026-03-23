@@ -209,15 +209,11 @@ function bindOtherSection(s: SettingsObj): void {
 
 function bindFeatureSection(s: SettingsObj): void {
     const toc = (s.toc ?? {}) as SettingsObj;
-    const license = (s.license ?? {}) as SettingsObj;
 
     setChecked("ss-toc-enable", Boolean(toc.enable));
     setChecked("ss-toc-jp", Boolean(toc.useJapaneseBadge));
     setSelect("ss-toc-mode", String(toc.mode ?? "sidebar"));
     setSelect("ss-toc-depth", String(toc.depth ?? 2));
-    setChecked("ss-license-enable", Boolean(license.enable));
-    setVal("ss-license-name", String(license.name ?? ""));
-    setVal("ss-license-url", String(license.url ?? ""));
 }
 
 export function bindSettings(s: SettingsObj): void {
@@ -394,19 +390,13 @@ export function collectOtherPayload(current: SettingsObj): SettingsObj {
     };
 }
 
-export function collectFeaturePayload(current: SettingsObj): SettingsObj {
+export function collectFeaturePayload(): SettingsObj {
     return {
         toc: {
             enable: checked("ss-toc-enable"),
             useJapaneseBadge: checked("ss-toc-jp"),
             mode: inputVal("ss-toc-mode") || "sidebar",
             depth: Number(inputVal("ss-toc-depth") || 2),
-        },
-        license: {
-            ...((current.license ?? {}) as SettingsObj),
-            enable: checked("ss-license-enable"),
-            name: inputVal("ss-license-name"),
-            url: inputVal("ss-license-url"),
         },
     };
 }

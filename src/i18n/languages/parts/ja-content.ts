@@ -15,7 +15,6 @@ export const jaContent: Record<string, string> = {
     [Key.contentMinutesCount]: "分",
     [Key.contentPostCount]: "件の投稿",
     [Key.contentPostsCount]: "件の投稿",
-    [Key.contentLicense]: "ライセンス",
     [Key.contentFriends]: "友達",
     [Key.contentFriendsSubtitle]: "もっと素敵なウェブサイトを見つける",
     [Key.contentFriendsFilterAll]: "すべて",

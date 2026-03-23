@@ -102,7 +102,6 @@ export const jaAdmin: Record<string, string> = {
     [Key.adminSiteSettingsAnalyticsHint]:
         "分析スクリプトとアクセス情報を設定します。",
     [Key.adminSiteSettingsAnalyticsTitle]: "分析設定",
-    [Key.adminSiteSettingsArticleLicenseInfo]: "記事ライセンス情報",
     [Key.adminSiteSettingsBannerAlignment]: "バナー配置",
     [Key.adminSiteSettingsBannerApiUrl]: "バナー API URL",
     [Key.adminSiteSettingsBannerRemovedPendingSave]:
@@ -124,7 +123,6 @@ export const jaAdmin: Record<string, string> = {
     [Key.adminSiteSettingsDesktopWallpaper]: "デスクトップ壁紙",
     [Key.adminSiteSettingsEnableArticleToc]: "記事目次を有効化",
     [Key.adminSiteSettingsEnableBannerApi]: "バナー API を有効化",
-    [Key.adminSiteSettingsEnableLicenseBlock]: "ライセンス情報ブロックを有効化",
     [Key.adminSiteSettingsEnableMusicPlayer]: "音楽プレーヤーを有効化",
     [Key.adminSiteSettingsEnableSakura]: "桜エフェクトを有効化",
     [Key.adminSiteSettingsEnableTypewriter]: "タイプライター効果を有効化",
@@ -147,8 +145,6 @@ export const jaAdmin: Record<string, string> = {
     [Key.adminSiteSettingsImageTooLargeWithLimit]:
         "画像サイズが大きすぎます（上限 {limit}）",
     [Key.adminSiteSettingsInvalidInput]: "入力が無効です",
-    [Key.adminSiteSettingsLicenseName]: "ライセンス名",
-    [Key.adminSiteSettingsLicenseUrl]: "ライセンス URL",
     [Key.adminSiteSettingsMarqueeSpeed]: "スクロール速度",
     [Key.adminSiteSettingsMusicServer]: "音楽サーバー",
     [Key.adminSiteSettingsMusicType]: "音楽タイプ",

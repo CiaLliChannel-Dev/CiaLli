@@ -1,7 +1,5 @@
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
-import { permalinkConfig } from "@/config";
-import { generatePermalinkSlug, type PermalinkPost } from "./permalink-utils";
 
 /**
  * 移除文件扩展名（.md, .mdx, .markdown）
@@ -35,7 +33,7 @@ export function getPostUrlByAlias(alias: string): string {
 }
 
 type PostUrlInput =
-    | (PermalinkPost & { slug?: string | null; url?: string })
+    | { id: string; slug?: string | null; url?: string }
     | {
           id?: string;
           slug?: string | null;
@@ -62,18 +60,6 @@ export function getPostUrl(post: PostUrlInput): string {
     // 如果文章有自定义 permalink，优先使用（在根目录下）
     if (data.permalink) {
         const slug = data.permalink.replace(/^\/+/, "").replace(/\/+$/, "");
-        return url(`/${slug}`);
-    }
-
-    // 如果全局 permalink 功能启用，使用生成的 slug（在根目录下）
-    if (
-        permalinkConfig.enable &&
-        "id" in post &&
-        "data" in post &&
-        post.data &&
-        typeof post.data === "object"
-    ) {
-        const slug = generatePermalinkSlug(post as PermalinkPost);
         return url(`/${slug}`);
     }
 

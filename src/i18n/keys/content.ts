@@ -14,7 +14,6 @@ export enum ContentKey {
     contentMinutesCount = "contentMinutesCount",
     contentPostCount = "contentPostCount",
     contentPostsCount = "contentPostsCount",
-    contentLicense = "contentLicense",
     contentFriends = "contentFriends",
     contentFriendsSubtitle = "contentFriendsSubtitle",
     contentFriendsFilterAll = "contentFriendsFilterAll",

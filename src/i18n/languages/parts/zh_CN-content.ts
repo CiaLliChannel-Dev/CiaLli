@@ -15,7 +15,6 @@ export const zhCNContent: Record<string, string> = {
     [Key.contentMinutesCount]: "分钟",
     [Key.contentPostCount]: "篇文章",
     [Key.contentPostsCount]: "篇文章",
-    [Key.contentLicense]: "许可协议",
     [Key.contentFriends]: "友情链接",
     [Key.contentFriendsSubtitle]: "发现更多优质网站",
     [Key.contentFriendsFilterAll]: "全部",

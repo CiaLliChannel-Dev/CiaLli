@@ -1,6 +1,5 @@
 import { cacheManager } from "@/server/cache/manager";
 import { hashParams } from "@/server/cache/key-utils";
-import { permalinkConfig } from "@/config";
 import { getAuthorBundle } from "@/server/api/v1/shared/author-cache";
 import {
     readMany,
@@ -8,7 +7,6 @@ import {
 } from "@/server/directus/client";
 import { createSingleFlightRunner } from "@/server/utils/single-flight";
 import type { JsonObject } from "@/types/json";
-import { initPostIdMap } from "@/utils/permalink-utils";
 import { excludeSpecialArticleSlugFilter } from "@/server/api/v1/shared";
 import type {
     HomeFeedArticleCandidate,
@@ -85,8 +83,6 @@ const HOME_FEED_OWNER_DRAFT_FIELDS = [
     "date_created",
     "date_updated",
 ] as const;
-
-let permalinkMapInitialized = false;
 
 const buildHomeFeedSingleFlight = createSingleFlightRunner(
     async (
@@ -166,37 +162,6 @@ const buildHomeFeedSingleFlight = createSingleFlightRunner(
     },
     (cacheKey: string) => cacheKey,
 );
-
-async function ensurePermalinkPostIdMapInitialized(): Promise<void> {
-    if (!permalinkConfig.enable || permalinkMapInitialized) {
-        return;
-    }
-
-    const articleFilters: JsonObject[] = [
-        { status: { _eq: "published" } },
-        { is_public: { _eq: true } },
-        excludeSpecialArticleSlugFilter(),
-    ];
-
-    const rows = await readMany("app_articles", {
-        filter: { _and: articleFilters } as JsonObject,
-        fields: ["id", "short_id", "date_updated", "date_created"],
-        sort: ["-date_updated", "-date_created"],
-        limit: 1000,
-    });
-
-    const permalinkPosts = rows
-        .map((row) => ({
-            id: normalizeIdentity(row.short_id) || normalizeIdentity(row.id),
-            data: {
-                published: resolveArticlePublishedAt(row),
-                created: toSafeDate(row.date_created),
-            },
-        }))
-        .filter((post) => Boolean(post.id));
-    initPostIdMap(permalinkPosts);
-    permalinkMapInitialized = true;
-}
 
 async function loadOwnerWorkingDraftCandidate(
     viewerId: string,
@@ -426,7 +391,6 @@ export async function buildHomeFeed(
         const algoVersion =
             normalizeIdentity(options.algoVersion) || HOME_FEED_ALGO_VERSION;
         const now = options.now ? toSafeDate(options.now) : new Date();
-        await ensurePermalinkPostIdMapInitialized();
 
         const cacheKey = hashParams({
             viewerId: viewerId || "guest",

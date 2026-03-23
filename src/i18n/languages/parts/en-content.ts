@@ -15,7 +15,6 @@ export const enContent: Record<string, string> = {
     [Key.contentMinutesCount]: "minutes",
     [Key.contentPostCount]: "post",
     [Key.contentPostsCount]: "posts",
-    [Key.contentLicense]: "License",
     [Key.contentFriends]: "Friends",
     [Key.contentFriendsSubtitle]: "Discover more great websites",
     [Key.contentFriendsFilterAll]: "All",

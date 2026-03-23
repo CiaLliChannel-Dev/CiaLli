@@ -19,7 +19,6 @@ import {
     normalizeBannerHomeText,
     normalizeBannerImageApi,
     normalizeBannerNavbar,
-    normalizeLicense,
     normalizeMusicPlayer,
     normalizeNavBarLinks,
     normalizeNavbarTitle,
@@ -136,7 +135,6 @@ function normalizeSettings(
     normalizeToc(merged);
     normalizeNavBarLinks(merged);
     normalizeProfile(merged, base);
-    normalizeLicense(merged, base);
     normalizeAnnouncement(merged);
     normalizeMusicPlayer(merged);
     merged.sakura.enable = Boolean(merged.sakura.enable);
