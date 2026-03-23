@@ -439,23 +439,3 @@ export function initSakura(config: SakuraConfig): void {
         }
     }
 }
-
-// 切换樱花特效
-export function toggleSakura(): void {
-    if (globalSakuraManager) {
-        globalSakuraManager.toggle();
-    }
-}
-
-// 停止樱花特效
-export function stopSakura(): void {
-    if (globalSakuraManager) {
-        globalSakuraManager.stop();
-        globalSakuraManager = null;
-    }
-}
-
-// 获取樱花特效运行状态
-export function getSakuraStatus(): boolean {
-    return globalSakuraManager ? globalSakuraManager.getIsRunning() : false;
-}

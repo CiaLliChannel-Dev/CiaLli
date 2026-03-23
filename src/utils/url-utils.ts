@@ -91,20 +91,6 @@ export function getCategoryUrl(category: string | null): string {
     return url(`/posts?category=${encodeURIComponent(category.trim())}`);
 }
 
-export function getDir(path: string): string {
-    // 移除文件扩展名
-    const pathWithoutExt = removeFileExtension(path);
-    const lastSlashIndex = pathWithoutExt.lastIndexOf("/");
-    if (lastSlashIndex < 0) {
-        return "/";
-    }
-    return pathWithoutExt.substring(0, lastSlashIndex + 1);
-}
-
-export function getFileDirFromPath(filePath: string): string {
-    return filePath.replace(/^src\//, "").replace(/\/[^/]+$/, "");
-}
-
 export function url(path: string): string {
     return joinUrl("", import.meta.env.BASE_URL, path);
 }

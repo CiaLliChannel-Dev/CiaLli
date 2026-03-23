@@ -395,27 +395,6 @@ export type PaginatedResult<T> = {
 };
 
 // ---------------------------------------------------------------------------
-// 按 username 加载资料（内部用）
-// ---------------------------------------------------------------------------
-
-function toAuthorFallbackInternal(userId: string): AuthorBundleItem {
-    const normalized = String(userId || "").trim();
-    const shortId = (normalized || "user").slice(0, 8);
-    return {
-        id: normalized,
-        name: `user-${shortId}`,
-        username: `user-${shortId}`,
-    };
-}
-
-export function readAuthorFromMap(
-    authorMap: Map<string, AuthorBundleItem>,
-    userId: string,
-): AuthorBundleItem {
-    return authorMap.get(userId) || toAuthorFallbackInternal(userId);
-}
-
-// ---------------------------------------------------------------------------
 // 相册列表与详情（委托给 public-data-album-helpers）
 // ---------------------------------------------------------------------------
 

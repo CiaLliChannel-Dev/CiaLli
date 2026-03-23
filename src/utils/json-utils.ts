@@ -1,11 +1,7 @@
-import type { JsonArray, JsonObject, JsonValue } from "@/types/json";
+import type { JsonObject, JsonValue } from "@/types/json";
 
 export function isJsonObject(value: JsonValue): value is JsonObject {
     return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-export function isJsonArray(value: JsonValue): value is JsonArray {
-    return Array.isArray(value);
 }
 
 export function getJsonString(
@@ -31,13 +27,4 @@ export function getJsonNumber(
         }
     }
     return undefined;
-}
-
-export function getJsonStringArray(object: JsonObject, key: string): string[] {
-    const value = object[key];
-    if (!Array.isArray(value)) {
-        return [];
-    }
-
-    return value.filter((entry): entry is string => typeof entry === "string");
 }

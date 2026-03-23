@@ -1,7 +1,4 @@
-import type {
-    AppUserRegistrationRequest,
-    RegistrationRequestStatus,
-} from "@/types/app";
+import type { AppUserRegistrationRequest } from "@/types/app";
 import type { JsonObject } from "@/types/json";
 import {
     createDirectusUser,
@@ -203,22 +200,4 @@ export async function loadRegistrationSnapshot(
         });
         return (rows[0] as RegistrationRequestSnapshot | undefined) ?? null;
     });
-}
-
-export async function updateRegistrationRequestStatus(params: {
-    requestId: string;
-    status: RegistrationRequestStatus;
-    reviewedAt: string;
-}): Promise<AppUserRegistrationRequest> {
-    return await withServiceRepositoryContext(
-        async () =>
-            await updateOne(
-                "app_user_registration_requests",
-                params.requestId,
-                {
-                    request_status: params.status,
-                    reviewed_at: params.reviewedAt,
-                },
-            ),
-    );
 }

@@ -197,36 +197,3 @@ export class WidgetManager {
  * 默认组件管理器实例
  */
 export const widgetManager: WidgetManager = new WidgetManager();
-
-/**
- * 工具函数：根据组件类型获取组件配置
- * @param componentType 组件类型
- */
-export function getComponentConfig(
-    componentType: WidgetComponentType,
-): WidgetComponentConfig | undefined {
-    return widgetManager
-        .getConfig()
-        .properties.find((p) => p.type === componentType);
-}
-
-/**
- * 工具函数：检查组件是否启用
- * @param componentType 组件类型
- */
-export function isComponentEnabled(
-    componentType: WidgetComponentType,
-): boolean {
-    const config = widgetManager.getConfig().components;
-    return (
-        config.left.includes(componentType) ||
-        config.right.includes(componentType)
-    );
-}
-
-/**
- * 工具函数：获取所有启用的组件类型(左侧边栏为主)
- */
-export function getEnabledComponentTypes(): WidgetComponentType[] {
-    return widgetManager.getConfig().components.left;
-}

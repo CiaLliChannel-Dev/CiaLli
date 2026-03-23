@@ -1,10 +1,6 @@
 import { DARK_MODE, DEFAULT_THEME, LIGHT_MODE } from "@constants/constants";
 import type { LIGHT_DARK_MODE } from "@/types/config";
 
-function getRuntimeSettings() {
-    return window.__CIALLI_RUNTIME_SETTINGS__;
-}
-
 export function applyThemeToDocument(theme: LIGHT_DARK_MODE): void {
     // 获取当前主题状态的完整信息
     const currentIsDark = document.documentElement.classList.contains("dark");
@@ -123,9 +119,4 @@ export function setTheme(theme: LIGHT_DARK_MODE): void {
 
 export function getStoredTheme(): LIGHT_DARK_MODE {
     return (localStorage.getItem("theme") as LIGHT_DARK_MODE) || DEFAULT_THEME;
-}
-
-export function getStoredWallpaperMode(): "banner" | "none" {
-    // 壁纸模式由配置控制，不再从 localStorage 读取
-    return getRuntimeSettings()?.settings.wallpaperMode.defaultMode || "banner";
 }

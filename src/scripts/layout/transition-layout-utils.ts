@@ -681,16 +681,6 @@ export function stripOnloadAnimationClasses(scope: HTMLElement): void {
     });
 }
 
-export function setBannerToSpecViewTransitionNames(scope: ParentNode): void {
-    const mainPanel = scope.querySelector<HTMLElement>(".main-panel-wrapper");
-    if (mainPanel) {
-        mainPanel.style.setProperty(
-            "view-transition-name",
-            BANNER_TO_SPEC_MAIN_PANEL_VT_NAME,
-        );
-    }
-}
-
 export function clearBannerToSpecViewTransitionNames(scope: ParentNode): void {
     const mainPanel = scope.querySelector<HTMLElement>(".main-panel-wrapper");
     if (mainPanel) {
@@ -789,24 +779,6 @@ export function applyBannerToSpecShiftVariables(
         BANNER_TO_SPEC_BG_OVERSHOOT_VAR,
         `${backgroundOvershootPx}px`,
     );
-}
-
-export function prepareIncomingBannerToSpecDocument(
-    targetDocument: Document,
-): void {
-    const root = targetDocument.documentElement;
-    root.classList.add(BANNER_TO_SPEC_TRANSITION_CLASS);
-    root.classList.add(BANNER_TO_SPEC_TRANSITION_PREPARING_CLASS);
-    root.classList.remove(BANNER_TO_SPEC_TRANSITION_ACTIVE_CLASS);
-    root.classList.remove(BANNER_TO_SPEC_NAVBAR_SYNC_CLASS);
-    root.classList.remove(BANNER_TO_SPEC_NAVBAR_COMMIT_FREEZE_CLASS);
-    root.style.setProperty(
-        BANNER_TO_SPEC_TRANSITION_DURATION_VAR,
-        `${BANNER_TO_SPEC_TRANSITION_DURATION_MS}ms`,
-    );
-    root.style.removeProperty(BANNER_TO_SPEC_VT_DURATION_VAR);
-    applyBannerToSpecShiftVariables(targetDocument, root);
-    primeBannerLayoutStateForIncomingDocument(targetDocument);
 }
 
 export function setPageHeightExtendVisible(visible: boolean): void {

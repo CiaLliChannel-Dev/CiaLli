@@ -82,16 +82,6 @@ export function readAuthor(
     return authorMap.get(userId) || toAuthorFallback(userId);
 }
 
-export async function loadPublicProfileByUsername(
-    username: string,
-): Promise<AppProfileView | null> {
-    const profile = await loadProfileByUsername(username);
-    if (!profile?.profile_public) {
-        return null;
-    }
-    return profile;
-}
-
 /**
  * 按指定访问者加载用户资料。
  * owner 始终可见；非 owner 仅在 profile_public=true 时可见。

@@ -12,7 +12,6 @@ import {
 } from "@/utils/content-utils";
 import type {
     HomeFeedCandidate,
-    HomeFeedDiaryEntry,
     HomeFeedItem,
     HomeFeedPreferenceProfile,
 } from "./home-feed.types";
@@ -148,23 +147,6 @@ export function normalizeWeightMap(
     return normalized;
 }
 
-export function buildCountMapByRelation(
-    rows: Array<Record<string, unknown>>,
-    relationField: InteractionRelationField,
-): Map<string, number> {
-    const counter = new Map<string, number>();
-    for (const row of rows) {
-        const relationId = normalizeIdentity(
-            String(row[relationField] || "").trim(),
-        );
-        if (!relationId) {
-            continue;
-        }
-        counter.set(relationId, (counter.get(relationId) || 0) + 1);
-    }
-    return counter;
-}
-
 export async function fetchInteractionCountMap(
     collection: InteractionCollection,
     relationField: InteractionRelationField,
@@ -219,13 +201,6 @@ export function readAuthorFromMap(
     return (
         authorMap.get(normalizedUserId) || toFallbackAuthor(normalizedUserId)
     );
-}
-
-export function stripTextLength(value: string | null | undefined): number {
-    return String(value || "")
-        .replace(/<[^>]+>/g, " ")
-        .replace(/\s+/g, " ")
-        .trim().length;
 }
 
 export function buildDiaryImageMap(
@@ -461,20 +436,4 @@ export function applyPreferenceProfileToCandidates(
             ),
         };
     });
-}
-
-export function buildDiaryFeedEntry(
-    row: HomeFeedDiaryEntry,
-    diaryAuthorMap: HomeFeedAuthorMap,
-    diaryImageMap: Map<string, AppDiaryImage[]>,
-    diaryCommentCountMap: Map<string, number>,
-    diaryLikeCountMap: Map<string, number>,
-): HomeFeedDiaryEntry {
-    return {
-        ...row,
-        author: readAuthorFromMap(diaryAuthorMap, row.author_id),
-        images: diaryImageMap.get(row.id) || [],
-        comment_count: diaryCommentCountMap.get(row.id) || 0,
-        like_count: diaryLikeCountMap.get(row.id) || 0,
-    };
 }

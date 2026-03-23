@@ -9,21 +9,8 @@ import * as z from "zod";
 
 export const AppStatusSchema = z.enum(["draft", "published", "archived"]);
 export const CommentStatusSchema = z.enum(["published", "hidden", "archived"]);
-export const WatchStatusSchema = z.enum([
-    "watching",
-    "completed",
-    "planned",
-    "onhold",
-    "dropped",
-]);
 export const AlbumLayoutSchema = z.enum(["grid", "masonry"]);
 export const AppRoleSchema = z.enum(["admin", "member"]);
-export const RegistrationRequestStatusSchema = z.enum([
-    "pending",
-    "approved",
-    "rejected",
-    "cancelled",
-]);
 
 // ── 分页 ──
 
@@ -33,14 +20,6 @@ export const PaginationSchema = z.object({
 });
 
 // ── 可见性 PATCH ──
-
-export const VisibilityPatchSchema = z
-    .object({
-        status: AppStatusSchema,
-        is_public: z.boolean(),
-        show_on_profile: z.boolean(),
-    })
-    .partial();
 
 // ── 社交链接 ──
 

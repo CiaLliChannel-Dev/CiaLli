@@ -4,7 +4,6 @@
  * 包含 bindSettings（及各分区子函数）与 collectXxxPayload 系列函数。
  */
 
-import I18nKey from "@/i18n/i18nKey";
 import { t } from "@/scripts/i18n-runtime";
 import { SITE_TIME_ZONE_AUTO_VALUE } from "@/utils/date-utils";
 import {
@@ -400,16 +399,5 @@ export function collectFeaturePayload(): SettingsObj {
         },
     };
 }
-
-// 导出 i18n 消息 key，供主文件使用（避免主文件再导入 I18nKey）
-export const MSG_KEYS = {
-    iconRemovedPendingSave: I18nKey.adminSiteSettingsIconRemovedPendingSave,
-    bannerRemovedPendingSave: I18nKey.adminSiteSettingsBannerRemovedPendingSave,
-    savingTitle: I18nKey.adminSiteSettingsSavingTitle,
-    savingConfig: I18nKey.adminSiteSettingsSavingConfig,
-    uploadFailedCanceled: I18nKey.adminSiteSettingsUploadFailedCanceled,
-    invalidInput: I18nKey.adminSiteSettingsInvalidInput,
-    iconAddedPendingSave: I18nKey.adminSiteSettingsIconAddedPendingSave,
-} as const;
 
 export { t };

@@ -27,25 +27,3 @@ export function generatePermalinkSlug(post: PermalinkPost): string {
 
     return removeFileExtension(post.id);
 }
-
-/**
- * 判断文章是否使用自定义 permalink（根目录下，不在 /posts/ 下）
- * @param post 文章数据
- */
-export function hasCustomPermalink(
-    post: PermalinkPost | { data: { permalink?: string } },
-): boolean {
-    return Boolean(post.data.permalink);
-}
-
-/**
- * 获取文章的完整 URL 路径
- * @param post 文章数据
- * @returns URL 路径（如 /my-post/ 或 /custom-path/）
- */
-export function getPermalinkPath(post: PermalinkPost): string {
-    const slug = generatePermalinkSlug(post);
-
-    // 所有 permalink 生成的链接都在根目录下
-    return `/${slug}`;
-}

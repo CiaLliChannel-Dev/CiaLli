@@ -308,19 +308,6 @@ function clearMode(): void {
     root.removeAttribute(MODE_ATTR);
 }
 
-export function activateEnterSkeleton(): void {
-    if (typeof window === "undefined") {
-        return;
-    }
-
-    activationToken += 1;
-    clearDeactivationTimer();
-
-    const mode = detectEnterSkeletonMode(document);
-    activatedAt = performance.now();
-    applyMode(mode, getRoot());
-}
-
 export function prepareEnterSkeletonForIncomingDocument(
     targetDocument: Document,
 ): void {
@@ -373,14 +360,6 @@ export function forceResetEnterSkeleton(): void {
     clearDeactivationTimer();
     activatedAt = 0;
     clearMode();
-}
-
-export function isEnterSkeletonActive(): boolean {
-    const root = getRoot();
-    if (!root) {
-        return false;
-    }
-    return root.classList.contains(ACTIVE_CLASS);
 }
 
 export function syncEnterSkeletonStateToIncomingDocument(

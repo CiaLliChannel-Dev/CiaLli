@@ -177,12 +177,6 @@ export function invalidateAuthorCache(userId: string): void {
     void invalidateAuthorCacheAsync(userId);
 }
 
-export function invalidateAuthorCacheByUsers(userIds: string[]): void {
-    for (const userId of userIds) {
-        invalidateAuthorCache(userId);
-    }
-}
-
 export async function getAuthorBundle(
     userIds: string[],
 ): Promise<Map<string, AuthorBundleItem>> {

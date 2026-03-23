@@ -6,7 +6,7 @@
 
 import { ARTICLE_TITLE_MAX, weightedCharLength } from "@/constants/text-limits";
 import I18nKey from "@/i18n/i18nKey";
-import { t, tFmt } from "@/scripts/i18n-runtime";
+import { t } from "@/scripts/i18n-runtime";
 import {
     type PendingUpload,
     buildDirectusAssetPreview,
@@ -15,13 +15,6 @@ import {
 import type { PublishDomRefs } from "@/scripts/publish-page-dom";
 import type { PublishState, UiHelpers } from "@/scripts/publish-page-submit";
 
-export const TITLE_TOO_LONG_MESSAGE = tFmt(
-    I18nKey.articleEditorTitleMaxLength,
-    {
-        max: ARTICLE_TITLE_MAX,
-    },
-);
-export const DEFAULT_BODY_PLACEHOLDER = t(I18nKey.articleEditorBodyPlaceholder);
 const EXISTING_ENCRYPT_HINT = t(I18nKey.articleEditorEncryptHintExisting);
 
 export function makeUiHelpers(

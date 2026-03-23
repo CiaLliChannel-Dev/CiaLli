@@ -150,10 +150,6 @@ export function buildDirectusAssetPreview(fileId: string): string {
     return `/api/v1/assets/${encodeURIComponent(normalized)}?width=960&height=540&fit=cover`;
 }
 
-export function isToolbarAction(value: string): value is ToolbarAction {
-    return TOOLBAR_ACTIONS.has(value as ToolbarAction);
-}
-
 export function getImageFileExt(file: File): string {
     const mimeMap: Record<string, string> = {
         "image/jpeg": "jpg",

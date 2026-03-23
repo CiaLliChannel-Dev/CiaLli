@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- 文件行数较长，按页面驱动与模块边界保留当前结构 */
 import I18nKey from "@/i18n/i18nKey";
 import { setupCodeCopyDelegation } from "@/scripts/code-copy";
 import { refreshGithubCards } from "@/scripts/github-card-runtime";
@@ -227,68 +226,6 @@ export function replaceSelection(
     textarea.focus();
     textarea.setSelectionRange(nextStart, nextEnd);
     onDirty();
-}
-
-export function applyWrapAction(
-    textarea: HTMLTextAreaElement,
-    prefix: string,
-    suffix: string,
-    placeholder: string,
-    onDirty: () => void,
-): void {
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selected = textarea.value.slice(start, end);
-    const content = selected || placeholder;
-    const replacement = `${prefix}${content}${suffix}`;
-    replaceSelection(
-        textarea,
-        replacement,
-        prefix.length,
-        prefix.length + content.length,
-        onDirty,
-    );
-}
-
-export function applyQuoteAction(
-    textarea: HTMLTextAreaElement,
-    onDirty: () => void,
-): void {
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const selected = textarea.value.slice(start, end);
-    const source = selected || t(I18nKey.adminMarkdownQuotePlaceholder);
-    const quoted = source
-        .replaceAll("\r\n", "\n")
-        .split("\n")
-        .map((line) => (line.startsWith("> ") ? line : `> ${line}`))
-        .join("\n");
-    replaceSelection(textarea, quoted, 0, quoted.length, onDirty);
-}
-
-export function applyCodeBlockAction(
-    textarea: HTMLTextAreaElement,
-    onDirty: () => void,
-): void {
-    const start = textarea.selectionStart;
-    const end = textarea.selectionEnd;
-    const source = textarea.value;
-    const selected =
-        source.slice(start, end) || t(I18nKey.adminMarkdownCodePlaceholder);
-    const language = "text";
-    const block = `\`\`\`${language}\n${selected}\n\`\`\``;
-    const needsLeadingBreak = start > 0 && source[start - 1] !== "\n";
-    const needsTrailingBreak = end < source.length && source[end] !== "\n";
-    const replacement = `${needsLeadingBreak ? "\n" : ""}${block}${needsTrailingBreak ? "\n" : ""}`;
-    const contentStartOffset = (needsLeadingBreak ? 1 : 0) + 8;
-    const contentEndOffset = contentStartOffset + selected.length;
-    replaceSelection(
-        textarea,
-        replacement,
-        contentStartOffset,
-        contentEndOffset,
-        onDirty,
-    );
 }
 
 export function applyToolbarAction(
