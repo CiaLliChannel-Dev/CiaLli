@@ -60,7 +60,6 @@ export type LayoutIntent =
 
 export type LayoutReducerConfig = {
     defaultWallpaperMode: "banner" | "none";
-    desktopCollapseMinWidth: number;
 };
 
 type InitialStateInput = {
@@ -145,14 +144,8 @@ function handleScrollUpdate(
 function handleCollapseBanner(
     state: LayoutState,
     intent: Extract<LayoutIntent, { type: "COLLAPSE_BANNER" }>,
-    config: LayoutReducerConfig,
 ): LayoutState {
-    if (
-        !state.bannerEnabled ||
-        !state.isHome ||
-        state.viewportWidth < config.desktopCollapseMinWidth ||
-        state.mode !== "banner"
-    ) {
+    if (!state.bannerEnabled || !state.isHome || state.mode !== "banner") {
         return state;
     }
     return {
@@ -211,7 +204,7 @@ export function reduceLayoutState(
         case "SCROLL_UPDATE":
             return handleScrollUpdate(state, intent);
         case "COLLAPSE_BANNER":
-            return handleCollapseBanner(state, intent, config);
+            return handleCollapseBanner(state, intent);
         case "EXPAND_BANNER":
             return handleExpandBanner(state, intent);
         case "LOGO_CLICK":

@@ -236,7 +236,7 @@ const diaryMetaText = formatSiteDateTime(diary?.date_created, siteDateContext);
                 </Markdown>
 
                 {diaryGalleryCount > 0 && (
-                  <section class="w-[60%]">
+                  <section class="w-full lg:w-[60%]">
                     {diaryGalleryCount === 1 ? (
                       <a
                         href={diaryGallery[0].preview}
@@ -257,7 +257,7 @@ const diaryMetaText = formatSiteDateTime(diary?.date_created, siteDateContext);
                           "grid gap-3",
                           diaryGalleryCount === 4
                             ? "grid-cols-2"
-                            : "grid-cols-3",
+                            : "grid-cols-2 lg:grid-cols-3",
                         ]}
                       >
                         {diaryGallery.map((image) => (
@@ -373,14 +373,25 @@ const diaryMetaText = formatSiteDateTime(diary?.date_created, siteDateContext);
 <style>
   .home-layout {
     display: grid;
-    grid-template-columns: 1fr 17.5rem;
     gap: 1rem;
     align-items: start;
   }
+
   .home-sidebar-placeholder {
-    position: sticky;
-    top: 5.5rem;
-    align-self: start;
-    min-height: 1px;
+    display: none;
+  }
+
+  @media (min-width: 1280px) {
+    .home-layout {
+      grid-template-columns: 1fr 17.5rem;
+    }
+
+    .home-sidebar-placeholder {
+      display: block;
+      position: sticky;
+      top: 5.5rem;
+      align-self: start;
+      min-height: 1px;
+    }
   }
 </style>

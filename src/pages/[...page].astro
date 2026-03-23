@@ -119,12 +119,22 @@ if (!invalidPath) {
 <style>
   .home-layout {
     display: grid;
-    grid-template-columns: 1fr 17.5rem;
     gap: 1rem;
     align-items: start;
   }
+
   .home-sidebar-placeholder {
-    /* 纯占位，不渲染任何内容 */
+    display: none;
+  }
+
+  @media (min-width: 1280px) {
+    .home-layout {
+      grid-template-columns: 1fr 17.5rem;
+    }
+
+    .home-sidebar-placeholder {
+      display: block;
+    }
   }
 </style>
 

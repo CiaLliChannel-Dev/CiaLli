@@ -11,6 +11,7 @@ export type DetailElements = {
     editBtn: HTMLButtonElement | null;
     deleteBtn: HTMLButtonElement | null;
     likeCountText: HTMLElement | null;
+    mobileManageGroup: HTMLElement | null;
 };
 
 export type DetailMountContext = {
@@ -35,6 +36,9 @@ export function queryDetailElements(rootEl: HTMLElement): DetailElements {
         ),
         likeCountText: rootEl.querySelector<HTMLElement>(
             "[data-like-count-text]",
+        ),
+        mobileManageGroup: rootEl.querySelector<HTMLElement>(
+            "[data-mobile-manage-group]",
         ),
     };
 }

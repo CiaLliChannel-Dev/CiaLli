@@ -3,6 +3,7 @@ import BackToTop from "@components/control/BackToTop.astro";
 import FloatingTOC from "@components/control/FloatingTOC.astro";
 import Footer from "@components/Footer.astro";
 import RightSideBar from "@components/layout/RightSideBar.astro";
+import ResponsiveSidebarPanel from "@components/layout/ResponsiveSidebarPanel.astro";
 import TransitionProxySkeletonTemplates from "@components/layout/TransitionProxySkeletonTemplates.astro";
 import Navbar from "@components/Navbar.astro";
 import SideBar from "@components/widget/SideBar.astro";
@@ -50,6 +51,7 @@ const {
 const hasCustomRightSidebar = Astro.slots.has("sidebar-right");
 const {
   isFloatTOC,
+  isPostDetailPage,
   isPostEditorPage,
   showHomeText,
   initialWallpaperMode,
@@ -57,6 +59,7 @@ const {
   shouldRenderDedicatedPostToc,
   shouldFixRightSidebarSlot,
   desktopShowLeftSidebar,
+  hasRightSidebarTocWidget,
   gridCols,
   sidebarClass,
   rightSidebarClass,
@@ -69,6 +72,14 @@ const {
   Astro.url.pathname,
   hasCustomRightSidebar,
 );
+const rightSidebarPanelTitle = shouldRenderDedicatedPostToc
+  ? "目录与页面工具"
+  : "页面工具";
+const shouldRenderMobilePostToolsDrawer =
+  isPostDetailPage &&
+  (hasRightSidebarComponents || (siteConfig.toc.enable && headings.length > 0));
+const shouldRenderMobileDedicatedToc =
+  siteConfig.toc.enable && headings.length > 0 && !hasRightSidebarTocWidget;
 ---
 
 <Layout
@@ -363,7 +374,14 @@ const {
         >
           {
             desktopShowLeftSidebar ? (
-              <SideBar class={sidebarClass} headings={headings} />
+              <div
+                class:list={["hidden lg:block", sidebarClass]}
+                data-responsive-sidebar-desktop-anchor
+              >
+                <div data-responsive-sidebar-node class="w-full min-w-0">
+                  <SideBar headings={headings} />
+                </div>
+              </div>
             ) : (
               // 保证 sidebar 容器在全宽页也存在，确保布局结构一致。
               <div
@@ -379,40 +397,50 @@ const {
 
           <div
             id="right-sidebar-slot"
-            class={`right-sidebar-container self-start ${shouldFixRightSidebarSlot ? "right-sidebar-toc-fixed" : ""} ${rightSidebarClass}`}
+            class={`right-sidebar-container self-start ${shouldFixRightSidebarSlot ? "right-sidebar-toc-fixed" : ""} ${rightSidebarClass} ${isPostDetailPage ? "hidden lg:block" : ""}`}
           >
-            {
-              hasCustomRightSidebar ? (
-                <slot name="sidebar-right" />
-              ) : hasRightSidebarComponents ? (
-                <>
-                  <RightSideBar headings={headings} />
-                  {shouldRenderDedicatedPostToc && (
-                    <div id="toc-wrapper" class="w-full transition-fade">
-                      <div
-                        id="toc-inner-wrapper"
-                        class="w-full max-h-[calc(100vh-10rem)] overflow-hidden"
-                      >
-                        <div id="toc-container" class="w-full transition-fade">
-                          <TOC headings={headings} />
+            <ResponsiveSidebarPanel
+              title={rightSidebarPanelTitle}
+              icon={shouldRenderDedicatedPostToc
+                ? "material-symbols:format-list-bulleted-rounded"
+                : "material-symbols:tune-rounded"}
+            >
+              {
+                hasCustomRightSidebar ? (
+                  <slot name="sidebar-right" />
+                ) : hasRightSidebarComponents ? (
+                  <>
+                    <RightSideBar headings={headings} />
+                    {shouldRenderDedicatedPostToc && (
+                      <div id="toc-wrapper" class="w-full transition-fade">
+                        <div
+                          id="toc-inner-wrapper"
+                          class="w-full max-h-[calc(100vh-10rem)] overflow-hidden"
+                        >
+                          <div
+                            id="toc-container"
+                            class="w-full transition-fade"
+                          >
+                            <TOC headings={headings} />
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  )}
-                </>
-              ) : shouldRenderDedicatedPostToc ? (
-                <div id="toc-wrapper" class="w-full transition-fade">
-                  <div
-                    id="toc-inner-wrapper"
-                    class="w-full max-h-[calc(100vh-10rem)] overflow-hidden"
-                  >
-                    <div id="toc-container" class="w-full transition-fade">
-                      <TOC headings={headings} />
+                    )}
+                  </>
+                ) : shouldRenderDedicatedPostToc ? (
+                  <div id="toc-wrapper" class="w-full transition-fade">
+                    <div
+                      id="toc-inner-wrapper"
+                      class="w-full max-h-[calc(100vh-10rem)] overflow-hidden"
+                    >
+                      <div id="toc-container" class="w-full transition-fade">
+                        <TOC headings={headings} />
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : null
-            }
+                ) : null
+              }
+            </ResponsiveSidebarPanel>
           </div>
 
           <main
@@ -426,6 +454,14 @@ const {
               class={`onload-animation transition-leaving ${isPostEditorPage ? "post-editor-content-wrapper" : ""}`}
             >
               <slot />
+              {
+                !isPostEditorPage && desktopShowLeftSidebar && (
+                  <div
+                    class="mobile-footer-sidebar-slot mb-4 lg:hidden"
+                    data-responsive-sidebar-mobile-anchor
+                  ></div>
+                )
+              }
               {
                 !isPostEditorPage && (
                   <div class="footer col-span-full onload-animation block">
@@ -497,8 +533,95 @@ const {
         避免被 filter/transform 捕获或被 overlay 事件策略影响。
       -->
       <div id="detail-action-float-anchor" aria-hidden="true"></div>
+      {
+        shouldRenderMobilePostToolsDrawer && (
+          <div
+            class="mobile-edge-drawer-root lg:hidden"
+            data-mobile-edge-drawer-root
+          >
+            <button
+              type="button"
+              class="mobile-edge-launcher btn-card"
+              data-mobile-edge-drawer-toggle
+              data-mobile-float-launcher
+              data-mobile-float-order="3"
+              aria-label="打开目录与页面工具"
+              aria-controls="mobile-post-tools-panel"
+              aria-expanded="false"
+            >
+              <span class="mobile-edge-launcher-icon">
+                <span
+                  class="iconify text-[1.45rem]"
+                  data-icon="material-symbols:format-list-bulleted-rounded"
+                ></span>
+              </span>
+            </button>
+            <div class="mobile-edge-drawer-layer">
+              <button
+                type="button"
+                class="mobile-edge-drawer-backdrop"
+                data-mobile-edge-drawer-backdrop
+                aria-label="关闭目录与页面工具"
+              ></button>
+              <aside
+                id="mobile-post-tools-panel"
+                class="mobile-edge-drawer-panel"
+                data-mobile-edge-drawer-panel
+                aria-hidden="true"
+              >
+                <div class="mobile-edge-drawer-head">
+                  <div class="space-y-1">
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-50">
+                      Tools
+                    </p>
+                    <p class="text-base font-semibold text-90">
+                      目录与页面工具
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn-plain scale-animation flex h-10 w-10 items-center justify-center rounded-lg active:scale-90"
+                    data-mobile-edge-drawer-close
+                    aria-label="关闭目录与页面工具"
+                  >
+                    <span
+                      class="iconify text-[1.3rem]"
+                      data-icon="material-symbols:close-rounded"
+                    ></span>
+                  </button>
+                </div>
+                <div class="mobile-edge-drawer-body">
+                  {hasRightSidebarComponents && (
+                    <RightSideBar headings={headings} />
+                  )}
+                  {shouldRenderMobileDedicatedToc && (
+                    <div class="card-base rounded-(--radius-large) pb-4">
+                      <div
+                        class="font-bold transition text-lg text-neutral-900 dark:text-neutral-100 relative ml-8 mt-4 mb-2 flex items-center
+                          before:w-1 before:h-4 before:rounded-md before:bg-(--primary)
+                          before:absolute before:left-[-16px] before:top-[5.5px]"
+                      >
+                        目录
+                      </div>
+                      <div class="px-4">
+                        <TOC id="mobile-post-tools-toc" headings={headings} />
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </aside>
+            </div>
+          </div>
+        )
+      }
       <BackToTop />
-      {siteConfig.toc.enable && isFloatTOC && <FloatingTOC />}
+      {
+        siteConfig.toc.enable && isFloatTOC && (
+          <div class="hidden lg:block">
+            <FloatingTOC />
+          </div>
+        )
+      }
     </div>
   </div>
 
@@ -509,4 +632,8 @@ const {
   }
 
   <slot name="modal" />
+  <script>
+    import "@/scripts/mobile-edge-drawer";
+    import "@/scripts/responsive-sidebar-placement";
+  </script>
 </Layout>

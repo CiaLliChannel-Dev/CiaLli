@@ -181,7 +181,10 @@ const sectionOrder =
                       {payload!.owner?.name ||
                         i18n(I18nKey.contentUserProfileDefaultName)}
                     </h1>
-                    <p class="text-xs text-60">@{ownerUsername}</p>
+                    <p class="text-xs text-60">
+                      {"@"}
+                      {ownerUsername}
+                    </p>
                   </div>
                 </div>
                 {payload!.profile?.bio && (

@@ -40,8 +40,25 @@
   height: 3rem;
 }
 .music-player {
-  max-width: 20rem;
+  max-width: min(20rem, calc(100vw - max(2rem, env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px) + 2rem)));
   user-select: none;
+}
+.music-player-shell {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+  right: max(1rem, env(safe-area-inset-right, 0px) + 1rem);
+}
+.music-player.mobile-drawer-mode {
+  inset: 0;
+  width: auto;
+  max-width: none;
+  bottom: auto;
+  right: auto;
+  pointer-events: none;
+}
+.music-player-error-toast {
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 5rem);
+  right: max(1rem, env(safe-area-inset-right, 0px) + 1rem);
+  width: min(20rem, calc(100vw - max(2rem, env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px) + 2rem)));
 }
 .title-marquee {
   position: relative;
@@ -91,16 +108,60 @@
   }
 }
 .mini-player {
-  width: 17.5rem;
+  width: min(17.5rem, calc(100vw - max(2rem, env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px) + 2rem)));
   position: absolute;
   bottom: 0;
   right: 0;
 }
 .expanded-player {
-  width: 20rem;
+  width: min(20rem, calc(100vw - max(2rem, env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px) + 2rem)));
   position: absolute;
   bottom: 0;
   right: 0;
+}
+.music-player-mobile-backdrop {
+  position: fixed;
+  inset: 0;
+  border: none;
+  background: rgba(15, 23, 42, 0.45);
+  opacity: 1;
+  pointer-events: auto;
+}
+.music-player.mobile-drawer-mode .orb-player {
+  position: fixed;
+  right: var(--mobile-float-rail-right, max(1rem, env(safe-area-inset-right, 0px) + 1rem));
+  bottom: calc(var(--mobile-float-rail-bottom, calc(env(safe-area-inset-bottom, 0px) + 1rem)) + (var(--mobile-float-size, 3.75rem) + var(--mobile-float-gap, 0.75rem)) * var(--mobile-float-index, 0));
+  width: var(--mobile-float-size, 3.75rem);
+  height: var(--mobile-float-size, 3.75rem);
+  border-radius: 1rem;
+  pointer-events: auto;
+}
+.music-player.mobile-drawer-mode .expanded-player {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(22rem, calc(100vw - max(1.5rem, env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px) + 1.5rem)));
+  max-width: calc(100vw - env(safe-area-inset-left, 0px));
+  padding: calc(env(safe-area-inset-top, 0px) + 1rem) 0 calc(env(safe-area-inset-bottom, 0px) + 1rem) 0;
+  display: flex;
+  align-items: stretch;
+  justify-content: flex-end;
+  pointer-events: auto;
+}
+.music-player.mobile-drawer-mode .expanded-player > .card-base {
+  width: 100%;
+  height: 100%;
+  border-radius: 1.5rem 0 0 1.5rem;
+  overflow: auto;
+}
+.music-player.mobile-drawer-mode .playlist-panel {
+  top: calc(env(safe-area-inset-top, 0px) + 1rem);
+  bottom: auto;
+  left: 0;
+  right: 0;
+  margin-bottom: 0;
+  max-height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px) - 2rem);
 }
 
 .playlist-panel {
@@ -179,4 +240,10 @@
 button.bg-\[var\(--primary\)\] {
   box-shadow: 0 0 0 2px var(--primary);
   border: none;
+}
+
+@media (min-width: 1280px) {
+  .music-player-mobile-backdrop {
+    display: none;
+  }
 }

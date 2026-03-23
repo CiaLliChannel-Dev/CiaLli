@@ -97,13 +97,13 @@ export const prerender = false;
                 <option value="semifull">semifull</option>
               </select>
             </label>
-            <div class="col-span-2 space-y-1.5">
+            <div class="lg:col-span-2 space-y-1.5">
               <span class="text-sm text-60">
                 {i18n(I18nKey.adminSiteSettingsNavLinks)}
               </span>
               <div id="ss-nav-links-list" class="space-y-2"></div>
             </div>
-            <div class="col-span-2 flex items-center gap-2 pt-2">
+            <div class="lg:col-span-2 flex items-center gap-2 pt-2">
               <button
                 type="submit"
                 class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
@@ -171,7 +171,43 @@ export const prerender = false;
                 <option value="3">3</option>
               </select>
             </label>
-            <div class="col-span-2 flex items-center gap-2 pt-2">
+            <hr class="border-(--line-divider) lg:col-span-2" />
+            <h3 class="text-lg font-medium text-75 lg:col-span-2">
+              {i18n(I18nKey.adminSiteSettingsArticleLicenseInfo)}
+            </h3>
+            <label
+              class="flex items-center gap-3 text-75 cursor-pointer select-none lg:col-span-2"
+            >
+              <input
+                type="checkbox"
+                id="ss-license-enable"
+                class="toggle-checkbox"
+              />
+              <span class="toggle-track"><span class="toggle-knob"></span></span
+              >
+              {i18n(I18nKey.adminSiteSettingsEnableLicenseBlock)}
+            </label>
+            <label class="space-y-1.5">
+              <span class="text-sm text-60">
+                {i18n(I18nKey.adminSiteSettingsLicenseName)}
+              </span>
+              <input
+                id="ss-license-name"
+                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75 placeholder:text-50"
+                placeholder="CC BY-NC-SA 4.0"
+              />
+            </label>
+            <label class="space-y-1.5">
+              <span class="text-sm text-60">
+                {i18n(I18nKey.adminSiteSettingsLicenseUrl)}
+              </span>
+              <input
+                id="ss-license-url"
+                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75 placeholder:text-50"
+                placeholder="https://creativecommons.org/licenses/by-nc-sa/4.0/"
+              />
+            </label>
+            <div class="lg:col-span-2 flex items-center gap-2 pt-2">
               <button
                 type="submit"
                 class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
@@ -191,11 +227,11 @@ export const prerender = false;
             id="ss-other-form"
             class="grid grid-cols-1 lg:grid-cols-2 gap-4"
           >
-            <h3 class="text-lg font-medium text-75 col-span-2">
+            <h3 class="text-lg font-medium text-75 lg:col-span-2">
               {i18n(I18nKey.coreMusicPlayer)}
             </h3>
             <label
-              class="flex items-center gap-3 text-75 cursor-pointer select-none col-span-2"
+              class="flex items-center gap-3 text-75 cursor-pointer select-none lg:col-span-2"
             >
               <input
                 type="checkbox"
@@ -256,8 +292,8 @@ export const prerender = false;
                 placeholder="30"
               />
             </label>
-            <hr class="border-(--line-divider) col-span-2" />
-            <h3 class="text-lg font-medium text-75 col-span-2">
+            <hr class="border-(--line-divider) lg:col-span-2" />
+            <h3 class="text-lg font-medium text-75 lg:col-span-2">
               {i18n(I18nKey.adminSiteSettingsSakuraEffect)}
             </h3>
             <label
@@ -272,7 +308,7 @@ export const prerender = false;
               >
               {i18n(I18nKey.adminSiteSettingsEnableSakura)}
             </label>
-            <div class="col-span-2 flex items-center gap-2 pt-2">
+            <div class="lg:col-span-2 flex items-center gap-2 pt-2">
               <button
                 type="submit"
                 class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
@@ -308,7 +344,7 @@ export const prerender = false;
               {Array.from({ length: index === 0 ? 6 : 4 }).map(() => (
                 <div class="md3-skeleton-block h-10 rounded-lg" />
               ))}
-              <div class="md3-skeleton-block h-24 rounded-lg col-span-2" />
+              <div class="md3-skeleton-block h-24 rounded-lg lg:col-span-2" />
             </div>
             <div class="flex items-center gap-2 pt-2">
               <div class="md3-skeleton-block h-10 w-28 rounded-lg" />

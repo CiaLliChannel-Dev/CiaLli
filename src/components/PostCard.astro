@@ -43,6 +43,12 @@ const {
 const url = getPostUrl(entry);
 const hasCover = typeof image === "string" && image.trim().length > 0;
 const coverWidth = "28%";
+const desktopBodyWidthClass = hasCover
+  ? "lg:w-[calc(100%-var(--coverWidth)-0.75rem)]"
+  : "lg:w-[calc(100%-3.25rem-0.75rem)]";
+const desktopEnterLinkClass = hasCover
+  ? "lg:w-[var(--coverWidth)]"
+  : "lg:w-[3.25rem]";
 const bodyText = entry.data.encrypted
   ? ""
   : String(entry.body || "")
@@ -82,21 +88,19 @@ const adminDeleteLabel = i18n(I18nKey.interactionCommonDeleteAdmin);
   <div
     data-enter-skeleton-content
     class:list={[
-      "pl-9 pr-2 pt-7 pb-6 relative",
-      {
-        "w-[calc(100%-3.25rem-0.75rem)]": !hasCover,
-        "w-[calc(100%-var(--coverWidth)-0.75rem)]": hasCover,
-      },
+      "relative flex flex-col gap-4 px-5 py-5 lg:pl-9 lg:pr-2 lg:pt-7 lg:pb-6",
+      desktopBodyWidthClass,
     ]}
   >
     <a
       href={url}
-      class="transition group w-full block font-bold mb-3 text-3xl text-90
+      class="transition group w-full block font-bold text-2xl lg:text-3xl text-90 pr-8 lg:pr-0
         hover:text-(--primary) dark:hover:text-(--primary)
         active:text-(--title-active) dark:active:text-(--title-active)
         before:w-1 before:h-5 before:rounded-md before:bg-(--primary)
         before:absolute
-        before:top-[2.1875rem] before:left-[1.125rem] before:block"
+        before:top-[0.75rem] before:left-0 before:block
+        lg:before:top-[2.1875rem] lg:before:left-[1.125rem]"
     >
       {
         pinned && (
@@ -117,15 +121,19 @@ const adminDeleteLabel = i18n(I18nKey.interactionCommonDeleteAdmin);
       />
     </a>
 
-    <div class="mb-4 h-5" aria-hidden="true"></div>
+    <div class="hidden lg:block h-5" aria-hidden="true"></div>
 
-    <div class="transition text-75 -mt-3 mb-3.5 pr-4 line-clamp-1">
+    <div
+      class="transition text-75 lg:-mt-3 mb-0 lg:mb-3.5 pr-0 lg:pr-4 line-clamp-2 lg:line-clamp-1"
+    >
       {excerpt}
     </div>
 
-    <div class="flex items-center justify-between gap-3 mt-2">
+    <div
+      class="flex flex-col items-start gap-3 mt-auto lg:mt-2 lg:flex-row lg:items-center lg:justify-between"
+    >
       <div
-        class="flex min-w-0 items-center gap-1.5 text-50 text-sm font-medium leading-none"
+        class="flex min-w-0 flex-wrap items-center gap-1.5 text-50 text-sm font-medium leading-none"
       >
         <div class="max-w-[14rem] min-w-0 inline-flex items-baseline gap-1">
           <a
@@ -138,14 +146,15 @@ const adminDeleteLabel = i18n(I18nKey.interactionCommonDeleteAdmin);
             href={`/${authorHandle}`}
             class="shrink-0 text-60 hover:text-(--primary) transition-colors"
           >
-            @{authorHandle}
+            {"@"}
+            {authorHandle}
           </a>
         </div>
         <span class="text-(--meta-divider)" aria-hidden="true">·</span>
         <span>{publishedDate}</span>
       </div>
       <div
-        class="flex items-center gap-4 ml-3 mr-2 shrink-0 post-card-actions leading-none"
+        class="flex w-full items-center justify-between gap-4 shrink-0 post-card-actions leading-none lg:ml-3 lg:mr-2 lg:w-auto lg:justify-start"
       >
         <button
           type="button"
@@ -229,8 +238,10 @@ const adminDeleteLabel = i18n(I18nKey.interactionCommonDeleteAdmin);
         data-enter-skeleton-content
         href={url}
         aria-label={title}
-        class="group absolute top-3 bottom-3 right-3 rounded-xl overflow-hidden active:scale-95"
-        style="width: var(--coverWidth);"
+        class:list={[
+          "group relative mx-5 mb-5 block h-52 rounded-xl overflow-hidden active:scale-95 lg:absolute lg:top-3 lg:right-3 lg:bottom-3 lg:mx-0 lg:mb-0 lg:h-auto",
+          desktopEnterLinkClass,
+        ]}
       >
         <div class="absolute pointer-events-none z-10 w-full h-full group-hover:bg-black/30 group-active:bg-black/50 transition" />
         <div class="absolute pointer-events-none z-20 w-full h-full flex items-center justify-center">
@@ -255,9 +266,9 @@ const adminDeleteLabel = i18n(I18nKey.interactionCommonDeleteAdmin);
         data-enter-skeleton-content
         href={url}
         aria-label={title}
-        class="flex btn-regular w-[3.25rem]
-         absolute right-3 top-3 bottom-3 rounded-xl bg-(--enter-btn-bg)
-         hover:bg-(--enter-btn-bg-hover) active:bg-(--enter-btn-bg-active) active:scale-95"
+        class:list={[
+          "mx-5 mb-5 flex h-12 btn-regular rounded-xl bg-(--enter-btn-bg) hover:bg-(--enter-btn-bg-hover) active:bg-(--enter-btn-bg-active) active:scale-95 lg:absolute lg:right-3 lg:top-3 lg:bottom-3 lg:mx-0 lg:mb-0 lg:w-[3.25rem]",
+        ]}
       >
         <Icon
           name="material-symbols:chevron-right-rounded"
@@ -273,11 +284,8 @@ const adminDeleteLabel = i18n(I18nKey.interactionCommonDeleteAdmin);
   >
     <div
       class:list={[
-        "pl-9 pr-2 pt-7 pb-6 h-full flex flex-col",
-        {
-          "w-[calc(100%-3.25rem-0.75rem)]": !hasCover,
-          "w-[calc(100%-var(--coverWidth)-0.75rem)]": hasCover,
-        },
+        "px-5 py-5 h-full flex flex-col gap-4 lg:pl-9 lg:pr-2 lg:pt-7 lg:pb-6",
+        desktopBodyWidthClass,
       ]}
     >
       <div class="space-y-4">

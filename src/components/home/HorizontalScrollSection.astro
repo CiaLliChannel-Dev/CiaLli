@@ -68,7 +68,7 @@ const className = Astro.props.class;
         moreHref && (
           <a
             href={moreHref}
-            class="shrink-0 w-[140px] min-h-[160px] rounded-xl border-2 border-dashed border-black/15 dark:border-white/20 flex flex-col items-center justify-center gap-2 text-50 hover:text-(--primary) hover:border-(--primary) transition-colors snap-start"
+            class="shrink-0 w-[42vw] max-w-[140px] min-h-[160px] rounded-xl border-2 border-dashed border-black/15 dark:border-white/20 flex flex-col items-center justify-center gap-2 text-50 hover:text-(--primary) hover:border-(--primary) transition-colors snap-start sm:w-[140px]"
           >
             <svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
               <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
@@ -93,6 +93,12 @@ const className = Astro.props.class;
   .scroll-arrow.visible {
     opacity: 1;
     pointer-events: auto;
+  }
+
+  @media (hover: none) and (pointer: coarse) {
+    .scroll-arrow {
+      display: none;
+    }
   }
 </style>
 

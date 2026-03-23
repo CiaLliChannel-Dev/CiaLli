@@ -113,7 +113,7 @@ function resolveDiaryImageSrc(image: AppDiaryImage): string {
       </p>
       {
         visibleImages.length > 0 && (
-          <div class="grid grid-cols-4 gap-2">
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
             {visibleImages.map((img) => (
               <ExternalImage
                 src={resolveDiaryImageSrc(img)}
@@ -127,9 +127,11 @@ function resolveDiaryImageSrc(image: AppDiaryImage): string {
       }
     </a>
 
-    <div class="flex items-center justify-between gap-3 mt-4">
+    <div
+      class="flex flex-col items-start gap-3 mt-4 lg:flex-row lg:items-center lg:justify-between"
+    >
       <div
-        class="flex min-w-0 items-center gap-1.5 text-50 text-sm font-medium leading-none"
+        class="flex min-w-0 flex-wrap items-center gap-1.5 text-50 text-sm font-medium leading-none"
       >
         <div class="max-w-[14rem] min-w-0 inline-flex items-baseline gap-1">
           <a
@@ -142,14 +144,15 @@ function resolveDiaryImageSrc(image: AppDiaryImage): string {
             href={`/${authorHandle}`}
             class="shrink-0 text-60 hover:text-(--primary) transition-colors"
           >
-            @{authorHandle}
+            {"@"}
+            {authorHandle}
           </a>
         </div>
         <span class="text-(--meta-divider)" aria-hidden="true">&middot;</span>
         <span>{publishedDate}</span>
       </div>
       <div
-        class="flex items-center gap-4 ml-3 mr-2 shrink-0 post-card-actions leading-none"
+        class="flex w-full items-center justify-between gap-4 shrink-0 post-card-actions leading-none lg:ml-3 lg:mr-2 lg:w-auto lg:justify-start"
       >
         <button
           type="button"

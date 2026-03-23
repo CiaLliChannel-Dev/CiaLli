@@ -5,32 +5,28 @@ const sourceRoot = path.resolve(process.cwd(), "src");
 
 const rules = [
     {
-        name: "Tailwind 响应式前缀 sm:/md:",
-        regex: /(?:^|[\s"'`])(?:sm|md):[A-Za-z0-9_()[\]/.%:-]+/gm,
+        name: "旧桌面端阻断组件",
+        regex: /\bDesktopOnlyNotice\b|\bdesktop-only-notice\b/gm,
     },
     {
-        name: "@media (max-width...) 语句",
-        regex: /@media\s*\(\s*max-width/gm,
+        name: "旧桌面端数据属性",
+        regex: /\bdata-desktop-(?:unsupported|force-browse)\b|\bdata-desktop-app\b/gm,
     },
     {
-        name: 'matchMedia("(max-width...) 调用',
-        regex: /matchMedia\(\s*["'`]\s*\(max-width/gm,
+        name: "旧首页桌面态类名",
+        regex: /\blg:is-home\b/gm,
     },
     {
-        name: "移动端变量分支 isMobile/isTablet",
-        regex: /\bisMobile\b|\bisTablet\b/gm,
+        name: "旧桌面强制浏览状态",
+        regex: /\bcialli\.desktop\.force-browse\b|\bdesktop-force-browse-change\b/gm,
     },
     {
-        name: "旧侧边栏 drawer 配置",
-        regex: /\bsidebarLayout\.components\.drawer\b|\bcomponents\.drawer\b|\bdrawer\s*:/gm,
+        name: "旧桌面折叠阈值配置",
+        regex: /\bdesktopCollapseMinWidth\b|\bviewportWidth\s*>=\s*1280\b/gm,
     },
     {
-        name: "旧 Banner 移动端字段",
-        regex: /\bbanner\.src\.mobile\b|\bmobileDisable\b/gm,
-    },
-    {
-        name: "旧移动导航面板标识",
-        regex: /\bnav-menu-panel\b|\bmobile-toc-panel\b/gm,
+        name: "旧桌面端最小宽度常量",
+        regex: /\bDESKTOP_MIN_WIDTH\b/gm,
     },
 ];
 
@@ -89,11 +85,11 @@ for (const filePath of files) {
 }
 
 if (violations.length === 0) {
-    console.log("[desktop-only-check] passed");
+    console.log("[responsive-layout-check] passed");
     process.exit(0);
 }
 
-console.error("[desktop-only-check] found unsupported responsive remnants:");
+console.error("[responsive-layout-check] found legacy desktop-only remnants:");
 for (const violation of violations) {
     const relativePath = path.relative(process.cwd(), violation.filePath);
     console.error(

@@ -96,7 +96,7 @@ if (hasSessionCookie || viewerId) {
   <!-- 右侧栏 slot: 筛选面板 -->
   <div
     slot="sidebar-right"
-    class="archive-filter-panel max-h-[calc(100vh-6.5rem)] overflow-y-auto flex flex-col gap-4 self-start"
+    class="archive-filter-panel w-full max-h-none overflow-visible flex flex-col gap-4 self-start lg:max-h-[calc(100dvh-6.5rem)] lg:overflow-y-auto"
   >
     <!-- 日历 -->
     <Calendar defaultExpanded={false} />

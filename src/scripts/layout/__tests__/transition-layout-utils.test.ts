@@ -246,7 +246,6 @@ describe("transition layout DOM helpers", () => {
 
         expect(body.dataset.layoutMode).toBe("banner");
         expect(body.dataset.routeHome).toBe("true");
-        expect(body.classList.contains("lg:is-home")).toBe(true);
         expect(body.classList.contains("enable-banner")).toBe(true);
         expect(body.classList.contains("no-banner-mode")).toBe(false);
         expect(body.classList.contains("waves-paused")).toBe(false);

@@ -4,7 +4,6 @@ import Analytics from "@vercel/analytics/astro";
 import SpeedInsights from "@vercel/speed-insights/astro";
 import ConfigCarrier from "@components/ConfigCarrier.astro";
 import MusicPlayer from "@components/widget/MusicPlayer/MusicPlayer.svelte";
-import DesktopOnlyNotice from "@components/misc/DesktopOnlyNotice.astro";
 import { buildLegacySiteConfig } from "@/config";
 import { generatedFontManifest } from "@/generated/font-manifest";
 import { getResolvedSiteSettings } from "@/server/site-settings/service";
@@ -14,7 +13,7 @@ import type { ResolvedSiteSettings } from "@/types/site-settings";
 const BANNER_HEIGHT = 35;
 const BANNER_HEIGHT_EXTEND = 30;
 const BANNER_HEIGHT_HOME = BANNER_HEIGHT + BANNER_HEIGHT_EXTEND;
-const DESKTOP_MIN_WIDTH = 1280;
+const PAGE_SCALE_MIN_WIDTH = 1280;
 
 import {
   DARK_MODE,
@@ -148,7 +147,6 @@ const htmlClassName = [
   .join(" ");
 const bodyClassName = [
   "min-h-screen",
-  isHomePage ? "lg:is-home" : "",
   isArchivePage ? "page-archive" : "",
   isPostEditorRoute ? "route-post-editor" : "",
   initialLayoutMode === "banner" ? "enable-banner" : "no-banner-mode",
@@ -378,52 +376,6 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
         });
       })();
     </script>
-    <script is:inline define:vars={{ DESKTOP_MIN_WIDTH }}>
-      (function () {
-        const runtimeWindow = window;
-        const DESKTOP_FORCE_BROWSE_KEY = "cialli.desktop.force-browse";
-
-        const readForceBrowseFlag = () => {
-          try {
-            return sessionStorage.getItem(DESKTOP_FORCE_BROWSE_KEY) === "true";
-          } catch (error) {
-            console.warn("[layout] 读取强制浏览状态失败:", error);
-            return false;
-          }
-        };
-
-        const applyDesktopSupportState = () => {
-          const forceBrowse = readForceBrowseFlag();
-          const unsupported =
-            window.innerWidth < DESKTOP_MIN_WIDTH && !forceBrowse;
-          const unsupportedValue = unsupported ? "true" : "false";
-          const forceBrowseValue = forceBrowse ? "true" : "false";
-          document.documentElement.dataset.desktopUnsupported =
-            unsupportedValue;
-          document.documentElement.dataset.desktopForceBrowse =
-            forceBrowseValue;
-          if (document.body) {
-            document.body.dataset.desktopUnsupported = unsupportedValue;
-            document.body.dataset.desktopForceBrowse = forceBrowseValue;
-          }
-        };
-
-        applyDesktopSupportState();
-        if (!runtimeWindow.__desktopOnlyGuardBound) {
-          runtimeWindow.__desktopOnlyGuardBound = true;
-          window.addEventListener("resize", applyDesktopSupportState, {
-            passive: true,
-          });
-          document.addEventListener(
-            "astro:page-load",
-            applyDesktopSupportState,
-          );
-          window.addEventListener("desktop-force-browse-change", () => {
-            applyDesktopSupportState();
-          });
-        }
-      })();
-    </script>
     <script is:inline define:vars={{ gtmId, clarityId, analyticsEnabled }}>
       if (analyticsEnabled) {
         // 使用 requestIdleCallback 延迟加载第三方脚本
@@ -546,8 +498,10 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
         DARK_MODE,
         BANNER_HEIGHT_EXTEND,
         PAGE_WIDTH,
+        PAGE_SCALE_MIN_WIDTH,
         configHue,
         DESKTOP_MIN_WIDTH,
+        themeColorFixed: siteConfig.themeColor.fixed,
         pageScaling: siteConfig.pageScaling,
       }}
     >
@@ -588,8 +542,29 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
 
       // 自动缩放逻辑（从 MainGridLayout 前移，尽早执行）
       (function () {
-        if (!pageScaling) {
-          return;
+        if (pageScaling && pageScaling.enable) {
+          function adjustPageScale() {
+            const currentWidth = document.documentElement.clientWidth;
+            // 仅在宽屏下启用整体缩放，避免影响移动端与平板端的原生响应式布局。
+            if (currentWidth < PAGE_SCALE_MIN_WIDTH) {
+              document.documentElement.style.fontSize = "";
+              return;
+            }
+            const targetWidth = pageScaling.targetWidth || 2000;
+            let scale = currentWidth / targetWidth;
+            if (scale > 1) scale = 1;
+            if (scale < 0.85) scale = 0.85;
+            document.documentElement.style.fontSize = `${scale * 100}%`;
+          }
+
+          // 立即执行一次
+          adjustPageScale();
+
+          // 监听窗口尺寸变化
+          window.addEventListener("resize", adjustPageScale);
+
+          // 页面切换后也需要检查
+          document.addEventListener("astro:page-load", adjustPageScale);
         }
 
         function adjustPageScale() {
@@ -637,38 +612,35 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
     data-route-post-editor={String(isPostEditorRoute)}
     data-overlayscrollbars-initialize
   >
-    <div data-desktop-app>
-      <ConfigCarrier resolvedSiteSettings={resolvedSiteSettings} />
-      {
-        gtmId && (
-          <noscript>
-            <iframe
-              src={`https://www.googletagmanager.com/ns.html?id=${encodeURIComponent(gtmId)}`}
-              height="0"
-              width="0"
-              style="display:none;visibility:hidden"
-            />
-          </noscript>
-        )
-      }
-      <slot />
+    <ConfigCarrier resolvedSiteSettings={resolvedSiteSettings} />
+    {
+      gtmId && (
+        <noscript>
+          <iframe
+            src={`https://www.googletagmanager.com/ns.html?id=${encodeURIComponent(gtmId)}`}
+            height="0"
+            width="0"
+            style="display:none;visibility:hidden"
+          />
+        </noscript>
+      )
+    }
+    <slot />
 
-      <!-- Music Player - 仅在启用时加载 -->
-      {
-        musicPlayerSettings.enable && (
-          <div id="music-player-shell" transition:persist>
-            <MusicPlayer musicPlayer={musicPlayerSettings} client:idle />
-          </div>
-        )
-      }
+    <!-- Music Player - 仅在启用时加载 -->
+    {
+      musicPlayerSettings.enable && (
+        <div id="music-player-shell" transition:persist>
+          <MusicPlayer musicPlayer={musicPlayerSettings} client:idle />
+        </div>
+      )
+    }
 
-      <!-- 切页时临时增加页面高度，避免滚动动画跳变 -->
-      <div id="page-height-extend" class="hidden h-[300vh]"></div>
-    </div>
+    <!-- 切页时临时增加页面高度，避免滚动动画跳变 -->
+    <div id="page-height-extend" class="hidden h-[300vh]"></div>
     <!-- Vercel 可观测性 -->
     <Analytics />
     <SpeedInsights />
-    <DesktopOnlyNotice />
   </body>
 </html>
 
@@ -683,26 +655,6 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
   @reference "../styles/main.css";
 
   @layer components {
-    #desktop-only-notice {
-      display: none;
-    }
-
-    html[data-desktop-unsupported="true"],
-    html[data-desktop-unsupported="true"] body {
-      overflow: hidden !important;
-      overscroll-behavior: none;
-    }
-
-    html[data-desktop-unsupported="true"] [data-desktop-app] {
-      visibility: hidden;
-      pointer-events: none !important;
-      user-select: none;
-    }
-
-    html[data-desktop-unsupported="true"] #desktop-only-notice {
-      display: flex;
-    }
-
     body[data-layout-mode="banner"][data-route-home="true"] #banner-wrapper {
       @apply h-(--banner-height-home) translate-y-(--banner-height-extend);
     }

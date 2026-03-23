@@ -49,7 +49,7 @@
         disabled={saving}
       />
     </label>
-    <div class="flex items-center gap-2 flex-1 min-w-[220px]">
+    <div class="flex items-center gap-2 flex-1 min-w-0 md:min-w-[220px]">
       <input
         type="url"
         bind:value={externalUrl}
@@ -72,7 +72,7 @@
   {#if pendingLocalPhotos.length > 0}
     <div class="space-y-2">
       <p class="text-xs text-60">待上传本地图片</p>
-      <div class="grid grid-cols-2 gap-2">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
         {#each pendingLocalPhotos as item (item.id)}
           <div
             class="relative rounded-lg overflow-hidden border border-(--line-divider) bg-(--card-bg)"

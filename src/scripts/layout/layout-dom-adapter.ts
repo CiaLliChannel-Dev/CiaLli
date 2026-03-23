@@ -32,8 +32,6 @@ function syncBodyState(next: LayoutState): void {
     body.dataset.layoutMode = next.mode;
     body.dataset.routeHome = String(next.isHome);
 
-    // Legacy classes are preserved as compatibility layer for existing utility styles.
-    body.classList.toggle("lg:is-home", next.isHome);
     body.classList.toggle("enable-banner", isBannerMode);
     body.classList.toggle("no-banner-mode", !isBannerMode);
     body.classList.toggle("waves-paused", !isBannerMode);

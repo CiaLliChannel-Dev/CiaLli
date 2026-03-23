@@ -9,7 +9,7 @@ import { i18n } from "@i18n/translation";
     {i18n(I18nKey.adminSiteSettingsSectionHome)}
   </h2>
   <form id="ss-home-form" class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-    <h3 class="text-lg font-medium text-75 col-span-2">
+    <h3 class="text-lg font-medium text-75 lg:col-span-2">
       {i18n(I18nKey.adminSiteSettingsCarouselWallpaper)}
     </h3>
     <label class="space-y-1.5">
@@ -38,7 +38,7 @@ import { i18n } from "@i18n/translation";
       </select>
     </label>
     <label
-      class="flex items-center gap-3 text-75 cursor-pointer select-none col-span-2"
+      class="flex items-center gap-3 text-75 cursor-pointer select-none lg:col-span-2"
     >
       <input
         type="checkbox"
@@ -61,12 +61,12 @@ import { i18n } from "@i18n/translation";
         placeholder="5"
       />
     </label>
-    <hr class="border-(--line-divider) col-span-2" />
-    <h3 class="text-lg font-medium text-75 col-span-2">
+    <hr class="border-(--line-divider) lg:col-span-2" />
+    <h3 class="text-lg font-medium text-75 lg:col-span-2">
       {i18n(I18nKey.adminSiteSettingsImageSourceAndCopy)}
     </h3>
     <label
-      class="flex items-center gap-3 text-75 cursor-pointer select-none col-span-2"
+      class="flex items-center gap-3 text-75 cursor-pointer select-none lg:col-span-2"
     >
       <input
         type="checkbox"
@@ -76,7 +76,7 @@ import { i18n } from "@i18n/translation";
       <span class="toggle-track"><span class="toggle-knob"></span></span>
       {i18n(I18nKey.adminSiteSettingsEnableBannerApi)}
     </label>
-    <label class="space-y-1.5 col-span-2">
+    <label class="space-y-1.5 lg:col-span-2">
       <span class="text-sm text-60">
         {i18n(I18nKey.adminSiteSettingsBannerApiUrl)}
       </span>
@@ -87,7 +87,7 @@ import { i18n } from "@i18n/translation";
       />
     </label>
     <label
-      class="flex items-center gap-3 text-75 cursor-pointer select-none col-span-2"
+      class="flex items-center gap-3 text-75 cursor-pointer select-none lg:col-span-2"
     >
       <input
         type="checkbox"
@@ -118,7 +118,7 @@ import { i18n } from "@i18n/translation";
       ></textarea>
     </label>
     <label
-      class="flex items-center gap-3 text-75 cursor-pointer select-none col-span-2"
+      class="flex items-center gap-3 text-75 cursor-pointer select-none lg:col-span-2"
     >
       <input
         type="checkbox"
@@ -182,7 +182,7 @@ import { i18n } from "@i18n/translation";
       <span class="toggle-track"><span class="toggle-knob"></span></span>
       {i18n(I18nKey.adminSiteSettingsOptimizeWavePerformance)}
     </label>
-    <div class="col-span-2 space-y-2">
+    <div class="lg:col-span-2 space-y-2">
       <h4 class="text-base font-medium text-75">
         {i18n(I18nKey.adminSiteSettingsDesktopWallpaper)}
       </h4>
@@ -214,7 +214,7 @@ import { i18n } from "@i18n/translation";
       </div>
       <div id="ss-banner-desktop-list" class="space-y-2"></div>
     </div>
-    <div class="col-span-2 flex items-center gap-2 pt-2">
+    <div class="lg:col-span-2 flex items-center gap-2 pt-2">
       <button
         type="submit"
         class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"

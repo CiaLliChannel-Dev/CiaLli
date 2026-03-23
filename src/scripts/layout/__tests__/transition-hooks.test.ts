@@ -54,8 +54,7 @@ function createBody(routeHome: "true" | "false"): HTMLElement {
             routeHome,
         },
         classList: {
-            contains: (token: string) =>
-                token === "lg:is-home" && routeHome === "true",
+            contains: () => false,
         },
     });
 }

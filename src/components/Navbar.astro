@@ -7,6 +7,8 @@ import defaultNavIconImage from "@assets/home/home.png";
 import defaultNavLogoImage from "@assets/home/default-logo.png";
 import { LinkPresets } from "@constants/link-presets";
 import type { LinkPreset } from "@/types/config";
+import I18nKey from "@i18n/i18nKey";
+import { i18n } from "@i18n/translation";
 import { type NavBarLink } from "@/types/config";
 import { isAdminOnlyLink } from "@utils/nav-link-utils";
 import { url } from "@utils/url-utils";
@@ -52,12 +54,40 @@ const useOptimizedDefaultNavLogo =
 const navbarTransparentMode =
   siteSettings.banner?.navbar?.transparentMode || "semi";
 const isHomePage = Astro.url.pathname === "/" || Astro.url.pathname === "";
+const navTitleMap: Record<string, I18nKey> = {
+  Links: I18nKey.coreNavLinks,
+  链接: I18nKey.coreNavLinks,
+  My: I18nKey.coreNavMy,
+  我的: I18nKey.coreNavMy,
+  About: I18nKey.coreNavAbout,
+  关于: I18nKey.coreNavAbout,
+  Others: I18nKey.coreNavOthers,
+  其他: I18nKey.coreNavOthers,
+  Anime: I18nKey.contentAnime,
+  番剧: I18nKey.contentAnime,
+  Diary: I18nKey.contentDiary,
+  日记: I18nKey.contentDiary,
+  Gallery: I18nKey.contentAlbums,
+  相册: I18nKey.contentAlbums,
+  Friends: I18nKey.contentFriends,
+  友情链接: I18nKey.contentFriends,
+  关于我们: I18nKey.coreAbout,
+  站点统计: I18nKey.coreSiteStats,
+};
 
 function resolveLink(link: NavBarLink | LinkPreset): NavBarLink {
   if (typeof link === "number") {
     return LinkPresets[link];
   }
   return link;
+}
+
+function getLocalizedName(name: string): string {
+  return name in navTitleMap ? i18n(navTitleMap[name]) : name;
+}
+
+function resolveHref(rawUrl: string, isExternal?: boolean): string {
+  return isExternal ? rawUrl : url(rawUrl);
 }
 
 function withoutAdminChildren(link: NavBarLink): NavBarLink | null {
@@ -99,13 +129,13 @@ const links: NavBarLink[] = navBarConfig.links
   <div
     class:list={[
       className,
-      "navbar-shell overflow-visible! w-full min-w-0 max-w-(--page-width) h-[4.5rem] mx-auto flex items-center justify-between px-4",
+      "navbar-shell overflow-visible! w-full min-w-0 max-w-(--page-width) h-[4.5rem] mx-auto flex items-center justify-between gap-3 px-4",
     ]}
   >
     <a
       id="navbar-logo"
       href={url("/")}
-      class="btn-plain scale-animation rounded-lg h-[3.25rem] in-[.enable-banner]:h-[2.5rem]! in-[.enable-banner]:group-[.scrolled]:h-[3.25rem]! px-5 font-bold active:scale-95 min-w-0 max-w-none transition-[height,padding-left,padding-right] duration-920"
+      class="btn-plain scale-animation rounded-lg h-[3rem] px-3.5 font-bold active:scale-95 min-w-0 max-w-none transition-[height,padding-left,padding-right] duration-920 lg:h-[3.25rem] lg:px-5 in-[.enable-banner]:h-[2.5rem]! in-[.enable-banner]:group-[.scrolled]:h-[3.25rem]!"
     >
       <div class="flex flex-row items-center min-w-0 text-md">
         {
@@ -173,7 +203,7 @@ const links: NavBarLink[] = navBarConfig.links
 
     <div
       id="navbar-links-container"
-      class="flex items-center space-x-1 transition-opacity duration-300"
+      class="hidden lg:flex items-center space-x-1 transition-opacity duration-300"
     >
       {
         links.map((l) => {
@@ -185,6 +215,132 @@ const links: NavBarLink[] = navBarConfig.links
     <div class="flex shrink-0 items-center gap-1">
       <LightDarkSwitch client:only="svelte" />
       <AuthStatus />
+      <button
+        id="mobile-nav-toggle"
+        type="button"
+        class="btn-plain scale-animation flex h-11 w-11 items-center justify-center rounded-lg active:scale-90 lg:hidden"
+        aria-label="打开导航菜单"
+        aria-expanded="false"
+        aria-controls="mobile-nav-drawer"
+      >
+        <Icon name="material-symbols:menu-rounded" class="text-[1.45rem]" />
+      </button>
+    </div>
+  </div>
+
+  <div
+    id="mobile-nav-drawer"
+    class="mobile-nav-drawer lg:hidden"
+    aria-hidden="true"
+  >
+    <button
+      id="mobile-nav-backdrop"
+      type="button"
+      class="mobile-nav-backdrop"
+      aria-label="关闭导航菜单"
+      tabindex="-1"></button>
+    <div class="mobile-nav-panel">
+      <div class="mobile-nav-head">
+        <div class="space-y-1">
+          <p class="text-xs font-semibold uppercase tracking-[0.16em] text-50">
+            Navigation
+          </p>
+          <p class="text-base font-semibold text-90">站点导航</p>
+        </div>
+        <button
+          id="mobile-nav-close"
+          type="button"
+          class="btn-plain scale-animation flex h-10 w-10 items-center justify-center rounded-lg active:scale-90"
+          aria-label="关闭导航菜单"
+        >
+          <Icon name="material-symbols:close-rounded" class="text-[1.3rem]" />
+        </button>
+      </div>
+      <nav class="mobile-nav-list" aria-label="移动端导航">
+        {
+          links.map((linkItem) => {
+            const drawerChildren =
+              linkItem.children?.map((child) =>
+                typeof child === "number" ? LinkPresets[child] : child,
+              ) ?? [];
+
+            return drawerChildren.length > 0 ? (
+              <details class="mobile-nav-group">
+                <summary class="mobile-nav-summary">
+                  <span class="flex min-w-0 items-center gap-3">
+                    {linkItem.icon && (
+                      <Icon
+                        name={linkItem.icon}
+                        class="shrink-0 text-[1.15rem] text-(--primary)"
+                      />
+                    )}
+                    <span class="truncate">
+                      {getLocalizedName(linkItem.name)}
+                    </span>
+                  </span>
+                  <Icon
+                    name="material-symbols:keyboard-arrow-down-rounded"
+                    class="mobile-nav-summary-icon shrink-0 text-[1.3rem] text-60"
+                  />
+                </summary>
+                <div class="mobile-nav-children">
+                  {drawerChildren.map((child) => (
+                    <a
+                      href={resolveHref(child.url, child.external)}
+                      target={child.external ? "_blank" : null}
+                      rel={child.external ? "noopener noreferrer" : null}
+                      class="mobile-nav-child-link"
+                    >
+                      <span class="flex min-w-0 items-center gap-3">
+                        {child.icon && (
+                          <Icon
+                            name={child.icon}
+                            class="shrink-0 text-[1rem] text-60"
+                          />
+                        )}
+                        <span class="truncate">
+                          {getLocalizedName(child.name)}
+                        </span>
+                      </span>
+                      {child.external && (
+                        <Icon
+                          name="fa7-solid:arrow-up-right-from-square"
+                          class="shrink-0 text-[0.8rem] text-40"
+                        />
+                      )}
+                    </a>
+                  ))}
+                </div>
+              </details>
+            ) : (
+              <a
+                href={resolveHref(linkItem.url, linkItem.external)}
+                target={linkItem.external ? "_blank" : null}
+                rel={linkItem.external ? "noopener noreferrer" : null}
+                class="mobile-nav-link"
+              >
+                <span class="flex min-w-0 items-center gap-3">
+                  {linkItem.icon && (
+                    <Icon
+                      name={linkItem.icon}
+                      class="shrink-0 text-[1.15rem] text-(--primary)"
+                    />
+                  )}
+                  <span class="truncate">
+                    {getLocalizedName(linkItem.name)}
+                  </span>
+                </span>
+                {linkItem.external && (
+                  <Icon
+                    name="fa7-solid:arrow-up-right-from-square"
+                    class="shrink-0 text-[0.85rem] text-40"
+                  />
+                )}
+              </a>
+            );
+          })
+        }
+      </nav>
     </div>
   </div>
 </div>
@@ -202,6 +358,7 @@ const links: NavBarLink[] = navBarConfig.links
     "navbar-links-container",
   );
   const AUTH_PROTECTED_TARGET_ATTR = "data-auth-target-href";
+  const MOBILE_NAV_OPEN_CLASS = "is-open";
 
   const normalizePathname = (pathname: string): string => {
     const normalized = pathname.replace(/\/+$/, "");
@@ -533,7 +690,194 @@ const links: NavBarLink[] = navBarConfig.links
 
   document.addEventListener("click", handleNavClick, true);
 
+  const setMobileNavOpen = (open: boolean): void => {
+    const drawer = document.getElementById("mobile-nav-drawer");
+    const toggle = document.getElementById("mobile-nav-toggle");
+    if (!(drawer instanceof HTMLElement)) {
+      return;
+    }
+    drawer.classList.toggle(MOBILE_NAV_OPEN_CLASS, open);
+    drawer.setAttribute("aria-hidden", open ? "false" : "true");
+    if (toggle instanceof HTMLButtonElement) {
+      toggle.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    document.documentElement.classList.toggle("mobile-nav-open", open);
+  };
+
+  const isMobileNavOpen = (): boolean => {
+    const drawer = document.getElementById("mobile-nav-drawer");
+    if (!(drawer instanceof HTMLElement)) {
+      return false;
+    }
+    return drawer.classList.contains(MOBILE_NAV_OPEN_CLASS);
+  };
+
+  const bindMobileNav = (): void => {
+    if (document.documentElement.dataset.mobileNavBound === "1") {
+      return;
+    }
+    document.documentElement.dataset.mobileNavBound = "1";
+
+    document.addEventListener("click", (event) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        return;
+      }
+      if (target.closest("#mobile-nav-toggle")) {
+        event.preventDefault();
+        setMobileNavOpen(!isMobileNavOpen());
+        return;
+      }
+      if (
+        target.closest("#mobile-nav-close") ||
+        target.closest("#mobile-nav-backdrop")
+      ) {
+        event.preventDefault();
+        setMobileNavOpen(false);
+        return;
+      }
+      if (target.closest("#mobile-nav-drawer a[href]")) {
+        setMobileNavOpen(false);
+      }
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        setMobileNavOpen(false);
+      }
+    });
+
+    window.addEventListener(
+      "resize",
+      () => {
+        if (window.matchMedia("(min-width: 1280px)").matches) {
+          setMobileNavOpen(false);
+        }
+      },
+      { passive: true },
+    );
+
+    document.addEventListener("astro:after-swap", () => {
+      setMobileNavOpen(false);
+    });
+  };
+
+  bindMobileNav();
+
   if (navbarLinksContainer) {
     navbarLinksContainer.style.opacity = "1";
   }
 </script>
+
+<style>
+  @reference "../styles/main.css";
+
+  .mobile-nav-drawer {
+    position: fixed;
+    inset: 0;
+    z-index: 70;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 180ms ease;
+  }
+
+  .mobile-nav-drawer.is-open {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .mobile-nav-backdrop {
+    position: absolute;
+    inset: 0;
+    border: none;
+    background: rgba(15, 23, 42, 0.45);
+  }
+
+  .mobile-nav-panel {
+    position: absolute;
+    top: calc(4.5rem + env(safe-area-inset-top, 0px) + 0.5rem);
+    right: max(1rem, env(safe-area-inset-right, 0px) + 1rem);
+    left: max(1rem, env(safe-area-inset-left, 0px) + 1rem);
+    max-height: calc(100dvh - 6rem - env(safe-area-inset-top, 0px));
+    overflow: auto;
+    border: 1px solid
+      color-mix(in oklch, var(--line-divider) 82%, var(--primary) 18%);
+    border-radius: 1.25rem;
+    background: color-mix(
+      in oklch,
+      var(--float-panel-bg) 94%,
+      var(--card-bg) 6%
+    );
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.16);
+    transform: translateY(-10px) scale(0.98);
+    transition: transform 180ms ease;
+    scrollbar-width: thin;
+  }
+
+  .mobile-nav-drawer.is-open .mobile-nav-panel {
+    transform: translateY(0) scale(1);
+  }
+
+  .mobile-nav-head {
+    @apply sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-(--line-divider) px-4 py-3;
+    background: color-mix(in oklch, var(--float-panel-bg) 97%, transparent 3%);
+    backdrop-filter: blur(16px);
+  }
+
+  .mobile-nav-list {
+    @apply flex flex-col gap-2 px-3 py-3;
+  }
+
+  .mobile-nav-link,
+  .mobile-nav-summary,
+  .mobile-nav-child-link {
+    @apply flex min-h-11 items-center justify-between gap-3 rounded-xl px-3 py-3 text-sm transition-colors;
+    color: rgb(0 0 0 / 0.9);
+  }
+
+  :root.dark .mobile-nav-link,
+  :root.dark .mobile-nav-summary,
+  :root.dark .mobile-nav-child-link {
+    color: rgb(255 255 255 / 0.9);
+  }
+
+  .mobile-nav-link,
+  .mobile-nav-child-link {
+    @apply hover:bg-(--btn-plain-bg-hover) active:bg-(--btn-plain-bg-active);
+  }
+
+  .mobile-nav-group {
+    @apply rounded-xl border border-(--line-divider) bg-black/3 dark:bg-white/4;
+  }
+
+  .mobile-nav-summary {
+    @apply cursor-pointer list-none hover:bg-(--btn-plain-bg-hover) active:bg-(--btn-plain-bg-active);
+  }
+
+  .mobile-nav-summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .mobile-nav-group[open] .mobile-nav-summary-icon {
+    @apply rotate-180 text-(--primary);
+  }
+
+  .mobile-nav-children {
+    @apply flex flex-col gap-1 px-3 pb-3;
+  }
+
+  .mobile-nav-child-link {
+    @apply border border-transparent bg-transparent pl-10;
+    color: rgb(0 0 0 / 0.75);
+  }
+
+  :root.dark .mobile-nav-child-link {
+    color: rgb(255 255 255 / 0.75);
+  }
+
+  :root.mobile-nav-open,
+  :root.mobile-nav-open body {
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+</style>

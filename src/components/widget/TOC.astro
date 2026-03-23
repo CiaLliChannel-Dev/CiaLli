@@ -2,16 +2,22 @@
 import type { MarkdownHeading } from "astro";
 
 interface Props {
+  id?: string;
   class?: string;
   style?: string;
   headings?: MarkdownHeading[];
 }
 
-const { style } = Astro.props;
+const { id = "toc", style } = Astro.props;
 const className = Astro.props.class;
 ---
 
-<table-of-contents class:list={[className, "group"]} id="toc" style={style}>
+<table-of-contents
+  class:list={[className, "group"]}
+  id={id}
+  data-toc-root
+  style={style}
+>
   <!-- TOC 内容由客户端脚本运行时生成 -->
 </table-of-contents>
 
@@ -20,7 +26,7 @@ const className = Astro.props.class;
 </script>
 
 <style>
-  #toc {
+  table-of-contents[data-toc-root] {
     max-height: 100%;
     overflow: auto;
     position: relative;
@@ -30,7 +36,7 @@ const className = Astro.props.class;
     -ms-overflow-style: none;
   }
 
-  #toc[data-post-detail-sidebar="1"] {
+  table-of-contents[data-toc-root][data-post-detail-sidebar="1"] {
     --toc-fade-height: 2.75rem;
     --toc-mask-image: none;
     max-height: var(--post-detail-toc-max-height, 100%);
@@ -44,7 +50,7 @@ const className = Astro.props.class;
     mask-size: 100% 100%;
   }
 
-  #toc[data-post-detail-sidebar="1"][data-fade-top="0"][data-fade-bottom="1"] {
+  table-of-contents[data-toc-root][data-post-detail-sidebar="1"][data-fade-top="0"][data-fade-bottom="1"] {
     --toc-mask-image: linear-gradient(
       to bottom,
       #000 0%,
@@ -53,7 +59,7 @@ const className = Astro.props.class;
     );
   }
 
-  #toc[data-post-detail-sidebar="1"][data-fade-top="1"][data-fade-bottom="0"] {
+  table-of-contents[data-toc-root][data-post-detail-sidebar="1"][data-fade-top="1"][data-fade-bottom="0"] {
     --toc-mask-image: linear-gradient(
       to bottom,
       transparent 0%,
@@ -62,7 +68,7 @@ const className = Astro.props.class;
     );
   }
 
-  #toc[data-post-detail-sidebar="1"][data-fade-top="1"][data-fade-bottom="1"] {
+  table-of-contents[data-toc-root][data-post-detail-sidebar="1"][data-fade-top="1"][data-fade-bottom="1"] {
     --toc-mask-image: linear-gradient(
       to bottom,
       transparent 0%,
@@ -72,7 +78,7 @@ const className = Astro.props.class;
     );
   }
 
-  #toc::-webkit-scrollbar {
+  table-of-contents[data-toc-root]::-webkit-scrollbar {
     display: none;
   }
 </style>

@@ -51,7 +51,10 @@ try {
           <h2 class="text-2xl font-semibold text-90">
             {i18n(I18nKey.meSettingsProfileSection)}
           </h2>
-          <form id="me-profile-form" class="grid grid-cols-2 gap-4">
+          <form
+            id="me-profile-form"
+            class="grid grid-cols-1 md:grid-cols-2 gap-4"
+          >
             <label class="space-y-1.5">
               <span class="text-sm text-60">{i18n(I18nKey.authEmailLabel)}</span
               >
@@ -125,7 +128,7 @@ try {
                 </span>
               </span>
             </label>
-            <div class="space-y-2 col-span-2">
+            <div class="space-y-2 md:col-span-2">
               <span class="text-sm text-60"
                 >{i18n(I18nKey.meSettingsAvatarLabel)}</span
               >
@@ -169,7 +172,7 @@ try {
                 </div>
               </div>
             </div>
-            <label class="space-y-1.5 col-span-2">
+            <label class="space-y-1.5 md:col-span-2">
               <span class="text-sm text-60"
                 >{i18n(I18nKey.meSettingsBioLabel)}</span
               >
@@ -200,7 +203,7 @@ try {
                 </span>
               </span>
             </label>
-            <h3 class="text-lg font-medium text-75 col-span-2">
+            <h3 class="text-lg font-medium text-75 md:col-span-2">
               {i18n(I18nKey.meSettingsBioTypewriter)}
             </h3>
             <label
@@ -228,7 +231,7 @@ try {
                 placeholder="80"
               />
             </label>
-            <div class="col-span-2 flex items-center gap-2">
+            <div class="md:col-span-2 flex items-center gap-2">
               <button
                 type="submit"
                 class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
@@ -264,7 +267,10 @@ try {
             <h3 class="text-xl font-medium text-75">
               {i18n(I18nKey.meSettingsPrivacyContent)}
             </h3>
-            <form id="me-privacy-form" class="grid grid-cols-2 gap-4 text-base">
+            <form
+              id="me-privacy-form"
+              class="grid grid-cols-1 md:grid-cols-2 gap-4 text-base"
+            >
               <label
                 class="flex items-center gap-3 text-75 cursor-pointer select-none"
               >
@@ -330,7 +336,7 @@ try {
                 >
                 {i18n(I18nKey.meSettingsPrivacyShowComments)}
               </label>
-              <div class="col-span-2 flex items-center gap-2 pt-4">
+              <div class="md:col-span-2 flex items-center gap-2 pt-4">
                 <button
                   type="submit"
                   class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
@@ -362,14 +368,14 @@ try {
           style="--skeleton-width: 22%; --skeleton-height: 1.6rem;"
         >
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           {
             Array.from({ length: 6 }).map(() => (
               <div class="md3-skeleton-block h-10 rounded-lg" />
             ))
           }
-          <div class="md3-skeleton-block h-28 rounded-lg col-span-2"></div>
-          <div class="md3-skeleton-block h-10 rounded-lg col-span-2"></div>
+          <div class="md3-skeleton-block h-28 rounded-lg md:col-span-2"></div>
+          <div class="md3-skeleton-block h-10 rounded-lg md:col-span-2"></div>
         </div>
       </section>
       <section class="card-base p-8 rounded-(--radius-large) space-y-4">
@@ -393,13 +399,13 @@ try {
           style="--skeleton-width: 18%; --skeleton-height: 1.6rem;"
         >
         </div>
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
           {
             Array.from({ length: 6 }).map(() => (
               <div class="md3-skeleton-block h-10 rounded-lg" />
             ))
           }
-          <div class="md3-skeleton-block h-10 rounded-lg col-span-2"></div>
+          <div class="md3-skeleton-block h-10 rounded-lg md:col-span-2"></div>
         </div>
       </section>
     </div>

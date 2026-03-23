@@ -248,8 +248,8 @@ const enrichedPhotos = album
             class:list={[
               "dc-album-gallery gap-3",
               album.layout === "masonry"
-                ? "columns-3"
-                : "grid grid-cols-2 lg:grid-cols-4",
+                ? "columns-1 md:columns-2 lg:columns-3"
+                : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4",
             ]}
           >
             {enrichedPhotos.map((photo) => (

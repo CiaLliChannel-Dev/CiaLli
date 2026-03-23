@@ -86,13 +86,13 @@ export function resolveGridCols(
     effectiveShowRightSidebar: boolean,
 ): string {
     if (desktopShowLeftSidebar && effectiveShowRightSidebar) {
-        return "grid-cols-[17.5rem_minmax(0,1fr)_17.5rem]";
+        return "grid-cols-1 lg:grid-cols-[17.5rem_minmax(0,1fr)_17.5rem]";
     }
     if (desktopShowLeftSidebar) {
-        return "grid-cols-[17.5rem_minmax(0,1fr)]";
+        return "grid-cols-1 lg:grid-cols-[17.5rem_minmax(0,1fr)]";
     }
     if (effectiveShowRightSidebar) {
-        return "grid-cols-[minmax(0,1fr)_17.5rem]";
+        return "grid-cols-1 lg:grid-cols-[minmax(0,1fr)_17.5rem]";
     }
     return "grid-cols-1";
 }
@@ -104,14 +104,17 @@ export function resolveRightSidebarClass(
     desktopShowLeftSidebar: boolean,
 ): string {
     const colClass = desktopShowLeftSidebar
-        ? "col-start-3 col-end-4"
-        : "col-start-2 col-end-3";
+        ? "lg:col-start-3 lg:col-end-4"
+        : "lg:col-start-2 lg:col-end-3";
+
+    const baseClass =
+        "onload-animation block w-full min-w-0 order-2 lg:order-none lg:row-start-1 lg:row-end-2 lg:max-w-[17.5rem]";
 
     if (hasCustomRightSidebar) {
-        return `onload-animation block mb-4 max-w-[17.5rem] row-start-1 row-end-2 ${colClass}`;
+        return `${baseClass} mb-4 ${colClass}`;
     }
     if (hasRightSidebarComponents || shouldRenderDedicatedPostToc) {
-        return `onload-animation block overflow-x-hidden mb-4 max-w-[17.5rem] row-start-1 row-end-2 ${colClass}`;
+        return `${baseClass} overflow-x-hidden mb-4 ${colClass}`;
     }
     return "hidden";
 }
@@ -121,9 +124,9 @@ export function resolveMainGridPositionClass(
     effectiveShowRightSidebar: boolean,
 ): string {
     if (desktopShowLeftSidebar || effectiveShowRightSidebar) {
-        return "col-start-2 col-end-3";
+        return "lg:col-start-2 lg:col-end-3";
     }
-    return "col-span-1";
+    return "lg:col-span-1";
 }
 
 type TocState = {
@@ -231,9 +234,10 @@ function resolveMainContentClass(
         effectiveShowRightSidebar,
     );
     return `
-  transition-fade overflow-clip w-full
-  col-span-1 row-start-1 row-end-2
-  ${desktopShowSidebar ? mainGridPositionClass : "col-span-1"}
+  transition-fade overflow-clip w-full min-w-0
+  order-1 col-span-1 row-start-auto
+  lg:order-none lg:row-start-1 lg:row-end-2
+  ${desktopShowSidebar ? mainGridPositionClass : "lg:col-span-1"}
 `
         .trim()
         .replace(/\s+/g, " ");
@@ -284,7 +288,7 @@ export function buildMainGridLayoutState(
         effectiveShowRightSidebar,
     );
     const sidebarClass = desktopShowLeftSidebar
-        ? "onload-animation mb-4 max-w-[17.5rem] col-start-1 col-end-2 row-start-1 row-end-2"
+        ? "onload-animation mb-4 w-full min-w-0 order-3 lg:order-none lg:max-w-[17.5rem] lg:col-start-1 lg:col-end-2 lg:row-start-1 lg:row-end-2"
         : "hidden";
     const rightSidebarClass = resolveRightSidebarClass(
         hasCustomRightSidebar,

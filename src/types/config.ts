@@ -56,7 +56,7 @@ export type SiteConfig = {
     };
 
     banner: {
-        src: string | string[]; // 仅支持桌面端 Banner 图片
+        src: string | string[]; // Banner 图片源，所有端共用
         position?: "top" | "center" | "bottom";
         carousel?: {
             enable: boolean; // 是否启用轮播

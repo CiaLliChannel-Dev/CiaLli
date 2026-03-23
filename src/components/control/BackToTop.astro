@@ -52,4 +52,16 @@ import { Icon } from "astro-icon/components";
 
     &:active
       transform: translateX(var(--right-float-shift-x, 5rem)) scale(0.9)
+
+  @media (max-width: 1279px)
+    .back-to-top-btn
+      right: var(--mobile-float-rail-right, 1rem)
+      bottom: calc(var(--mobile-float-rail-bottom, 1rem) + (var(--mobile-float-size, 3.75rem) + var(--mobile-float-gap, 0.75rem)) * var(--mobile-float-launcher-count, 0) + 0.85rem)
+      transform: none
+
+      &.hide
+        transform: scale(0.9)
+
+      &:active
+        transform: scale(0.9)
 </style>

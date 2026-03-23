@@ -47,7 +47,10 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
 ---
 
 <div
-  class:list={["detail-action-float", dockToBackTop && "fixed-mode"]}
+  class:list={[
+    "detail-action-float detail-action-float-desktop hidden lg:block",
+    dockToBackTop && "fixed-mode",
+  ]}
   data-content-type={contentType}
   data-content-id={contentId}
   data-author-id={authorId}
@@ -132,8 +135,166 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
   </div>
 </div>
 
+<div
+  class="detail-action-float detail-action-float-mobile lg:hidden"
+  data-mobile-drawer="1"
+  data-content-type={contentType}
+  data-content-id={contentId}
+  data-author-id={authorId}
+  data-like-count={String(likeCount)}
+  data-comment-count={String(commentCount)}
+  data-liked={likedByViewer ? "1" : "0"}
+  data-dock-to-back-top={dockToBackTop ? "1" : "0"}
+  data-share-dialog-id={sharePayload ? "article-share-dialog" : ""}
+  data-edit-href={editHref}
+  data-delete-endpoint={deleteEndpoint}
+  data-admin-delete-endpoint={adminDeleteEndpoint}
+  data-delete-confirm-message={deleteConfirmMessage}
+  data-admin-delete-confirm-message={adminDeleteConfirmMessage}
+  data-delete-label={deleteLabel}
+  data-admin-delete-label={adminDeleteLabel}
+  data-delete-success-href={deleteSuccessHref}
+>
+  <div class="mobile-edge-drawer-root" data-mobile-edge-drawer-root>
+    <button
+      type="button"
+      class="mobile-edge-launcher btn-card"
+      data-mobile-edge-drawer-toggle
+      data-mobile-float-launcher
+      data-mobile-float-order="2"
+      aria-label="打开互动操作"
+      aria-controls={`detail-action-panel-${contentType}-${contentId}`}
+      aria-expanded="false"
+    >
+      <span class="mobile-edge-launcher-icon">
+        <Icon name="material-symbols:favorite-rounded" class="text-[1.35rem]" />
+      </span>
+    </button>
+
+    <div class="mobile-edge-drawer-layer">
+      <button
+        type="button"
+        class="mobile-edge-drawer-backdrop"
+        data-mobile-edge-drawer-backdrop
+        aria-label="关闭互动操作"
+      >
+      </button>
+      <aside
+        id={`detail-action-panel-${contentType}-${contentId}`}
+        class="mobile-edge-drawer-panel"
+        data-mobile-edge-drawer-panel
+        aria-hidden="true"
+      >
+        <div class="mobile-edge-drawer-head">
+          <div class="space-y-1">
+            <p
+              class="text-xs font-semibold uppercase tracking-[0.16em] text-50"
+            >
+              Actions
+            </p>
+            <p class="text-base font-semibold text-90">互动操作</p>
+          </div>
+          <button
+            type="button"
+            class="btn-plain scale-animation flex h-10 w-10 items-center justify-center rounded-lg active:scale-90"
+            data-mobile-edge-drawer-close
+            aria-label="关闭互动操作"
+          >
+            <Icon name="material-symbols:close-rounded" class="text-[1.3rem]" />
+          </button>
+        </div>
+
+        <div class="mobile-edge-drawer-body">
+          <div class="detail-mobile-action-list">
+            {
+              showLikeAction && (
+                <button
+                  type="button"
+                  class="detail-action-btn detail-like-btn detail-mobile-action-btn"
+                  aria-label="点赞"
+                >
+                  <span class="detail-mobile-action-main">
+                    <Icon
+                      name="material-symbols:thumb-up-rounded"
+                      class="detail-mobile-action-icon"
+                    />
+                    <span>点赞</span>
+                  </span>
+                  <span class="detail-action-count" data-like-count-text>
+                    {likeCount}
+                  </span>
+                </button>
+              )
+            }
+            {
+              showCommentAction && (
+                <button
+                  type="button"
+                  class="detail-action-btn detail-comment-btn detail-mobile-action-btn"
+                  aria-label="查看评论"
+                >
+                  <span class="detail-mobile-action-main">
+                    <Icon
+                      name="material-symbols:comment-rounded"
+                      class="detail-mobile-action-icon"
+                    />
+                    <span>评论</span>
+                  </span>
+                  <span class="detail-action-count">{commentCount}</span>
+                </button>
+              )
+            }
+            {
+              sharePayload && (
+                <button
+                  type="button"
+                  id="share-component"
+                  class:list={[
+                    "detail-action-btn detail-share-btn detail-mobile-action-btn",
+                    sharePayload.hiddenUntilDecrypt && "encrypted-hidden",
+                  ]}
+                  aria-label={i18n(I18nKey.contentShareArticle)}
+                >
+                  <span class="detail-mobile-action-main">
+                    <Icon
+                      name="material-symbols:share"
+                      class="detail-mobile-action-icon"
+                    />
+                    <span>{i18n(I18nKey.contentShareArticle)}</span>
+                  </span>
+                </button>
+              )
+            }
+          </div>
+
+          <div
+            class="detail-mobile-manage-group hidden"
+            data-mobile-manage-group
+          >
+            <div class="detail-mobile-group-title">管理</div>
+            <div class="detail-mobile-manage-list">
+              <button
+                type="button"
+                class="detail-manage-edit hidden detail-mobile-manage-btn"
+              >
+                编辑
+              </button>
+              <button
+                type="button"
+                class="detail-manage-delete hidden detail-mobile-manage-btn detail-mobile-manage-btn-danger"
+              >
+                {deleteLabel}
+              </button>
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+</div>
+
 <style lang="stylus">
-  .detail-action-float
+  .detail-action-float-desktop
     position: relative
     width: var(--right-float-size, 3.75rem)
     margin-top: 9.5rem
@@ -165,16 +326,8 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     border: 1px solid var(--line-divider)
 
   .detail-action-btn
-    width: 100%
-    min-height: 3.35rem
     border: none
     background: transparent
-    border-radius: .85rem
-    display: flex
-    flex-direction: column
-    align-items: center
-    justify-content: center
-    gap: .25rem
     color: var(--btn-content)
     transition: background-color .2s ease, color .2s ease
 
@@ -187,6 +340,16 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     &:disabled
       opacity: .65
       cursor: not-allowed
+
+  .detail-action-float-desktop .detail-action-btn
+    width: 100%
+    min-height: 3.35rem
+    border-radius: .85rem
+    display: flex
+    flex-direction: column
+    align-items: center
+    justify-content: center
+    gap: .25rem
 
   .detail-icon
     font-size: 1.65rem
@@ -219,20 +382,80 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
       transform: translate(0, 0) scale(1)
       pointer-events: auto
 
-  .detail-action-float.fixed-mode .detail-manage-panel
+  .detail-action-float-desktop.fixed-mode .detail-manage-panel
     left: auto
     right: calc(100% + .4rem)
     transform: translate(6px, 6px) scale(0.95)
 
-  .detail-action-float.fixed-mode .detail-manage-panel.show
+  .detail-action-float-desktop.fixed-mode .detail-manage-panel.show
     transform: translate(0, 0) scale(1)
 
+  .detail-action-float-mobile
+    position: relative
+    z-index: 65
+
+  .detail-mobile-action-list,
+  .detail-mobile-manage-list
+    display: flex
+    flex-direction: column
+    gap: .75rem
+
+  .detail-mobile-action-btn,
+  .detail-mobile-manage-btn
+    width: 100%
+    min-height: 3.25rem
+    border-radius: 1rem
+    display: flex
+    align-items: center
+    justify-content: space-between
+    gap: .75rem
+    padding: .9rem 1rem
+    background: unquote("color-mix(in oklch, var(--card-bg) 72%, var(--btn-plain-bg-hover) 28%)")
+    border: 1px solid unquote("color-mix(in oklch, var(--line-divider) 78%, var(--primary) 22%)")
+
+  .detail-mobile-manage-btn
+    color: var(--text-90)
+    text-align: left
+
+  .detail-mobile-manage-btn-danger
+    color: rgb(239, 68, 68)
+
+  .detail-mobile-action-main
+    display: inline-flex
+    align-items: center
+    gap: .75rem
+    min-width: 0
+    font-size: .95rem
+    font-weight: 600
+    color: var(--text-90)
+
+  .detail-mobile-action-icon
+    font-size: 1.35rem
+    color: var(--primary)
+    flex-shrink: 0
+
+  .detail-mobile-manage-group
+    display: flex
+    flex-direction: column
+    gap: .75rem
+
+  .detail-mobile-group-title
+    font-size: .82rem
+    font-weight: 700
+    text-transform: uppercase
+    letter-spacing: .12em
+    color: var(--text-50)
+
+  @media (max-width: 1279px)
+    .detail-action-count
+      font-size: .88rem
 </style>
 
 <script>
   import { getAuthState, subscribeAuthState } from "@/scripts/auth-state";
   import type { AuthState } from "@/scripts/auth-state";
   import { showAuthRequiredDialog } from "@/scripts/dialogs";
+  import { closeMobileEdgeDrawerRoot } from "@/scripts/mobile-edge-drawer";
   import { navigateToPage } from "@/utils/navigation-utils";
   import {
     queryDetailElements,
@@ -249,11 +472,15 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     button.textContent = label;
   }
 
+  // 同一组件同时承载桌面浮条与移动端抽屉，需要在绑定时分流布局行为。
   // eslint-disable-next-line complexity -- 该组件需在单一绑定点整合多种交互状态
   function bindDetailRoot(rootEl: HTMLElement): void {
     rootEl.dataset.bound = "1";
     const dockToBackTop = rootEl.dataset.dockToBackTop === "1";
-    resolveAndMountElement({ rootEl, dockToBackTop });
+    const isMobileDrawer = rootEl.dataset.mobileDrawer === "1";
+    if (!isMobileDrawer) {
+      resolveAndMountElement({ rootEl, dockToBackTop });
+    }
 
     const contentType = String(rootEl.dataset.contentType || "");
     const contentId = String(rootEl.dataset.contentId || "");
@@ -286,6 +513,7 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
       editBtn,
       deleteBtn,
       likeCountText,
+      mobileManageGroup,
     } = els;
 
     const likeState: LikeActionState = {
@@ -295,6 +523,18 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     };
     let currentAuthState: AuthState = getAuthState();
     let isOpen = false;
+
+    function closeMobileDrawer(): void {
+      if (!isMobileDrawer) {
+        return;
+      }
+      const drawerRoot = rootEl.querySelector<HTMLElement>(
+        "[data-mobile-edge-drawer-root]",
+      );
+      if (drawerRoot) {
+        closeMobileEdgeDrawerRoot(drawerRoot);
+      }
+    }
 
     function applyLikeUI(): void {
       const count = Math.max(0, likeState.likeCount);
@@ -321,12 +561,10 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
       const canDelete = isOwner || isAdminOnly;
       const canOpenPanel = canEdit || canDelete;
 
-      manageBtn?.classList.toggle("hidden", !canOpenPanel);
       editBtn?.classList.toggle("hidden", !canEdit);
       deleteBtn?.classList.toggle("hidden", !canDelete);
 
       if (deleteBtn) {
-        // 管理员删除与作者删除走不同链路，按钮文案同步标识当前模式。
         const deleteMode = isAdminOnly ? "admin" : "owner";
         deleteBtn.dataset.deleteMode = deleteMode;
         applyDeleteButtonLabel(
@@ -335,6 +573,12 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
         );
       }
 
+      if (isMobileDrawer) {
+        mobileManageGroup?.classList.toggle("hidden", !canOpenPanel);
+        return;
+      }
+
+      manageBtn?.classList.toggle("hidden", !canOpenPanel);
       if (!canOpenPanel && isOpen) {
         panel?.classList.remove("show");
         isOpen = false;
@@ -366,22 +610,25 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
       }
     });
 
-    document.addEventListener("click", (event) => {
-      if (!isOpen) return;
-      if (!rootEl.contains(event.target as Node)) {
-        closePanel();
-      }
-    });
+    if (!isMobileDrawer) {
+      document.addEventListener("click", (event) => {
+        if (!isOpen) return;
+        if (!rootEl.contains(event.target as Node)) {
+          closePanel();
+        }
+      });
 
-    document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && isOpen) {
-        closePanel();
-      }
-    });
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && isOpen) {
+          closePanel();
+        }
+      });
+    }
 
     editBtn?.addEventListener("click", () => {
       if (!editHref) return;
       closePanel();
+      closeMobileDrawer();
       navigateToPage(editHref, { force: contentType === "diary" });
     });
 
@@ -403,7 +650,10 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
         deleteSuccessHref,
         contentType,
         deleteBtn,
-        closePanel,
+        closePanel: () => {
+          closePanel();
+          closeMobileDrawer();
+        },
       });
     });
 
@@ -429,9 +679,11 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     commentBtn?.addEventListener("click", () => {
       const commentRoot = document.getElementById("comment-root");
       if (commentRoot) {
+        closeMobileDrawer();
         commentRoot.scrollIntoView({ behavior: "smooth", block: "start" });
         return;
       }
+      closeMobileDrawer();
       navigateToPage(`${window.location.pathname}#comment-root`);
     });
 
@@ -439,6 +691,7 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
       if (!shareDialogId) {
         return;
       }
+      closeMobileDrawer();
       runtimeWindow.cialliOpenArticleShareDialog?.(shareDialogId);
     });
   }
@@ -469,7 +722,6 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
 
   if (!runtimeWindow.__detailActionSettledInitBound) {
     runtimeWindow.__detailActionSettledInitBound = true;
-    // 统一在导航最终稳定后初始化，避免骨架阶段重复绑定引发二次动画体感
     document.addEventListener(NAVIGATION_SETTLED_EVENT, initDetailActionFloat);
   }
 </script>
