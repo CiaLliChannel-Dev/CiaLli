@@ -18,15 +18,6 @@ export const DIRECTUS_POLICY_NAME = {
     siteAdmin: "Site Admin",
 } as const;
 
-export const APP_PERMISSION_KEYS: AppPermissionKey[] = [
-    "can_publish_articles",
-    "can_comment_articles",
-    "can_manage_diaries",
-    "can_comment_diaries",
-    "can_manage_albums",
-    "can_upload_files",
-];
-
 const POLICY_NAME_BY_PERMISSION: Record<AppPermissionKey, string> = {
     can_publish_articles: DIRECTUS_POLICY_NAME.publishArticles,
     can_comment_articles: DIRECTUS_POLICY_NAME.commentArticles,
@@ -152,8 +143,4 @@ export function buildPermissionsFromDirectus(params: {
             POLICY_NAME_BY_PERMISSION.can_upload_files,
         ),
     };
-}
-
-export function permissionToPolicyName(permission: AppPermissionKey): string {
-    return POLICY_NAME_BY_PERMISSION[permission];
 }

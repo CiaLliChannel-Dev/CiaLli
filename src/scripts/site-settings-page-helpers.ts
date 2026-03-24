@@ -4,7 +4,6 @@
  * 包含 bindSettings（及各分区子函数）与 collectXxxPayload 系列函数。
  */
 
-import I18nKey from "@/i18n/i18nKey";
 import { t } from "@/scripts/i18n-runtime";
 import { SITE_TIME_ZONE_AUTO_VALUE } from "@/utils/date-utils";
 import {
@@ -209,15 +208,11 @@ function bindOtherSection(s: SettingsObj): void {
 
 function bindFeatureSection(s: SettingsObj): void {
     const toc = (s.toc ?? {}) as SettingsObj;
-    const license = (s.license ?? {}) as SettingsObj;
 
     setChecked("ss-toc-enable", Boolean(toc.enable));
     setChecked("ss-toc-jp", Boolean(toc.useJapaneseBadge));
     setSelect("ss-toc-mode", String(toc.mode ?? "sidebar"));
     setSelect("ss-toc-depth", String(toc.depth ?? 2));
-    setChecked("ss-license-enable", Boolean(license.enable));
-    setVal("ss-license-name", String(license.name ?? ""));
-    setVal("ss-license-url", String(license.url ?? ""));
 }
 
 export function bindSettings(s: SettingsObj): void {
@@ -394,7 +389,7 @@ export function collectOtherPayload(current: SettingsObj): SettingsObj {
     };
 }
 
-export function collectFeaturePayload(current: SettingsObj): SettingsObj {
+export function collectFeaturePayload(): SettingsObj {
     return {
         toc: {
             enable: checked("ss-toc-enable"),
@@ -402,24 +397,7 @@ export function collectFeaturePayload(current: SettingsObj): SettingsObj {
             mode: inputVal("ss-toc-mode") || "sidebar",
             depth: Number(inputVal("ss-toc-depth") || 2),
         },
-        license: {
-            ...((current.license ?? {}) as SettingsObj),
-            enable: checked("ss-license-enable"),
-            name: inputVal("ss-license-name"),
-            url: inputVal("ss-license-url"),
-        },
     };
 }
-
-// 导出 i18n 消息 key，供主文件使用（避免主文件再导入 I18nKey）
-export const MSG_KEYS = {
-    iconRemovedPendingSave: I18nKey.adminSiteSettingsIconRemovedPendingSave,
-    bannerRemovedPendingSave: I18nKey.adminSiteSettingsBannerRemovedPendingSave,
-    savingTitle: I18nKey.adminSiteSettingsSavingTitle,
-    savingConfig: I18nKey.adminSiteSettingsSavingConfig,
-    uploadFailedCanceled: I18nKey.adminSiteSettingsUploadFailedCanceled,
-    invalidInput: I18nKey.adminSiteSettingsInvalidInput,
-    iconAddedPendingSave: I18nKey.adminSiteSettingsIconAddedPendingSave,
-} as const;
 
 export { t };

@@ -40,14 +40,14 @@ import {
 /** 文章过滤：非 owner 仅按公开状态过滤 */
 export function articleFilters(isOwner: boolean): JsonObject[] {
     return isOwner
-        ? [excludeSpecialArticleSlugFilter()]
+        ? [{ status: { _eq: "published" } }, excludeSpecialArticleSlugFilter()]
         : [filterPublicStatus(), excludeSpecialArticleSlugFilter()];
 }
 
 /** 日记过滤：非 owner 仅按发布且非私有过滤 */
 export function diaryFilters(isOwner: boolean): JsonObject[] {
     return isOwner
-        ? []
+        ? [{ status: { _eq: "published" } }]
         : [{ status: { _eq: "published" } }, { praviate: { _eq: true } }];
 }
 
@@ -393,27 +393,6 @@ export type PaginatedResult<T> = {
     limit: number;
     total: number;
 };
-
-// ---------------------------------------------------------------------------
-// 按 username 加载资料（内部用）
-// ---------------------------------------------------------------------------
-
-function toAuthorFallbackInternal(userId: string): AuthorBundleItem {
-    const normalized = String(userId || "").trim();
-    const shortId = (normalized || "user").slice(0, 8);
-    return {
-        id: normalized,
-        name: `user-${shortId}`,
-        username: `user-${shortId}`,
-    };
-}
-
-export function readAuthorFromMap(
-    authorMap: Map<string, AuthorBundleItem>,
-    userId: string,
-): AuthorBundleItem {
-    return authorMap.get(userId) || toAuthorFallbackInternal(userId);
-}
 
 // ---------------------------------------------------------------------------
 // 相册列表与详情（委托给 public-data-album-helpers）

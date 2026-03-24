@@ -15,7 +15,6 @@ export const zhTWContent: Record<string, string> = {
     [Key.contentMinutesCount]: "分鐘",
     [Key.contentPostCount]: "篇文章",
     [Key.contentPostsCount]: "篇文章",
-    [Key.contentLicense]: "許可協議",
     [Key.contentFriends]: "友鏈",
     [Key.contentFriendsSubtitle]: "發現更多優秀網站",
     [Key.contentFriendsFilterAll]: "全部",

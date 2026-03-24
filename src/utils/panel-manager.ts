@@ -156,5 +156,3 @@ export const panelManager: PanelManager = new PanelManager();
 if (typeof window !== "undefined") {
     (window as WindowWithPanelManager).panelManager = panelManager;
 }
-
-export default panelManager;

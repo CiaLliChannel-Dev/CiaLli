@@ -10,6 +10,7 @@ import {
     resolveTransitionProxyPayloadFromPath,
     syncEnterSkeletonStateToIncomingDocument,
 } from "./enter-skeleton";
+import type { TransitionProxyPayload } from "./enter-skeleton";
 import { scrollToHashBelowTocBaseline } from "@/utils/hash-scroll";
 import {
     isCurrentHomeRoute,
@@ -102,6 +103,18 @@ const ONLOAD_STRIP_SCOPE_IDS = [
     "toc-wrapper",
 ] as const;
 
+type PreparationTransitionProxyDecision = {
+    payload: TransitionProxyPayload | null;
+    preservePreparedPayload: boolean;
+};
+
+type PreparationRouteState = {
+    sourcePathname: string;
+    targetPathname: string;
+    currentIsHome: boolean;
+    isTargetHome: boolean;
+};
+
 function setNavigationPhase(
     phase: NavigationPhase,
     targetDocument: Document = document,
@@ -110,8 +123,6 @@ function setNavigationPhase(
 }
 
 function stripOnloadAnimationsInDocument(targetDocument: Document): void {
-    // 客户端切页时只剥离高风险容器的 onload 关键帧，
-    // 避免骨架结束后再次触发“二次揭幕”造成抽动
     for (const id of ONLOAD_STRIP_SCOPE_IDS) {
         const scope = targetDocument.getElementById(id);
         if (scope instanceof HTMLElement) {
@@ -132,8 +143,6 @@ function dispatchNavigationSettledEvent(navigationToken: number): void {
     );
 }
 
-// ===== Before-preparation helpers =====
-
 function resetNavigationState(state: TransitionState): void {
     state.pendingBannerToSpecRoutePath = null;
     state.pendingTransitionProxyRoutePath = null;
@@ -143,6 +152,7 @@ function resetNavigationState(state: TransitionState): void {
     state.bannerToSpecAnimationStartedAt = null;
     state.transitionProxyMode = null;
     state.transitionProxyLayoutKey = null;
+    state.preservePreparedTransitionProxyPayload = false;
     state.bannerToSpecMotionCompleted = false;
     state.bannerToSpecLoaderSettled = false;
     state.viewTransitionFinished = null;
@@ -216,10 +226,9 @@ function clearTransitionProxyEnterScheduling(state: TransitionState): void {
 
 function scheduleTransitionProxyEnter(state: TransitionState): void {
     clearTransitionProxyEnterScheduling(state);
-    mountTransitionProxy();
+    startTransitionProxyEnter();
     state.proxyEnterFrameId = window.requestAnimationFrame(() => {
         state.proxyEnterFrameId = null;
-        startTransitionProxyEnter();
         const prefersReducedMotion = window.matchMedia(
             "(prefers-reduced-motion: reduce)",
         ).matches;
@@ -234,7 +243,71 @@ function scheduleTransitionProxyEnter(state: TransitionState): void {
     });
 }
 
-// ===== Before-preparation event handler =====
+function resetViewportForIncomingPage(): void {
+    if (window.scrollY <= 0) {
+        return;
+    }
+    window.scrollTo({ top: 0, behavior: "instant" as ScrollBehavior });
+}
+
+export function shouldResetViewportOnPreparation(
+    shouldUseBannerToSpec: boolean,
+): boolean {
+    return !shouldUseBannerToSpec;
+}
+
+export function resolvePreparationTransitionProxyPayload(
+    currentPathname: string,
+    targetPathname: string,
+    currentDocument: Document,
+    isTargetHome: boolean,
+    shouldUseBannerToSpec: boolean,
+): PreparationTransitionProxyDecision {
+    if (shouldUseBannerToSpec) {
+        return {
+            payload: null,
+            preservePreparedPayload: false,
+        };
+    }
+
+    if (isTargetHome) {
+        return {
+            payload: resolveTransitionProxyPayloadFromDocument(
+                currentDocument,
+                currentPathname,
+            ),
+            preservePreparedPayload: true,
+        };
+    }
+    return {
+        payload: resolveTransitionProxyPayloadFromPath(targetPathname),
+        preservePreparedPayload: false,
+    };
+}
+
+export function resolvePreparationRouteState(
+    sourcePathname: string,
+    targetPathname: string,
+    body: HTMLElement,
+    deps: Pick<TransitionIntentSourceDependencies, "pathsEqual" | "url">,
+): PreparationRouteState {
+    const normalizedSourcePathname = normalizePathname(sourcePathname);
+    const normalizedTargetPathname = normalizePathname(targetPathname);
+    const isTargetHome = deps.pathsEqual(
+        normalizedTargetPathname,
+        deps.url("/"),
+    );
+    const currentIsHome =
+        deps.pathsEqual(normalizedSourcePathname, deps.url("/")) ||
+        isCurrentHomeRoute(body);
+
+    return {
+        sourcePathname: normalizedSourcePathname,
+        targetPathname: normalizedTargetPathname,
+        currentIsHome,
+        isTargetHome,
+    };
+}
 
 function handleBeforePreparation(
     e: BeforePreparationEvent,
@@ -244,13 +317,11 @@ function handleBeforePreparation(
     const runtimeWindow = window as RuntimeWindowWithTOC;
     const canceledAt = runtimeWindow.__cialliUnsavedNavigationCanceledAt ?? 0;
     if (Date.now() - canceledAt <= 1800) {
-        // 兜底：未保存拦截取消后若仍误触发准备阶段，直接复位并跳过骨架激活。
         forceResetTransitionState(state);
         return;
     }
 
     if (e.defaultPrevented) {
-        // 若导航在其他监听器中已被取消，需立即复位过渡状态，防止骨架屏残留。
         forceResetTransitionState(state);
         return;
     }
@@ -268,7 +339,6 @@ function handleBeforePreparation(
         return;
     }
 
-    const targetPathname = normalizePathname(e.to.pathname);
     state.navigationToken += 1;
     state.navigationInProgress = true;
     state.didReplaceContentDuringVisit = false;
@@ -281,12 +351,15 @@ function handleBeforePreparation(
     clearBannerToSpecTransitionVisualState(state);
     document.documentElement.style.setProperty("--content-delay", "0ms");
 
-    const isTargetHome = deps.pathsEqual(targetPathname, deps.url("/"));
     const body = document.body;
-    const currentPathname = normalizePathname(window.location.pathname);
-    const currentIsHome =
-        deps.pathsEqual(currentPathname, deps.url("/")) ||
-        isCurrentHomeRoute(body);
+    const routeState = resolvePreparationRouteState(
+        e.from.pathname,
+        e.to.pathname,
+        body,
+        deps,
+    );
+    const { sourcePathname, targetPathname, currentIsHome, isTargetHome } =
+        routeState;
     const currentBannerWrapper = document.getElementById(
         "banner-wrapper",
     ) as HTMLElement | null;
@@ -296,7 +369,16 @@ function handleBeforePreparation(
         body,
         bannerWrapper: currentBannerWrapper,
     });
-    const shouldUseImmediateProxy = !isTargetHome;
+    const preparationProxyDecision = resolvePreparationTransitionProxyPayload(
+        sourcePathname,
+        targetPathname,
+        document,
+        isTargetHome,
+        shouldUseBannerToSpec,
+    );
+    const immediateProxyPayload = preparationProxyDecision.payload;
+    state.preservePreparedTransitionProxyPayload =
+        preparationProxyDecision.preservePreparedPayload;
 
     if (shouldUseBannerToSpec) {
         applyBannerToSpecTransitionSetup(state, targetPathname);
@@ -308,8 +390,7 @@ function handleBeforePreparation(
         ) {
             scheduleTransitionProxyEnter(state);
         }
-        // 立即在当前首页文档启动“全屏上滑”，
-        // 让代理骨架在加载阶段就可见，而不是等 incoming 文档 ready 后才开动。
+
         startBannerToSpecMoveTransition(state);
 
         const originalLoader = e.loader;
@@ -317,8 +398,6 @@ function handleBeforePreparation(
             try {
                 const motionPromise =
                     state.bannerToSpecMotionPromise ?? Promise.resolve();
-                // swap 进入前同时等待内容加载与宏观位移动画完成，
-                // 这样不会出现“旧页还没动，新页已经 ready”的空转窗口。
                 await Promise.all([originalLoader(), motionPromise]);
                 state.bannerToSpecLoaderSettled = true;
                 markBannerToSpecMotionCompleted(state);
@@ -327,13 +406,11 @@ function handleBeforePreparation(
                 throw error;
             }
         };
-    } else if (shouldUseImmediateProxy) {
-        const proxyPayload =
-            resolveTransitionProxyPayloadFromPath(targetPathname);
+    } else if (immediateProxyPayload) {
         state.pendingTransitionProxyRoutePath = targetPathname;
-        state.transitionProxyMode = proxyPayload.mode;
-        state.transitionProxyLayoutKey = proxyPayload.layoutKey;
-        if (applyTransitionProxySkeleton(proxyPayload, document)) {
+        state.transitionProxyMode = immediateProxyPayload.mode;
+        state.transitionProxyLayoutKey = immediateProxyPayload.layoutKey;
+        if (applyTransitionProxySkeleton(immediateProxyPayload, document)) {
             scheduleTransitionProxyEnter(state);
         } else {
             state.pendingTransitionProxyRoutePath = null;
@@ -356,7 +433,9 @@ function handleBeforePreparation(
         toc.classList.add("toc-not-ready");
     }
 
-    // 整页骨架只打到 incoming 文档，避免 outgoing 页面先闪成骨架。
+    if (shouldResetViewportOnPreparation(shouldUseBannerToSpec)) {
+        resetViewportForIncomingPage();
+    }
 }
 
 // ===== Before-swap event handler =====
@@ -382,10 +461,15 @@ function handleBeforeSwap(
         deps.darkMode,
     );
     if (hasPendingTransitionProxy(state)) {
-        const resolvedProxyPayload = resolveTransitionProxyPayloadFromDocument(
-            newDocument,
-            state.pendingTransitionProxyRoutePath ?? undefined,
-        );
+        const preparedProxyPayload = getPendingTransitionProxyPayload(state);
+        const resolvedProxyPayload =
+            state.preservePreparedTransitionProxyPayload &&
+            preparedProxyPayload !== null
+                ? preparedProxyPayload
+                : resolveTransitionProxyPayloadFromDocument(
+                      newDocument,
+                      state.pendingTransitionProxyRoutePath ?? undefined,
+                  );
         state.transitionProxyMode = resolvedProxyPayload.mode;
         state.transitionProxyLayoutKey = resolvedProxyPayload.layoutKey;
         const didPrepareProxy = applyTransitionProxySkeleton(
@@ -408,6 +492,7 @@ function handleBeforeSwap(
             state.pendingTransitionProxyRoutePath = null;
             state.transitionProxyMode = null;
             state.transitionProxyLayoutKey = null;
+            state.preservePreparedTransitionProxyPayload = false;
             syncEnterSkeletonStateToIncomingDocument(newDocument);
         }
     } else {
@@ -416,7 +501,6 @@ function handleBeforeSwap(
     stripOnloadAnimationsInDocument(newDocument);
     setNavigationPhase("swapped", newDocument);
 
-    // spec -> home：在交换前就冻结 incoming body 布局态，避免交换瞬间出现一帧 navbar 尺寸闪动
     if (state.pendingSpecToBannerFreeze) {
         freezeSpecLayoutStateForHomeDocument(newDocument);
     }
@@ -502,8 +586,6 @@ async function finalizePageViewWhenReady(
     );
 }
 
-// ===== After-swap event handler =====
-
 function handleAfterSwap(state: TransitionState): void {
     state.didReplaceContentDuringVisit = true;
     setAwaitingReplaceState(false);
@@ -525,8 +607,6 @@ function handleAfterSwap(state: TransitionState): void {
         state.pendingBannerWaveAnimationSnapshot = null;
     }
 }
-
-// ===== Page-view finalization helpers =====
 
 function doVisitEndCleanup(
     state: TransitionState,
@@ -621,6 +701,7 @@ function finalizePageView(
         state.pendingTransitionProxyRoutePath = null;
         state.pendingSidebarProfilePatch = null;
         state.pendingSpecToBannerFreeze = false;
+        state.preservePreparedTransitionProxyPayload = false;
         const bannerTextOverlay = document.querySelector(
             ".banner-text-overlay",
         );
@@ -629,7 +710,6 @@ function finalizePageView(
         }
         setPageHeightExtendVisible(false);
 
-        // 过渡完成后再恢复重初始化任务，避免动画窗口内主线程抖动
         requestAnimationFrame(() => {
             if (navigationToken !== state.navigationToken) {
                 return;
@@ -692,8 +772,6 @@ function finalizePageView(
     finishAfterReveal();
 }
 
-// ===== Page-load event handler =====
-
 function handlePageLoad(
     state: TransitionState,
     transitionDeps: TransitionIntentDeps,
@@ -713,8 +791,6 @@ function handlePageLoad(
     );
 }
 
-// ===== Main setup function =====
-
 export function setupTransitionIntentSource(
     deps: TransitionIntentSourceDependencies,
 ): void {
@@ -730,6 +806,7 @@ export function setupTransitionIntentSource(
         bannerToSpecMotionDurationMs: BANNER_TO_SPEC_TRANSITION_DURATION_MS,
         transitionProxyMode: null,
         transitionProxyLayoutKey: null,
+        preservePreparedTransitionProxyPayload: false,
         bannerToSpecMotionCompleted: false,
         bannerToSpecMotionPromise: null,
         bannerToSpecMotionResolve: null,
@@ -756,7 +833,6 @@ export function setupTransitionIntentSource(
         url: deps.url,
     };
 
-    // Ensure spacer is always reset when tab visibility/lifecycle changes.
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState !== "visible") {
             setPageHeightExtendVisible(false);
@@ -783,7 +859,6 @@ export function setupTransitionIntentSource(
     });
 
     document.addEventListener("cialli:unsaved-navigation-cancel", () => {
-        // 未保存拦截取消后，确保所有过渡视觉态立即回收，避免骨架屏残留。
         forceResetTransitionState(state);
     });
 }

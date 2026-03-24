@@ -595,17 +595,6 @@ export type PostForList = {
     url?: string;
 };
 
-export async function getSortedPostsList(
-    viewerId?: string | null,
-): Promise<PostForList[]> {
-    const sortedFullPosts = (await loadDerivedBlogData(viewerId)).posts;
-    return sortedFullPosts.map((post) => ({
-        id: post.id,
-        data: post.data,
-        url: post.url,
-    }));
-}
-
 export async function getTagList(viewerId?: string | null): Promise<Tag[]> {
     return (await loadDerivedBlogData(viewerId)).tags;
 }

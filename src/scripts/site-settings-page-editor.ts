@@ -147,31 +147,6 @@ function handleRowDrop(
     }
 }
 
-export const createAddDivider = (
-    label: string,
-    onClick: () => void,
-): HTMLElement => {
-    const wrap = document.createElement("button");
-    wrap.type = "button";
-    wrap.className =
-        "flex items-center gap-2 w-full py-1.5 group/add cursor-pointer";
-    const lineL = document.createElement("span");
-    lineL.className =
-        "flex-1 border-t border-dashed border-(--line-divider) group-hover/add:border-(--primary) transition-colors";
-    const labelEl = document.createElement("span");
-    labelEl.className =
-        "px-4 py-1.5 rounded-lg border border-(--line-divider) text-sm text-60 group-hover/add:border-(--primary) group-hover/add:text-(--primary) transition-colors whitespace-nowrap select-none";
-    labelEl.textContent = label;
-    const lineR = document.createElement("span");
-    lineR.className =
-        "flex-1 border-t border-dashed border-(--line-divider) group-hover/add:border-(--primary) transition-colors";
-    wrap.appendChild(lineL);
-    wrap.appendChild(labelEl);
-    wrap.appendChild(lineR);
-    wrap.addEventListener("click", onClick);
-    return wrap;
-};
-
 // ---------------------------------------------------------------------------
 // 图片列表编辑器（favicon 与 banner）
 // ---------------------------------------------------------------------------

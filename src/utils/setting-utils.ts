@@ -1,45 +1,6 @@
 import { DARK_MODE, DEFAULT_THEME, LIGHT_MODE } from "@constants/constants";
 import type { LIGHT_DARK_MODE } from "@/types/config";
 
-function getRuntimeSettings() {
-    return window.__CIALLI_RUNTIME_SETTINGS__;
-}
-
-function isThemeColorFixed(): boolean {
-    return getRuntimeSettings()?.system.themeColor.fixed ?? false;
-}
-
-export function getDefaultHue(): number {
-    const runtimeHue = getRuntimeSettings()?.system.themeColor.hue;
-    const fallback = String(typeof runtimeHue === "number" ? runtimeHue : 250);
-    const configCarrier = document.getElementById("config-carrier");
-    // 在页面切换时，config-carrier可能不存在，使用默认值
-    if (!configCarrier) {
-        return Number.parseInt(fallback);
-    }
-    return Number.parseInt(configCarrier.dataset.hue || fallback);
-}
-
-export function getHue(): number {
-    if (isThemeColorFixed()) {
-        return getDefaultHue();
-    }
-    const stored = localStorage.getItem("hue");
-    return stored ? Number.parseInt(stored) : getDefaultHue();
-}
-
-export function setHue(hue: number): void {
-    if (isThemeColorFixed()) {
-        return;
-    }
-    localStorage.setItem("hue", String(hue));
-    const r = document.querySelector(":root") as HTMLElement;
-    if (!r) {
-        return;
-    }
-    r.style.setProperty("--hue", String(hue));
-}
-
 export function applyThemeToDocument(theme: LIGHT_DARK_MODE): void {
     // 获取当前主题状态的完整信息
     const currentIsDark = document.documentElement.classList.contains("dark");
@@ -158,9 +119,4 @@ export function setTheme(theme: LIGHT_DARK_MODE): void {
 
 export function getStoredTheme(): LIGHT_DARK_MODE {
     return (localStorage.getItem("theme") as LIGHT_DARK_MODE) || DEFAULT_THEME;
-}
-
-export function getStoredWallpaperMode(): "banner" | "none" {
-    // 壁纸模式由配置控制，不再从 localStorage 读取
-    return getRuntimeSettings()?.settings.wallpaperMode.defaultMode || "banner";
 }

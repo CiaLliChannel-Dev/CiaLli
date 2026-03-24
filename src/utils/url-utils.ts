@@ -1,7 +1,5 @@
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
-import { permalinkConfig } from "@/config";
-import { generatePermalinkSlug, type PermalinkPost } from "./permalink-utils";
 
 /**
  * 移除文件扩展名（.md, .mdx, .markdown）
@@ -35,7 +33,7 @@ export function getPostUrlByAlias(alias: string): string {
 }
 
 type PostUrlInput =
-    | (PermalinkPost & { slug?: string | null; url?: string })
+    | { id: string; slug?: string | null; url?: string }
     | {
           id?: string;
           slug?: string | null;
@@ -65,18 +63,6 @@ export function getPostUrl(post: PostUrlInput): string {
         return url(`/${slug}`);
     }
 
-    // 如果全局 permalink 功能启用，使用生成的 slug（在根目录下）
-    if (
-        permalinkConfig.enable &&
-        "id" in post &&
-        "data" in post &&
-        post.data &&
-        typeof post.data === "object"
-    ) {
-        const slug = generatePermalinkSlug(post as PermalinkPost);
-        return url(`/${slug}`);
-    }
-
     // 如果文章有 alias，使用 alias（在 /posts/ 下）
     if (data.alias) {
         return getPostUrlByAlias(data.alias);
@@ -103,20 +89,6 @@ export function getCategoryUrl(category: string | null): string {
         return url("/posts?uncategorized=true");
     }
     return url(`/posts?category=${encodeURIComponent(category.trim())}`);
-}
-
-export function getDir(path: string): string {
-    // 移除文件扩展名
-    const pathWithoutExt = removeFileExtension(path);
-    const lastSlashIndex = pathWithoutExt.lastIndexOf("/");
-    if (lastSlashIndex < 0) {
-        return "/";
-    }
-    return pathWithoutExt.substring(0, lastSlashIndex + 1);
-}
-
-export function getFileDirFromPath(filePath: string): string {
-    return filePath.replace(/^src\//, "").replace(/\/[^/]+$/, "");
 }
 
 export function url(path: string): string {

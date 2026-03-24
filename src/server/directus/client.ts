@@ -423,25 +423,6 @@ export async function updateOne<K extends keyof DirectusSchema>(
     )) as DirectusSchema[K][number];
 }
 
-export async function updateOneWithoutReadback<K extends keyof DirectusSchema>(
-    collection: K,
-    id: string,
-    payload: Partial<DirectusSchema[K][number]>,
-): Promise<void> {
-    assertNonSystemCollection(collection);
-    await executeDirectusRequest(
-        `更新集合 ${String(collection)} 数据`,
-        updateItem(
-            collection as never,
-            id,
-            payload as never,
-            {
-                fields: ["id"],
-            } as never,
-        ),
-    );
-}
-
 export async function deleteOne<K extends keyof DirectusSchema>(
     collection: K,
     id: string,

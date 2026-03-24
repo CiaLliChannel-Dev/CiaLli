@@ -3,10 +3,8 @@ import type {
     AnnouncementConfig,
     ExpressiveCodeConfig,
     Favicon,
-    LicenseConfig,
     MusicPlayerConfig,
     NavBarConfig,
-    PermalinkConfig,
     SakuraConfig,
     SiteConfig,
 } from "./config";
@@ -46,7 +44,6 @@ export type EditableSiteSettings = {
     toc: SiteConfig["toc"];
     navBar: NavBarConfig;
     profile: ProfileRuntimeSettings;
-    license: LicenseConfig;
     announcement: AnnouncementConfig;
     musicPlayer: MusicPlayerConfig;
     sakura: SakuraConfig;
@@ -65,7 +62,6 @@ export type SystemSiteConfig = {
     themeColor: SiteConfig["themeColor"];
     font: SiteConfig["font"];
     pageScaling: NonNullable<SiteConfig["pageScaling"]>;
-    permalink: PermalinkConfig;
     expressiveCode: ExpressiveCodeConfig;
 };
 

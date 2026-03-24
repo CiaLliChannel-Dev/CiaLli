@@ -17,5 +17,3 @@ export const SOCIAL_PLATFORM_META: Record<string, SocialPlatformMeta> = {
     gitee: { label: "Gitee", icon: "mdi:git" },
     codeberg: { label: "Codeberg", icon: "simple-icons:codeberg" },
 };
-
-export const SOCIAL_PLATFORMS = Object.keys(SOCIAL_PLATFORM_META);

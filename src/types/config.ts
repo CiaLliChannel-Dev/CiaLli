@@ -22,7 +22,6 @@ export type SiteConfig = {
 
     themeColor: {
         hue: number;
-        fixed: boolean;
     };
 
     // 顶栏标题配置
@@ -35,7 +34,6 @@ export type SiteConfig = {
 
     // 页面自动缩放配置
     pageScaling?: {
-        enable: boolean; // 是否开启自动缩放
         targetWidth?: number; // 目标宽度，低于此宽度时开始缩放
     };
 
@@ -122,38 +120,6 @@ export type NavBarLink = {
 
 export type NavBarConfig = {
     links: (NavBarLink | LinkPreset)[];
-};
-
-export type LicenseConfig = {
-    enable: boolean;
-    name: string;
-    url: string;
-};
-
-// Permalink 配置
-export type PermalinkConfig = {
-    enable: boolean; // 是否启用全局 permalink 功能
-    /**
-     * permalink 格式模板
-     * 支持的占位符：
-     * - %year% : 4位年份 (2024)
-     * - %monthnum% : 2位月份 (01-12)
-     * - %day% : 2位日期 (01-31)
-     * - %hour% : 2位小时 (00-23)
-     * - %minute% : 2位分钟 (00-59)
-     * - %second% : 2位秒数 (00-59)
-     * - %post_id% : 文章序号（按创建时间升序排列，稳定不随编辑变化）
-     * - %postname% : 文章文件名（slug）
-     * - %category% : 分类名（无分类时为 "uncategorized"）
-     *
-     * 示例：
-     * - "%year%-%monthnum%-%postname%" => "2024-12-my-post"
-     * - "%post_id%-%postname%" => "42-my-post"
-     * - "%category%-%postname%" => "tech-my-post"
-     *
-     * 注意：不支持斜杠 "/"，所有生成的链接都在根目录下
-     */
-    format: string;
 };
 
 export type LIGHT_DARK_MODE = typeof LIGHT_MODE | typeof DARK_MODE;

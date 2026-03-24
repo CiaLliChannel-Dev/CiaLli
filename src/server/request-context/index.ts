@@ -26,14 +26,6 @@ export function getRequestContext(): RequestContextState | undefined {
     return requestContextStorage.getStore();
 }
 
-export function getRequestId(): string | undefined {
-    return getRequestContext()?.requestId;
-}
-
-export function getRequestSiteSettings(): ResolvedSiteSettings | undefined {
-    return getRequestContext()?.siteSettings;
-}
-
 export function getRequestLanguage(): string {
     return (
         getRequestContext()?.language ||

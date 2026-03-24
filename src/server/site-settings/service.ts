@@ -4,7 +4,6 @@ import { readMany } from "@/server/directus/client";
 import { withServiceRepositoryContext } from "@/server/repositories/directus/scope";
 import { createSingleFlightRunner } from "@/server/utils/single-flight";
 import type {
-    EditableSiteSettings,
     PublicSiteSettings,
     ResolvedSiteSettings,
     SiteSettingsPayload,
@@ -19,7 +18,6 @@ import {
     normalizeBannerHomeText,
     normalizeBannerImageApi,
     normalizeBannerNavbar,
-    normalizeLicense,
     normalizeMusicPlayer,
     normalizeNavBarLinks,
     normalizeNavbarTitle,
@@ -136,7 +134,6 @@ function normalizeSettings(
     normalizeToc(merged);
     normalizeNavBarLinks(merged);
     normalizeProfile(merged, base);
-    normalizeLicense(merged, base);
     normalizeAnnouncement(merged);
     normalizeMusicPlayer(merged);
     merged.sakura.enable = Boolean(merged.sakura.enable);
@@ -297,11 +294,4 @@ export async function getPublicSiteSettings(): Promise<{
 
 export function invalidateSiteSettingsCache(): void {
     void cacheManager.invalidate("site-settings", "default");
-}
-
-export async function mergeSiteSettingsPatch(
-    patch: Partial<EditableSiteSettings>,
-): Promise<SiteSettingsPayload> {
-    const current = await getResolvedSiteSettings();
-    return normalizeSettings(patch, current.settings);
 }

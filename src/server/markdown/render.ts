@@ -377,15 +377,3 @@ export async function renderMarkdown(
     });
     return result;
 }
-
-export async function renderMarkdownHtml(markdown: string): Promise<string> {
-    return renderMarkdown(markdown, { target: "page" });
-}
-
-export async function renderMarkdownForFeed(
-    markdown: string,
-    site: URL,
-): Promise<string> {
-    return renderMarkdown(markdown, { target: "feed", site });
-}
-

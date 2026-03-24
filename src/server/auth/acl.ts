@@ -35,19 +35,6 @@ export type AppAccessContext = {
     isPlatformAdmin: boolean;
 };
 
-function toCsvArray(input: string | string[] | null | undefined): string[] {
-    if (!input) {
-        return [];
-    }
-    if (Array.isArray(input)) {
-        return input.map((entry) => String(entry).trim()).filter(Boolean);
-    }
-    return input
-        .split(",")
-        .map((entry) => entry.trim())
-        .filter(Boolean);
-}
-
 function normalizeHomeSectionOrder(input: unknown): string[] | null {
     if (!Array.isArray(input)) {
         return null;
@@ -279,10 +266,4 @@ export async function updateProfileUsername(
         void cacheManager.invalidateByDomain("profile-viewer");
         return normalized;
     });
-}
-
-export function normalizeTagsCsv(
-    input: string | string[] | null | undefined,
-): string[] {
-    return toCsvArray(input);
 }

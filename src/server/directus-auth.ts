@@ -142,16 +142,6 @@ export function getDirectusUrl(): string {
     return url.trim().replace(/\/+$/, "");
 }
 
-export function getDirectusStaticToken(): string {
-    const token =
-        process.env.DIRECTUS_STATIC_TOKEN ||
-        import.meta.env.DIRECTUS_STATIC_TOKEN;
-    if (!token || !token.trim()) {
-        throw internal("DIRECTUS_STATIC_TOKEN 未配置");
-    }
-    return token.trim();
-}
-
 function extractDirectusFileId(
     value: JsonValue | undefined,
 ): string | undefined {

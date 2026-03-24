@@ -103,7 +103,6 @@ export const enAdmin: Record<string, string> = {
     [Key.adminSiteSettingsAnalyticsHint]:
         "Configure analytics scripts and traffic information.",
     [Key.adminSiteSettingsAnalyticsTitle]: "Analytics settings",
-    [Key.adminSiteSettingsArticleLicenseInfo]: "Article license information",
     [Key.adminSiteSettingsBannerAlignment]: "Banner alignment",
     [Key.adminSiteSettingsBannerApiUrl]: "Banner API URL",
     [Key.adminSiteSettingsBannerRemovedPendingSave]:
@@ -127,7 +126,6 @@ export const enAdmin: Record<string, string> = {
     [Key.adminSiteSettingsDesktopWallpaper]: "Desktop wallpaper",
     [Key.adminSiteSettingsEnableArticleToc]: "Enable article table of contents",
     [Key.adminSiteSettingsEnableBannerApi]: "Enable banner API",
-    [Key.adminSiteSettingsEnableLicenseBlock]: "Enable license info block",
     [Key.adminSiteSettingsEnableMusicPlayer]: "Enable music player",
     [Key.adminSiteSettingsEnableSakura]: "Enable sakura effect",
     [Key.adminSiteSettingsEnableTypewriter]: "Enable typewriter effect",
@@ -149,8 +147,6 @@ export const enAdmin: Record<string, string> = {
     [Key.adminSiteSettingsImageTooLargeWithLimit]:
         "Image is too large (limit {limit})",
     [Key.adminSiteSettingsInvalidInput]: "Invalid input",
-    [Key.adminSiteSettingsLicenseName]: "License name",
-    [Key.adminSiteSettingsLicenseUrl]: "License URL",
     [Key.adminSiteSettingsMarqueeSpeed]: "Marquee speed",
     [Key.adminSiteSettingsMusicServer]: "Music server",
     [Key.adminSiteSettingsMusicType]: "Music type",

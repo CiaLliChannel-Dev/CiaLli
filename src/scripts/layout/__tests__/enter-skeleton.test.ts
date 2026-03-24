@@ -26,7 +26,12 @@ describe("enter-skeleton", () => {
         vi.stubGlobal("HTMLElement", MockHtmlElement);
         vi.stubGlobal("window", {
             clearTimeout,
+            innerHeight: 720,
+            scrollY: 640,
             setTimeout,
+            performance: {
+                now: () => 0,
+            },
         });
     });
 
@@ -39,12 +44,31 @@ describe("enter-skeleton", () => {
             classList: createClassList(),
             setAttribute: vi.fn(),
         });
+        const pageTarget = Object.assign(new HTMLElement(), {
+            hasAttribute: vi.fn(() => false),
+            setAttribute: vi.fn(),
+            style: {
+                minHeight: "",
+            },
+        });
+        const mainContainer = Object.assign(new HTMLElement(), {
+            hasAttribute: vi.fn(() => false),
+            setAttribute: vi.fn(),
+            style: {
+                minHeight: "",
+            },
+        });
         const targetDocument = {
             documentElement,
             querySelector: (selector: string) =>
                 selector === '[data-enter-skeleton-target="post-detail"]'
                     ? {}
-                    : null,
+                    : selector ===
+                        "[data-enter-skeleton-page][data-enter-skeleton-target]"
+                      ? pageTarget
+                      : null,
+            getElementById: (id: string) =>
+                id === "main-container" ? mainContainer : null,
         } as unknown as Document;
 
         prepareEnterSkeletonForIncomingDocument(targetDocument);
@@ -56,9 +80,50 @@ describe("enter-skeleton", () => {
             "data-enter-skeleton-mode",
             "post-detail",
         );
+        expect(pageTarget.style.minHeight).toBe("1360px");
+        expect(pageTarget.setAttribute).toHaveBeenCalledWith(
+            "data-enter-skeleton-runtime-min-height",
+            "true",
+        );
+        expect(mainContainer.style.minHeight).toBe("1360px");
+    });
+
+    it("prepareEnterSkeletonForIncomingDocument 在页面级骨架不存在时会回退到 main container", () => {
+        const documentElement = Object.assign(new HTMLElement(), {
+            classList: createClassList(),
+            setAttribute: vi.fn(),
+        });
+        const mainContainer = Object.assign(new HTMLElement(), {
+            hasAttribute: vi.fn(() => false),
+            setAttribute: vi.fn(),
+            style: {
+                minHeight: "",
+            },
+        });
+        const targetDocument = {
+            documentElement,
+            querySelector: (selector: string) =>
+                selector === '[data-enter-skeleton-target="post-detail"]'
+                    ? {}
+                    : null,
+            getElementById: (id: string) =>
+                id === "main-container" ? mainContainer : null,
+        } as unknown as Document;
+
+        prepareEnterSkeletonForIncomingDocument(targetDocument);
+
+        expect(
+            documentElement.classList.contains("enter-skeleton-active"),
+        ).toBe(true);
+        expect(documentElement.setAttribute).toHaveBeenCalledWith(
+            "data-enter-skeleton-mode",
+            "post-detail",
+        );
+        expect(mainContainer.style.minHeight).toBe("1360px");
     });
 
     it("resolveEnterSkeletonModeFromPath 会把文章详情、归档与个人页路由映射到稳定 mode", () => {
+        expect(resolveEnterSkeletonModeFromPath("/")).toBe("fallback");
         expect(resolveEnterSkeletonModeFromPath("/posts/demo")).toBe(
             "post-detail",
         );
@@ -106,6 +171,10 @@ describe("enter-skeleton", () => {
     });
 
     it("resolveTransitionProxyPayloadFromPath 会同时返回骨架 mode 与代理壳 key", () => {
+        expect(resolveTransitionProxyPayloadFromPath("/")).toEqual({
+            mode: "fallback",
+            layoutKey: "sidebar-main",
+        });
         expect(resolveTransitionProxyPayloadFromPath("/posts/new")).toEqual({
             mode: "publish-page",
             layoutKey: "full-width-post-editor",

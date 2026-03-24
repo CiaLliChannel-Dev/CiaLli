@@ -1,17 +1,8 @@
 import { cacheManager } from "@/server/cache/manager";
 import { hashParams } from "@/server/cache/key-utils";
-import { permalinkConfig } from "@/config";
-import { getAuthorBundle } from "@/server/api/v1/shared/author-cache";
-import {
-    readMany,
-    runWithDirectusServiceAccess,
-} from "@/server/directus/client";
+import { runWithDirectusServiceAccess } from "@/server/directus/client";
 import { createSingleFlightRunner } from "@/server/utils/single-flight";
-import type { JsonObject } from "@/types/json";
-import { initPostIdMap } from "@/utils/permalink-utils";
-import { excludeSpecialArticleSlugFilter } from "@/server/api/v1/shared";
 import type {
-    HomeFeedArticleCandidate,
     HomeFeedBuildOptions,
     HomeFeedBuildResult,
     HomeFeedCandidate,
@@ -21,12 +12,10 @@ import type {
 } from "./home-feed.types";
 import {
     applyPreferenceProfileToCandidates,
-    buildArticleFeedEntry,
     clamp01,
     createEmptyPreferenceProfile,
     normalizeIdentity,
     normalizePositiveInt,
-    resolveArticlePublishedAt,
     toSafeDate,
 } from "./home-feed-helpers";
 import {
@@ -68,25 +57,6 @@ const MIX_PATTERN: HomeFeedItemType[] = [
 ];
 
 export const HOME_FEED_ALGO_VERSION = "home-feed-v2";
-
-const HOME_FEED_OWNER_DRAFT_FIELDS = [
-    "id",
-    "short_id",
-    "author_id",
-    "status",
-    "title",
-    "slug",
-    "summary",
-    "cover_file",
-    "cover_url",
-    "tags",
-    "category",
-    "is_public",
-    "date_created",
-    "date_updated",
-] as const;
-
-let permalinkMapInitialized = false;
 
 const buildHomeFeedSingleFlight = createSingleFlightRunner(
     async (
@@ -131,18 +101,7 @@ const buildHomeFeedSingleFlight = createSingleFlightRunner(
             now: params.now,
             isLoggedIn,
         });
-        const mixedItems = mixHomeFeedCandidates(
-            scoredCandidates,
-            params.limit,
-        );
-        const ownerDraft = params.viewerId
-            ? await loadOwnerWorkingDraftCandidate(params.viewerId)
-            : null;
-        const items = prependOwnerDraftToHomeFeed(
-            mixedItems,
-            ownerDraft,
-            params.limit,
-        );
+        const items = mixHomeFeedCandidates(scoredCandidates, params.limit);
 
         const result: HomeFeedBuildResult = {
             items,
@@ -166,114 +125,6 @@ const buildHomeFeedSingleFlight = createSingleFlightRunner(
     },
     (cacheKey: string) => cacheKey,
 );
-
-async function ensurePermalinkPostIdMapInitialized(): Promise<void> {
-    if (!permalinkConfig.enable || permalinkMapInitialized) {
-        return;
-    }
-
-    const articleFilters: JsonObject[] = [
-        { status: { _eq: "published" } },
-        { is_public: { _eq: true } },
-        excludeSpecialArticleSlugFilter(),
-    ];
-
-    const rows = await readMany("app_articles", {
-        filter: { _and: articleFilters } as JsonObject,
-        fields: ["id", "short_id", "date_updated", "date_created"],
-        sort: ["-date_updated", "-date_created"],
-        limit: 1000,
-    });
-
-    const permalinkPosts = rows
-        .map((row) => ({
-            id: normalizeIdentity(row.short_id) || normalizeIdentity(row.id),
-            data: {
-                published: resolveArticlePublishedAt(row),
-                created: toSafeDate(row.date_created),
-            },
-        }))
-        .filter((post) => Boolean(post.id));
-    initPostIdMap(permalinkPosts);
-    permalinkMapInitialized = true;
-}
-
-async function loadOwnerWorkingDraftCandidate(
-    viewerId: string,
-): Promise<HomeFeedArticleCandidate | null> {
-    const normalizedViewerId = normalizeIdentity(viewerId);
-    if (!normalizedViewerId) {
-        return null;
-    }
-
-    const rows = await readMany("app_articles", {
-        filter: {
-            _and: [
-                { author_id: { _eq: normalizedViewerId } },
-                { status: { _eq: "draft" } },
-                excludeSpecialArticleSlugFilter(),
-            ],
-        } as JsonObject,
-        fields: [...HOME_FEED_OWNER_DRAFT_FIELDS],
-        sort: ["-date_updated", "-date_created"],
-        limit: 1,
-    });
-    const article = rows[0];
-    if (!article) {
-        return null;
-    }
-
-    const authorMap = await getAuthorBundle([normalizedViewerId]);
-    const entry = buildArticleFeedEntry(
-        article,
-        authorMap,
-        new Map(),
-        new Map(),
-        { forceAuthenticatedCover: true },
-    );
-    if (!entry) {
-        return null;
-    }
-
-    return {
-        type: "article",
-        id: normalizeIdentity(article.id),
-        authorId: normalizeIdentity(article.author_id),
-        publishedAt: resolveArticlePublishedAt(article),
-        entry,
-        likes72h: 0,
-        comments72h: 0,
-        qualityScore: 0,
-        personalizationScore: 0,
-    };
-}
-
-export function prependOwnerDraftToHomeFeed(
-    items: HomeFeedItem[],
-    ownerDraft: HomeFeedArticleCandidate | null,
-    limit: number,
-): HomeFeedItem[] {
-    if (!ownerDraft || limit <= 0) {
-        return items.slice(0, limit);
-    }
-    const ownerDraftItem: HomeFeedItem = {
-        ...ownerDraft,
-        score: Number.MAX_SAFE_INTEGER,
-        signals: {
-            recency: 0,
-            engagement: 0,
-            quality: 0,
-            personalization: 0,
-            engagementRaw: 0,
-            likes72h: 0,
-            comments72h: 0,
-        },
-    };
-    return [
-        ownerDraftItem,
-        ...items.filter((item) => item.id !== ownerDraft.id),
-    ].slice(0, limit);
-}
 
 export function scoreHomeFeedCandidates(
     candidates: HomeFeedCandidate[],
@@ -426,7 +277,6 @@ export async function buildHomeFeed(
         const algoVersion =
             normalizeIdentity(options.algoVersion) || HOME_FEED_ALGO_VERSION;
         const now = options.now ? toSafeDate(options.now) : new Date();
-        await ensurePermalinkPostIdMapInitialized();
 
         const cacheKey = hashParams({
             viewerId: viewerId || "guest",

@@ -141,23 +141,6 @@ export function buildSiteDateFormatContext(
     };
 }
 
-export function formatDateI18n(
-    dateString: string,
-    lang: string | null | undefined = "en",
-): string {
-    const date = toValidDate(dateString);
-    if (!date) {
-        return "";
-    }
-    const locale = resolveSiteLocale(lang);
-    const options: Intl.DateTimeFormatOptions = {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-    };
-    return date.toLocaleDateString(locale, options);
-}
-
 export function formatSiteDate(
     input: SiteDateInput,
     context: SiteDateFormatContext,

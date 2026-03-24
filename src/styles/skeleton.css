@@ -109,6 +109,12 @@
   will-change: opacity, transform, filter;
 }
 
+html.enter-skeleton-active,
+html.enter-skeleton-active body {
+  overflow: hidden !important;
+  overscroll-behavior: none;
+}
+
 html.enter-skeleton-active .transition-main {
   opacity: 1 !important;
   transform: none !important;

@@ -1,8 +1,4 @@
-import type {
-    PermalinkConfig,
-    SidebarLayoutConfig,
-    SiteConfig,
-} from "./types/config";
+import type { SidebarLayoutConfig, SiteConfig } from "./types/config";
 import {
     type SiteSettingsPayload,
     type SystemSiteConfig,
@@ -15,7 +11,6 @@ export const systemSiteConfig: SystemSiteConfig = {
     timeZone: "UTC",
     themeColor: {
         hue: 285,
-        fixed: true,
     },
     font: {
         asciiFont: {
@@ -28,12 +23,7 @@ export const systemSiteConfig: SystemSiteConfig = {
         },
     },
     pageScaling: {
-        enable: true,
         targetWidth: 2000,
-    },
-    permalink: {
-        enable: false,
-        format: "%postname%",
     },
     expressiveCode: {
         theme: "github-dark",
@@ -169,11 +159,6 @@ export const defaultSiteSettings: SiteSettingsPayload = {
         avatar: "assets/images/avatar.webp",
         name: "CiaLli†Channel",
     },
-    license: {
-        enable: true,
-        name: "CC BY-NC-SA 4.0",
-        url: "https://creativecommons.org/licenses/by-nc-sa/4.0/",
-    },
     announcement: {
         title: "",
         summary: "欢迎来到博客！这是一条示例公告",
@@ -226,8 +211,6 @@ export function buildLegacySiteConfig(
         favicon: settings.site.favicon,
     };
 }
-
-export const permalinkConfig: PermalinkConfig = systemSiteConfig.permalink;
 
 export const sidebarLayoutConfig: SidebarLayoutConfig = {
     properties: [

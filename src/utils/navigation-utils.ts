@@ -155,57 +155,8 @@ function fallbackNavigation(url: string, options?: NavigateOptions): void {
 }
 
 /**
- * ClientRouter 始终可用，返回 true
- */
-export function isNavigationReady(): boolean {
-    return true;
-}
-
-/**
- * ClientRouter 始终可用，立即 resolve
- */
-export function waitForNavigation(_timeout = 5000): Promise<boolean> {
-    return Promise.resolve(true);
-}
-
-/**
- * 预加载页面（Astro 自动处理 prefetch）
- */
-export function preloadPage(_url: string): void {
-    // Astro prefetch 自动处理，无需手动预加载
-}
-
-/**
  * 获取当前页面路径
  */
 export function getCurrentPath(): string {
     return typeof window !== "undefined" ? window.location.pathname : "";
-}
-
-/**
- * 检查是否为首页
- */
-export function isHomePage(): boolean {
-    const path = getCurrentPath();
-    return path === "/" || path === "";
-}
-
-/**
- * 检查是否为文章页面
- */
-export function isPostPage(): boolean {
-    const path = getCurrentPath();
-    return path.startsWith("/posts/");
-}
-
-/**
- * 检查两个路径是否相等
- */
-export function pathsEqual(path1: string, path2: string): boolean {
-    // 标准化路径（移除末尾斜杠）
-    const normalize = (path: string) => {
-        return path.endsWith("/") && path.length > 1 ? path.slice(0, -1) : path;
-    };
-
-    return normalize(path1) === normalize(path2);
 }

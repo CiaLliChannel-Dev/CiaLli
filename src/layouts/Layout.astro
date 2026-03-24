@@ -548,7 +548,6 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
         PAGE_WIDTH,
         configHue,
         DESKTOP_MIN_WIDTH,
-        themeColorFixed: siteConfig.themeColor.fixed,
         pageScaling: siteConfig.pageScaling,
       }}
     >
@@ -574,10 +573,8 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
         document.documentElement.setAttribute("data-theme", expressiveTheme);
       }
 
-      // 固定主题色相（fixed=true 时忽略本地存储）
-      const storedHue = localStorage.getItem("hue");
-      const resolvedHue = themeColorFixed ? configHue : storedHue || configHue;
-      document.documentElement.style.setProperty("--hue", resolvedHue);
+      // 主题色相改为固定配置，移除本地覆盖分支。
+      document.documentElement.style.setProperty("--hue", configHue);
 
       // 计算 --banner-height-extend，取 4 的倍数以避免文字发虚
       let offset = Math.floor(
@@ -591,29 +588,31 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
 
       // 自动缩放逻辑（从 MainGridLayout 前移，尽早执行）
       (function () {
-        if (pageScaling && pageScaling.enable) {
-          function adjustPageScale() {
-            const currentWidth = document.documentElement.clientWidth;
-            if (currentWidth < DESKTOP_MIN_WIDTH) {
-              document.documentElement.style.fontSize = "";
-              return;
-            }
-            const targetWidth = pageScaling.targetWidth || 2000;
-            let scale = currentWidth / targetWidth;
-            if (scale > 1) scale = 1;
-            if (scale < 0.85) scale = 0.85;
-            document.documentElement.style.fontSize = `${scale * 100}%`;
-          }
-
-          // 立即执行一次
-          adjustPageScale();
-
-          // 监听窗口尺寸变化
-          window.addEventListener("resize", adjustPageScale);
-
-          // 页面切换后也需要检查
-          document.addEventListener("astro:page-load", adjustPageScale);
+        if (!pageScaling) {
+          return;
         }
+
+        function adjustPageScale() {
+          const currentWidth = document.documentElement.clientWidth;
+          if (currentWidth < DESKTOP_MIN_WIDTH) {
+            document.documentElement.style.fontSize = "";
+            return;
+          }
+          const targetWidth = pageScaling.targetWidth || 2000;
+          let scale = currentWidth / targetWidth;
+          if (scale > 1) scale = 1;
+          if (scale < 0.85) scale = 0.85;
+          document.documentElement.style.fontSize = `${scale * 100}%`;
+        }
+
+        // 立即执行一次
+        adjustPageScale();
+
+        // 监听窗口尺寸变化
+        window.addEventListener("resize", adjustPageScale);
+
+        // 页面切换后也需要检查
+        document.addEventListener("astro:page-load", adjustPageScale);
       })();
     </script>
     <!-- 定义全局 CSS 变量，会作用到 <html>、<body> 及部分根节点 -->

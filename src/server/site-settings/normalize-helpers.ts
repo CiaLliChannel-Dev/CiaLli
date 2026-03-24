@@ -474,21 +474,6 @@ export function normalizeProfile(
 }
 
 /**
- * 规范化 license 字段（enable、name、url）。
- */
-export function normalizeLicense(
-    merged: SiteSettingsPayload,
-    base: SiteSettingsPayload,
-): void {
-    merged.license.enable = Boolean(merged.license.enable);
-    merged.license.name =
-        String(merged.license.name || "").trim() || base.license.name;
-    merged.license.url = isSafeNavigationUrl(String(merged.license.url || ""))
-        ? String(merged.license.url || "").trim()
-        : base.license.url;
-}
-
-/**
  * 规范化 announcement 字段（title、summary、body_markdown、closable）。
  */
 export function normalizeAnnouncement(merged: SiteSettingsPayload): void {

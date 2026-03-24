@@ -8,23 +8,6 @@ export type AutoScrollConfig = {
     safeInsetPx: number;
 };
 
-export function resolveAutoScrollDirection(
-    pageScrollDirection: number,
-    topDistance: number,
-    bottomDistance: number,
-): number {
-    if (pageScrollDirection !== 0) {
-        return pageScrollDirection > 0 ? 1 : -1;
-    }
-    if (bottomDistance < 0) {
-        return 1;
-    }
-    if (topDistance < 0) {
-        return -1;
-    }
-    return 0;
-}
-
 export type ScrollTargetParams = {
     topmost: HTMLElement;
     bottommost: HTMLElement;
@@ -35,39 +18,6 @@ export type ScrollTargetParams = {
     isPostDetailSidebarToc: boolean;
     config: AutoScrollConfig;
 };
-
-export function calculateScrollTarget(params: ScrollTargetParams): number {
-    const {
-        topmost,
-        bottommost,
-        currentScrollTop,
-        tocHeight,
-        maxScrollTop,
-        direction,
-        isPostDetailSidebarToc,
-        config,
-    } = params;
-
-    const fadeZone = isPostDetailSidebarToc ? config.fadePx : 0;
-    const safeInset = fadeZone + config.safeInsetPx;
-
-    const rawTarget =
-        direction > 0
-            ? bottommost.offsetTop +
-              bottommost.offsetHeight -
-              tocHeight +
-              safeInset
-            : topmost.offsetTop - safeInset;
-    const clampedTarget = Math.max(0, Math.min(maxScrollTop, rawTarget));
-    const delta = clampedTarget - currentScrollTop;
-
-    const maxStep = Math.max(config.minStepPx, tocHeight * config.stepRatio);
-    const nextTop =
-        Math.abs(delta) > maxStep
-            ? currentScrollTop + Math.sign(delta) * maxStep
-            : clampedTarget;
-    return Math.max(0, Math.min(maxScrollTop, nextTop));
-}
 
 export type AnimateScrollParams = {
     tocEl: HTMLElement;
@@ -80,49 +30,6 @@ export type AnimateScrollParams = {
     requestFrame: (cb: (now: number) => void) => number;
     cancelFrame: (id: number) => void;
 };
-
-export function createAutoScrollAnimation(params: AnimateScrollParams): number {
-    const {
-        tocEl,
-        targetTop,
-        minDurationMs,
-        maxDurationMs,
-        onFrame,
-        onComplete,
-        requestFrame,
-    } = params;
-
-    const startTop = tocEl.scrollTop;
-    const distance = targetTop - startTop;
-    if (Math.abs(distance) < 1) {
-        return -1;
-    }
-
-    params.cancelPrev();
-    const duration = Math.max(
-        minDurationMs,
-        Math.min(maxDurationMs, Math.abs(distance) * 1.6),
-    );
-    const startTime = performance.now();
-    const easeOutCubic = (t: number): number => 1 - (1 - t) ** 3;
-
-    const step = (now: number): void => {
-        const progress = Math.min(1, (now - startTime) / duration);
-        const eased = easeOutCubic(progress);
-        const newScrollTop = startTop + distance * eased;
-        onFrame(newScrollTop);
-
-        if (progress < 1) {
-            requestFrame(step);
-            return;
-        }
-
-        onComplete(targetTop);
-    };
-
-    requestFrame(step);
-    return duration;
-}
 
 export type TocListenerTarget = {
     tocEl: HTMLElement;
