@@ -54,6 +54,13 @@ export type OverlayDialogOptions = {
         actionKey: string,
         values: Record<string, string>,
     ) => OverlayDialogActionGuardResult | null;
+    customContent?: {
+        node: HTMLElement | DocumentFragment;
+        className?: string;
+    };
+    cardClassName?: string;
+    bodyClassName?: string;
+    actionsClassName?: string;
 };
 
 export type OverlayDialogResult = {
@@ -68,8 +75,11 @@ type OverlayDialogControl = {
 };
 
 let overlayEl: HTMLElement | null = null;
+let cardEl: HTMLElement | null = null;
+let bodyEl: HTMLElement | null = null;
 let messageEl: HTMLElement | null = null;
 let contentEl: HTMLElement | null = null;
+let customContentEl: HTMLElement | null = null;
 let fieldsEl: HTMLElement | null = null;
 let errorEl: HTMLElement | null = null;
 let actionsEl: HTMLElement | null = null;
@@ -87,8 +97,11 @@ function resetDetachedDialogState(): void {
         values: {},
     });
     overlayEl = null;
+    cardEl = null;
+    bodyEl = null;
     messageEl = null;
     contentEl = null;
+    customContentEl = null;
     fieldsEl = null;
     errorEl = null;
     actionsEl = null;
@@ -112,10 +125,10 @@ function ensureDOM(): void {
     overlayEl.setAttribute("aria-label", "提示");
     overlayEl.hidden = true;
 
-    const card = document.createElement("div");
-    card.className = "overlay-dialog-card";
+    cardEl = document.createElement("div");
+    cardEl.className = "overlay-dialog-card";
 
-    const bodyEl = document.createElement("div");
+    bodyEl = document.createElement("div");
     bodyEl.className = "overlay-dialog-body";
 
     messageEl = document.createElement("p");
@@ -124,6 +137,10 @@ function ensureDOM(): void {
     contentEl = document.createElement("div");
     contentEl.className = "overlay-dialog-content";
     contentEl.hidden = true;
+
+    customContentEl = document.createElement("div");
+    customContentEl.className = "overlay-dialog-custom-content";
+    customContentEl.hidden = true;
 
     fieldsEl = document.createElement("div");
     fieldsEl.className = "overlay-dialog-fields";
@@ -138,11 +155,12 @@ function ensureDOM(): void {
 
     bodyEl.appendChild(messageEl);
     bodyEl.appendChild(contentEl);
+    bodyEl.appendChild(customContentEl);
     bodyEl.appendChild(fieldsEl);
     bodyEl.appendChild(errorEl);
-    card.appendChild(bodyEl);
-    card.appendChild(actionsEl);
-    overlayEl.appendChild(card);
+    cardEl.appendChild(bodyEl);
+    cardEl.appendChild(actionsEl);
+    overlayEl.appendChild(cardEl);
 
     overlayEl.addEventListener("click", (event) => {
         if (event.target === overlayEl && activeDismissKey) {
@@ -179,6 +197,13 @@ function getActionClassName(variant: OverlayDialogActionVariant): string {
     return "overlay-dialog-action-secondary";
 }
 
+function splitClassNames(input: string): string[] {
+    return input
+        .split(/\s+/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+}
+
 function closeWithoutAnimation(result?: OverlayDialogResult): void {
     if (!overlayEl) {
         return;
@@ -189,6 +214,11 @@ function closeWithoutAnimation(result?: OverlayDialogResult): void {
     document.removeEventListener("keydown", onKeyDown);
     activeDismissKey = null;
     fieldControls = [];
+    if (customContentEl) {
+        customContentEl.replaceChildren();
+        customContentEl.hidden = true;
+        customContentEl.className = "overlay-dialog-custom-content";
+    }
 
     if (result) {
         resolveActive(result);
@@ -412,6 +442,30 @@ function renderContent(
     }
 }
 
+function renderCustomContent(
+    customContent: OverlayDialogOptions["customContent"],
+): void {
+    if (!customContentEl) {
+        return;
+    }
+
+    customContentEl.replaceChildren();
+    customContentEl.className = "overlay-dialog-custom-content";
+    customContentEl.hidden = true;
+
+    if (!customContent) {
+        return;
+    }
+
+    if (customContent.className) {
+        customContentEl.classList.add(
+            ...splitClassNames(customContent.className),
+        );
+    }
+    customContentEl.appendChild(customContent.node);
+    customContentEl.hidden = false;
+}
+
 function collectFieldValues(): Record<string, string> {
     const values: Record<string, string> = {};
     for (const control of fieldControls) {
@@ -542,7 +596,16 @@ export function showOverlayDialog(
     options: OverlayDialogOptions,
 ): Promise<OverlayDialogResult> {
     ensureDOM();
-    if (!overlayEl || !messageEl || !contentEl || !fieldsEl || !actionsEl) {
+    if (
+        !overlayEl ||
+        !cardEl ||
+        !bodyEl ||
+        !messageEl ||
+        !contentEl ||
+        !customContentEl ||
+        !fieldsEl ||
+        !actionsEl
+    ) {
         return Promise.resolve({
             actionKey: options.dismissKey || "",
             values: {},
@@ -557,9 +620,22 @@ export function showOverlayDialog(
     }
 
     overlayEl.setAttribute("aria-label", options.ariaLabel);
+    cardEl.className = "overlay-dialog-card";
+    bodyEl.className = "overlay-dialog-body";
+    actionsEl.className = "overlay-dialog-actions";
+    if (options.cardClassName) {
+        cardEl.classList.add(...splitClassNames(options.cardClassName));
+    }
+    if (options.bodyClassName) {
+        bodyEl.classList.add(...splitClassNames(options.bodyClassName));
+    }
+    if (options.actionsClassName) {
+        actionsEl.classList.add(...splitClassNames(options.actionsClassName));
+    }
     messageEl.textContent = options.message;
     clearDialogError();
     renderContent(options.content, options.contentColumns || 1);
+    renderCustomContent(options.customContent);
     renderFields(options.fields);
     renderActions(options.actions, options.actionGuard);
     activeDismissKey = options.dismissKey;

@@ -552,7 +552,18 @@ export async function listDirectusUsers(params?: {
     limit?: number;
     offset?: number;
     search?: string;
+    sort?: {
+        field: "email";
+        order?: "asc" | "desc";
+    };
 }): Promise<AppUser[]> {
+    const directusSort = params?.sort
+        ? [
+              params.sort.order === "desc"
+                  ? `-${params.sort.field}`
+                  : params.sort.field,
+          ]
+        : undefined;
     return (await executeDirectusRequest(
         "读取 Directus 用户列表",
         readUsers({
@@ -571,6 +582,7 @@ export async function listDirectusUsers(params?: {
             limit: params?.limit ?? 50,
             offset: params?.offset ?? 0,
             search: params?.search,
+            sort: directusSort,
         } as never),
     )) as AppUser[];
 }

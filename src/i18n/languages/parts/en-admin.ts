@@ -65,9 +65,11 @@ export const enAdmin: Record<string, string> = {
     [Key.adminUsersLoadRegistrationsFailed]:
         "Failed to load registration requests",
     [Key.adminUsersLoadSwitchFailed]: "Failed to load registration switch",
+    [Key.adminUsersLoadUsersFailed]: "Failed to load users",
     [Key.adminUsersNoRegistrationData]: "No registration request data",
     [Key.adminUsersNoUserData]: "No user data",
     [Key.adminUsersNone]: "None",
+    [Key.adminUsersOpenListButton]: "View user list",
     [Key.adminUsersProcessingRegistrationTitle]:
         "Processing registration request",
     [Key.adminUsersRegisterDisabled]: "Disabled",
@@ -89,6 +91,8 @@ export const enAdmin: Record<string, string> = {
     [Key.adminUsersReviewedAt]: "Reviewed at",
     [Key.adminUsersReviewedBy]: "Reviewed by",
     [Key.adminUsersRole]: "Role",
+    [Key.adminUsersSortAsc]: "Ascending",
+    [Key.adminUsersSortDesc]: "Descending",
     [Key.adminUsersSavingRegisterSwitchTitle]: "Saving registration switch",
     [Key.adminUsersSavingRoleTitle]: "Saving user role",
     [Key.adminUsersSubmittedAt]: "Submitted at",

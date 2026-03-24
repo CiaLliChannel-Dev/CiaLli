@@ -11,10 +11,34 @@ import {
     buildRegistrationDetailContent,
 } from "@/scripts/admin-users-page-helpers";
 
-const getUsersTableBody = (): HTMLTableSectionElement | null =>
+type AdminUsersSortBy = "email" | "username" | "role";
+type AdminUsersSortOrder = "asc" | "desc";
+
+type UsersSortButtonState = {
+    button: HTMLButtonElement;
+    label: string;
+};
+
+type UsersDialogSession = {
+    container: HTMLElement;
+    tableBody: HTMLTableSectionElement;
+    messageEl: HTMLElement;
+    sortButtons: Map<AdminUsersSortBy, UsersSortButtonState>;
+    sortBy: AdminUsersSortBy;
+    sortOrder: AdminUsersSortOrder;
+    sourceRows: UnknownRecord[];
+    requestVersion: number;
+    closed: boolean;
+    eventsController: AbortController;
+};
+
+const USERS_DIALOG_LIMIT = 200;
+const USER_SORT_COLUMNS = ["email", "username", "role"] as const;
+
+const getUsersListOpenButton = (): HTMLButtonElement | null =>
     document.getElementById(
-        "admin-users-table",
-    ) as HTMLTableSectionElement | null;
+        "admin-users-open-list",
+    ) as HTMLButtonElement | null;
 const getRegisterEnabledInput = (): HTMLInputElement | null =>
     document.getElementById(
         "admin-register-enabled",
@@ -73,10 +97,7 @@ const resolveErrorMessage = (data: UnknownRecord | null, fallback: string) => {
 };
 
 const registrationRequestMap = new Map<string, UnknownRecord>();
-
-const renderUsersRows = (rows: UnknownRecord[]): void => {
-    renderUsersRowsImpl(rows, getUsersTableBody);
-};
+let registrationRequestsCache: UnknownRecord[] = [];
 
 const renderRegistrationRows = (rows: UnknownRecord[]): void => {
     renderRegistrationRowsImpl(
@@ -84,15 +105,6 @@ const renderRegistrationRows = (rows: UnknownRecord[]): void => {
         getRegistrationTableBody,
         registrationRequestMap,
     );
-};
-
-const loadUsers = async (): Promise<void> => {
-    const { response, data } = await api("/api/v1/admin/users?limit=200");
-    if (!response.ok || !data?.ok) {
-        renderUsersRows([]);
-        return;
-    }
-    renderUsersRows((data.items as UnknownRecord[]) || []);
 };
 
 const loadRegisterSwitch = async (): Promise<void> => {
@@ -113,29 +125,50 @@ const loadRegisterSwitch = async (): Promise<void> => {
     setRegisterMessage("");
 };
 
-const loadRegistrationRequests = async (): Promise<void> => {
+function filterRegistrationRequestsByStatus(
+    rows: UnknownRecord[],
+    status: string,
+): UnknownRecord[] {
+    if (status === "all") {
+        return [...rows];
+    }
+    return rows.filter((item) => {
+        const requestStatus = String(item.request_status || "").trim();
+        return requestStatus === status;
+    });
+}
+
+const loadRegistrationRequests = async (options?: {
+    forceReload?: boolean;
+}): Promise<void> => {
     const registrationStatusSelect = getRegistrationStatusSelect();
     const status =
         String(registrationStatusSelect?.value || "").trim() || "pending";
-    const params =
-        status && status !== "all"
-            ? `?status=${encodeURIComponent(status)}&limit=200`
-            : "?limit=200";
-    const { response, data } = await api(
-        `/api/v1/admin/registration-requests${params}`,
-    );
-    if (!response.ok || !data?.ok) {
-        renderRegistrationRows([]);
-        setRegistrationMessage(
-            resolveErrorMessage(
-                data,
-                t(I18nKey.adminUsersLoadRegistrationsFailed),
-            ),
+
+    // 分类切换仅做本地筛选；只有首次加载、手动刷新或审批后才重拉接口。
+    if (options?.forceReload || registrationRequestsCache.length === 0) {
+        const { response, data } = await api(
+            "/api/v1/admin/registration-requests?limit=200",
         );
-        return;
+        if (!response.ok || !data?.ok) {
+            renderRegistrationRows([]);
+            setRegistrationMessage(
+                resolveErrorMessage(
+                    data,
+                    t(I18nKey.adminUsersLoadRegistrationsFailed),
+                ),
+            );
+            return;
+        }
+        registrationRequestsCache = Array.isArray(data.items)
+            ? (data.items as UnknownRecord[])
+            : [];
     }
+
     setRegistrationMessage("");
-    renderRegistrationRows((data.items as UnknownRecord[]) || []);
+    renderRegistrationRows(
+        filterRegistrationRequestsByStatus(registrationRequestsCache, status),
+    );
 };
 
 const processRegistrationAction = async (
@@ -178,10 +211,9 @@ const processRegistrationAction = async (
                 text: t(I18nKey.interactionCommonActionSucceededReloading),
             });
             setRegistrationMessage(t(I18nKey.interactionCommonActionSucceeded));
-            await loadRegistrationRequests();
-            if (action === "approve") {
-                await loadUsers();
-            }
+            await loadRegistrationRequests({
+                forceReload: true,
+            });
         },
     );
 };
@@ -252,11 +284,332 @@ const showRegistrationDetailDialog = async (
     await processRegistrationAction(requestId, action, rejectReason);
 };
 
+function isUserSortBy(value: string): value is AdminUsersSortBy {
+    return (USER_SORT_COLUMNS as readonly string[]).includes(value);
+}
+
+function renderUsersPlaceholderRow(
+    tableBody: HTMLTableSectionElement,
+    message: string,
+): void {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 4;
+    cell.className = "py-4 text-60";
+    cell.textContent = message;
+    row.appendChild(cell);
+    tableBody.replaceChildren(row);
+}
+
+function createUsersSortButton(
+    label: string,
+    sortBy: AdminUsersSortBy,
+): HTMLButtonElement {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "overlay-dialog-sort-btn";
+    button.setAttribute("data-users-sort-by", sortBy);
+    button.setAttribute("aria-sort", "none");
+    button.setAttribute("aria-label", label);
+
+    const textEl = document.createElement("span");
+    textEl.textContent = label;
+
+    const indicatorEl = document.createElement("span");
+    indicatorEl.className = "overlay-dialog-sort-indicator";
+    indicatorEl.setAttribute("data-users-sort-indicator", sortBy);
+    indicatorEl.textContent = "↕";
+
+    button.appendChild(textEl);
+    button.appendChild(indicatorEl);
+    return button;
+}
+
+function updateUsersSortButtons(session: UsersDialogSession): void {
+    for (const [sortBy, sortButtonState] of session.sortButtons.entries()) {
+        const isActive = sortBy === session.sortBy;
+        const direction =
+            session.sortOrder === "asc" ? "ascending" : "descending";
+        sortButtonState.button.setAttribute(
+            "aria-sort",
+            isActive ? direction : "none",
+        );
+        sortButtonState.button.setAttribute(
+            "aria-label",
+            isActive
+                ? `${sortButtonState.label} (${t(
+                      session.sortOrder === "asc"
+                          ? I18nKey.adminUsersSortAsc
+                          : I18nKey.adminUsersSortDesc,
+                  )})`
+                : sortButtonState.label,
+        );
+        const indicatorEl = sortButtonState.button.querySelector<HTMLElement>(
+            "[data-users-sort-indicator]",
+        );
+        if (!indicatorEl) {
+            continue;
+        }
+        indicatorEl.textContent = isActive
+            ? session.sortOrder === "asc"
+                ? "↑"
+                : "↓"
+            : "↕";
+    }
+}
+
+function createUsersDialogSession(): UsersDialogSession {
+    const container = document.createElement("section");
+    container.className = "overlay-dialog-table-shell";
+
+    const tableScroll = document.createElement("div");
+    tableScroll.className = "overlay-dialog-table-scroll";
+
+    const table = document.createElement("table");
+    table.className = "overlay-dialog-table";
+
+    const head = document.createElement("thead");
+    const headRow = document.createElement("tr");
+
+    const sortButtons = new Map<AdminUsersSortBy, UsersSortButtonState>();
+    const emailLabel = t(I18nKey.authEmailLabel);
+    const usernameLabel = t(I18nKey.meSettingsUsernameLabel);
+    const roleLabel = t(I18nKey.adminUsersRole);
+    const emailSortButton = createUsersSortButton(emailLabel, "email");
+    const usernameSortButton = createUsersSortButton(usernameLabel, "username");
+    const roleSortButton = createUsersSortButton(roleLabel, "role");
+
+    sortButtons.set("email", {
+        button: emailSortButton,
+        label: emailLabel,
+    });
+    sortButtons.set("username", {
+        button: usernameSortButton,
+        label: usernameLabel,
+    });
+    sortButtons.set("role", {
+        button: roleSortButton,
+        label: roleLabel,
+    });
+
+    const emailHeadCell = document.createElement("th");
+    const usernameHeadCell = document.createElement("th");
+    const roleHeadCell = document.createElement("th");
+    const actionsHeadCell = document.createElement("th");
+    actionsHeadCell.textContent = t(I18nKey.adminUsersActions);
+    actionsHeadCell.style.width = "9.5rem";
+
+    emailHeadCell.appendChild(emailSortButton);
+    usernameHeadCell.appendChild(usernameSortButton);
+    roleHeadCell.appendChild(roleSortButton);
+    headRow.appendChild(emailHeadCell);
+    headRow.appendChild(usernameHeadCell);
+    headRow.appendChild(roleHeadCell);
+    headRow.appendChild(actionsHeadCell);
+    head.appendChild(headRow);
+
+    const tableBody = document.createElement("tbody");
+    table.appendChild(head);
+    table.appendChild(tableBody);
+    tableScroll.appendChild(table);
+
+    const messageEl = document.createElement("p");
+    messageEl.className = "overlay-dialog-table-message";
+
+    container.appendChild(tableScroll);
+    container.appendChild(messageEl);
+
+    return {
+        container,
+        tableBody,
+        messageEl,
+        sortButtons,
+        sortBy: "email",
+        sortOrder: "asc",
+        sourceRows: [],
+        requestVersion: 0,
+        closed: false,
+        eventsController: new AbortController(),
+    };
+}
+
+function buildUsersListRequestPath(): string {
+    const params = new URLSearchParams();
+    params.set("limit", String(USERS_DIALOG_LIMIT));
+    return `/api/v1/admin/users?${params.toString()}`;
+}
+
+function normalizeSortText(value: unknown): string {
+    return String(value || "")
+        .trim()
+        .toLocaleLowerCase();
+}
+
+function resolveUserSortRoleRank(row: UnknownRecord): number {
+    const isPlatformAdmin = Boolean(row.is_platform_admin);
+    if (isPlatformAdmin) {
+        return 0;
+    }
+    const permissions =
+        typeof row.permissions === "object" && row.permissions
+            ? (row.permissions as UnknownRecord)
+            : null;
+    const appRole = String(permissions?.app_role || "").trim();
+    if (appRole === "admin" || Boolean(row.is_site_admin)) {
+        return 1;
+    }
+    return 2;
+}
+
+function sortUsersRows(
+    rows: UnknownRecord[],
+    sortBy: AdminUsersSortBy,
+    sortOrder: AdminUsersSortOrder,
+): UnknownRecord[] {
+    const indexedRows = rows.map((item, index) => ({ item, index }));
+    indexedRows.sort((left, right) => {
+        const leftUser =
+            typeof left.item.user === "object" && left.item.user
+                ? (left.item.user as UnknownRecord)
+                : null;
+        const rightUser =
+            typeof right.item.user === "object" && right.item.user
+                ? (right.item.user as UnknownRecord)
+                : null;
+        const leftProfile =
+            typeof left.item.profile === "object" && left.item.profile
+                ? (left.item.profile as UnknownRecord)
+                : null;
+        const rightProfile =
+            typeof right.item.profile === "object" && right.item.profile
+                ? (right.item.profile as UnknownRecord)
+                : null;
+
+        const leftEmail = normalizeSortText(leftUser?.email);
+        const rightEmail = normalizeSortText(rightUser?.email);
+        const leftUsername = normalizeSortText(leftProfile?.username);
+        const rightUsername = normalizeSortText(rightProfile?.username);
+
+        const compareAsc = (leftValue: string, rightValue: string): number =>
+            leftValue.localeCompare(rightValue);
+        const applyOrder = (diff: number): number =>
+            sortOrder === "desc" ? -diff : diff;
+
+        if (sortBy === "role") {
+            const rankDiff =
+                resolveUserSortRoleRank(left.item) -
+                resolveUserSortRoleRank(right.item);
+            if (rankDiff !== 0) {
+                return applyOrder(rankDiff);
+            }
+            const usernameDiff = compareAsc(leftUsername, rightUsername);
+            if (usernameDiff !== 0) {
+                return usernameDiff;
+            }
+            const emailDiff = compareAsc(leftEmail, rightEmail);
+            if (emailDiff !== 0) {
+                return emailDiff;
+            }
+            return left.index - right.index;
+        }
+
+        const leftValue = sortBy === "email" ? leftEmail : leftUsername;
+        const rightValue = sortBy === "email" ? rightEmail : rightUsername;
+        const leftMissing = leftValue.length === 0;
+        const rightMissing = rightValue.length === 0;
+        if (leftMissing && rightMissing) {
+            return left.index - right.index;
+        }
+        if (leftMissing) {
+            return 1;
+        }
+        if (rightMissing) {
+            return -1;
+        }
+        const primaryDiff = compareAsc(leftValue, rightValue);
+        if (primaryDiff !== 0) {
+            return applyOrder(primaryDiff);
+        }
+        const emailDiff = compareAsc(leftEmail, rightEmail);
+        if (emailDiff !== 0) {
+            return emailDiff;
+        }
+        return left.index - right.index;
+    });
+    return indexedRows.map((entry) => entry.item);
+}
+
+function renderUsersBySessionSort(session: UsersDialogSession): void {
+    renderUsersRowsImpl(
+        sortUsersRows(session.sourceRows, session.sortBy, session.sortOrder),
+        () => session.tableBody,
+    );
+}
+
+async function loadUsersForDialog(
+    session: UsersDialogSession,
+    options: {
+        showLoading: boolean;
+        forceReload: boolean;
+    },
+): Promise<void> {
+    if (!options.forceReload && session.sourceRows.length > 0) {
+        renderUsersBySessionSort(session);
+        session.messageEl.textContent = "";
+        return;
+    }
+
+    const requestVersion = ++session.requestVersion;
+    if (options.showLoading) {
+        renderUsersPlaceholderRow(
+            session.tableBody,
+            t(I18nKey.interactionCommonLoading),
+        );
+    }
+
+    const { response, data } = await api(buildUsersListRequestPath());
+    if (session.closed || requestVersion !== session.requestVersion) {
+        return;
+    }
+
+    if (!response.ok || !data?.ok) {
+        renderUsersRowsImpl([], () => session.tableBody);
+        session.messageEl.textContent = resolveErrorMessage(
+            data,
+            t(I18nKey.adminUsersLoadUsersFailed),
+        );
+        return;
+    }
+
+    session.sourceRows = Array.isArray(data.items)
+        ? (data.items as UnknownRecord[])
+        : [];
+    renderUsersBySessionSort(session);
+    session.messageEl.textContent = "";
+}
+
+function toggleUsersSortAndRender(
+    session: UsersDialogSession,
+    nextSortBy: AdminUsersSortBy,
+): void {
+    // 点击同一列在升序/降序之间切换；切换列时回到升序，保证行为可预期。
+    if (session.sortBy === nextSortBy) {
+        session.sortOrder = session.sortOrder === "asc" ? "desc" : "asc";
+    } else {
+        session.sortBy = nextSortBy;
+        session.sortOrder = "asc";
+    }
+    updateUsersSortButtons(session);
+    renderUsersBySessionSort(session);
+}
+
 let pageEventsController: AbortController | null = null;
+let usersListDialogPromise: Promise<void> | null = null;
 
 const handleDeleteUser = async (
     target: HTMLElement,
     userId: string,
+    onDeleted: () => Promise<void>,
 ): Promise<void> => {
     const username = String(target.getAttribute("data-username") || "").trim();
     const email = String(target.getAttribute("data-email") || "").trim();
@@ -303,10 +656,117 @@ const handleDeleteUser = async (
                 text: t(I18nKey.interactionCommonActionSucceededReloading),
             });
             window.alert(t(I18nKey.adminUsersDeleted));
-            await loadUsers();
+            await onDeleted();
         },
     );
 };
+
+async function openUsersListDialog(): Promise<void> {
+    if (usersListDialogPromise) {
+        return usersListDialogPromise;
+    }
+
+    const session = createUsersDialogSession();
+    updateUsersSortButtons(session);
+
+    // 弹层内容节点与事件监听都绑定在 session 上，关闭后统一 abort + remove，避免悬空监听器。
+    const usersTableHead = session.container.querySelector("thead");
+    usersTableHead?.addEventListener(
+        "click",
+        (event) => {
+            const target =
+                event.target instanceof HTMLElement ? event.target : null;
+            const sortTarget = target?.closest<HTMLButtonElement>(
+                "[data-users-sort-by]",
+            );
+            if (!sortTarget) {
+                return;
+            }
+            const nextSortBy = String(
+                sortTarget.getAttribute("data-users-sort-by") || "",
+            );
+            if (!isUserSortBy(nextSortBy)) {
+                return;
+            }
+            // 排序切换仅做本地重排，避免每次点击都触发数据库查询。
+            toggleUsersSortAndRender(session, nextSortBy);
+        },
+        { signal: session.eventsController.signal },
+    );
+
+    session.tableBody.addEventListener(
+        "click",
+        (event) => {
+            const target =
+                event.target instanceof HTMLElement ? event.target : null;
+            const actionTarget = target?.closest<HTMLElement>(
+                "[data-action][data-user-id]",
+            );
+            if (!actionTarget) {
+                return;
+            }
+            const action = String(
+                actionTarget.getAttribute("data-action") || "",
+            );
+            const userId = String(
+                actionTarget.getAttribute("data-user-id") || "",
+            ).trim();
+            if (action !== "delete" || !userId) {
+                return;
+            }
+            void handleDeleteUser(actionTarget, userId, async () => {
+                await loadUsersForDialog(session, {
+                    showLoading: false,
+                    forceReload: true,
+                });
+            });
+        },
+        { signal: session.eventsController.signal },
+    );
+
+    usersListDialogPromise = (async () => {
+        const dialogPromise = showOverlayDialog({
+            ariaLabel: t(I18nKey.adminUsersListTitle),
+            message: t(I18nKey.adminUsersListTitle),
+            dismissKey: "close",
+            customContent: {
+                node: session.container,
+                className: "overlay-dialog-custom-content-data-table",
+            },
+            cardClassName: "overlay-dialog-card-data-table",
+            bodyClassName: "overlay-dialog-body-data-table",
+            actions: [
+                {
+                    key: "close",
+                    label: t(I18nKey.interactionCommonClose),
+                    variant: "secondary",
+                },
+            ],
+        });
+        await loadUsersForDialog(session, {
+            showLoading: true,
+            forceReload: true,
+        });
+        try {
+            await dialogPromise;
+        } finally {
+            session.closed = true;
+            session.eventsController.abort();
+            session.container.remove();
+        }
+    })()
+        .catch((error) => {
+            console.error(
+                "[admin-users] open users list dialog failed:",
+                error,
+            );
+        })
+        .finally(() => {
+            usersListDialogPromise = null;
+        });
+
+    return usersListDialogPromise;
+}
 
 const handleRegisterSwitchChange = async (): Promise<void> => {
     const currentRegisterEnabledInput = getRegisterEnabledInput();
@@ -366,20 +826,29 @@ const bindEvents = (): void => {
     const { signal } = pageEventsController;
 
     document
-        .getElementById("admin-users-refresh")
-        ?.addEventListener("click", () => void loadUsers(), { signal });
-
-    document
-        .getElementById("admin-registration-refresh")
-        ?.addEventListener("click", () => void loadRegistrationRequests(), {
+        .getElementById("admin-users-open-list")
+        ?.addEventListener("click", () => void openUsersListDialog(), {
             signal,
         });
+
+    document.getElementById("admin-registration-refresh")?.addEventListener(
+        "click",
+        () =>
+            void loadRegistrationRequests({
+                forceReload: true,
+            }),
+        {
+            signal,
+        },
+    );
 
     const registrationStatusSelect = getRegistrationStatusSelect();
     registrationStatusSelect?.addEventListener(
         "change",
         () => {
-            void loadRegistrationRequests();
+            void loadRegistrationRequests({
+                forceReload: false,
+            });
         },
         { signal },
     );
@@ -388,24 +857,6 @@ const bindEvents = (): void => {
     registerEnabledInput?.addEventListener(
         "change",
         () => void handleRegisterSwitchChange(),
-        { signal },
-    );
-
-    const usersTableBody = getUsersTableBody();
-    usersTableBody?.addEventListener(
-        "click",
-        (event) => {
-            const target =
-                event.target instanceof HTMLElement ? event.target : null;
-            if (!target) return;
-            const action = target.getAttribute("data-action");
-            const userId = target.getAttribute("data-user-id");
-            if (!action || !userId) return;
-
-            if (action === "delete") {
-                void handleDeleteUser(target, userId);
-            }
-        },
         { signal },
     );
 
@@ -440,14 +891,16 @@ const bindEvents = (): void => {
 };
 
 export const initAdminUsersPage = (): void => {
-    if (!getUsersTableBody() || !getRegistrationTableBody()) {
+    if (!getUsersListOpenButton() || !getRegistrationTableBody()) {
         pageEventsController?.abort();
         return;
     }
+    registrationRequestsCache = [];
     bindEvents();
     void Promise.all([
-        loadUsers(),
-        loadRegistrationRequests(),
+        loadRegistrationRequests({
+            forceReload: true,
+        }),
         loadRegisterSwitch(),
     ]);
 };

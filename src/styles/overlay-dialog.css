@@ -101,6 +101,14 @@
   display: none !important;
 }
 
+.overlay-dialog-custom-content {
+  margin: 0 0 1.5rem;
+}
+
+.overlay-dialog-custom-content[hidden] {
+  display: none !important;
+}
+
 .overlay-dialog-content-item {
   border: 1px solid var(--line-divider);
   border-radius: 0.65rem;
@@ -294,6 +302,105 @@ textarea.overlay-dialog-field-control {
 
 .overlay-dialog-action-danger:hover {
   filter: brightness(1.08);
+}
+
+/* 数据表弹层 */
+
+.overlay-dialog-card-data-table {
+  max-width: min(96vw, 1080px);
+}
+
+.overlay-dialog-body-data-table {
+  padding-bottom: 0.5rem;
+}
+
+.overlay-dialog-custom-content-data-table {
+  margin-bottom: 1rem;
+}
+
+.overlay-dialog-table-scroll {
+  overflow: auto;
+  border: 1px solid var(--line-divider);
+  border-radius: 0.75rem;
+  max-height: min(58vh, 620px);
+  background: color-mix(in oklab, var(--card-bg) 94%, var(--primary) 6%);
+}
+
+.overlay-dialog-table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  color: var(--deep-text);
+}
+
+.overlay-dialog-table th,
+.overlay-dialog-table td {
+  text-align: left;
+  padding: 0.7rem 0.85rem;
+  border-bottom: 1px solid var(--line-divider);
+  font-size: 0.875rem;
+  vertical-align: middle;
+}
+
+.overlay-dialog-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--card-bg);
+}
+
+.overlay-dialog-sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.35rem;
+  transition:
+    background-color 140ms ease,
+    color 140ms ease;
+}
+
+.overlay-dialog-sort-btn:hover {
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+}
+
+.overlay-dialog-sort-btn:focus-visible {
+  outline: 2px solid color-mix(in oklab, var(--primary) 64%, white 36%);
+  outline-offset: 1px;
+}
+
+.overlay-dialog-sort-btn[aria-sort="ascending"],
+.overlay-dialog-sort-btn[aria-sort="descending"] {
+  color: var(--primary);
+}
+
+.overlay-dialog-sort-indicator {
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
+.overlay-dialog-table-row:hover {
+  background: color-mix(in oklab, var(--primary) 10%, transparent);
+}
+
+.overlay-dialog-table-message {
+  margin: 0.375rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  text-align: left;
+  color: var(--deep-text);
+  opacity: 0.76;
+}
+
+:root.dark .overlay-dialog-table,
+:root.dark .overlay-dialog-table-message {
+  color: oklch(0.9 0.02 var(--hue));
 }
 
 /* Animations */

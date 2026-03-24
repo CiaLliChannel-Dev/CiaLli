@@ -95,12 +95,17 @@ type AdminUserRow = {
     is_site_admin: boolean;
 };
 
+type AdminUsersSortBy = "email" | "username" | "role";
+type AdminUsersSortOrder = "asc" | "desc";
+
 type DirectusUserSnapshot = {
     roleName: string | null;
     policyIds: string[];
     policyNames: string[];
     isPlatformAdmin: boolean;
 };
+
+const ADMIN_USERS_SORT_BY_DEFAULT: AdminUsersSortBy = "email";
 
 function extractPermissionPatch(
     input: AdminUpdateUserInput,
@@ -396,13 +401,179 @@ async function loadDirectusUserForAdmin(
     });
 }
 
+function normalizeAdminUsersSortBy(value: string): AdminUsersSortBy {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "email") {
+        return "email";
+    }
+    if (normalized === "username") {
+        return "username";
+    }
+    if (normalized === "role") {
+        return "role";
+    }
+    return ADMIN_USERS_SORT_BY_DEFAULT;
+}
+
+function normalizeAdminUsersSortOrder(value: string): AdminUsersSortOrder {
+    return value.trim().toLowerCase() === "desc" ? "desc" : "asc";
+}
+
+function normalizeSortText(value: string | null | undefined): string {
+    return String(value || "")
+        .trim()
+        .toLocaleLowerCase();
+}
+
+type SortTextValue = {
+    value: string;
+    missing: boolean;
+};
+
+function toSortTextValue(value: string | null | undefined): SortTextValue {
+    const normalizedValue = normalizeSortText(value);
+    return {
+        value: normalizedValue,
+        missing: normalizedValue.length === 0,
+    };
+}
+
+function compareSortTextValue(
+    left: SortTextValue,
+    right: SortTextValue,
+    order: AdminUsersSortOrder,
+): number {
+    if (left.missing && right.missing) {
+        return 0;
+    }
+    if (left.missing) {
+        return 1;
+    }
+    if (right.missing) {
+        return -1;
+    }
+    if (left.value === right.value) {
+        return 0;
+    }
+    const compareResult = left.value.localeCompare(right.value);
+    return order === "desc" ? -compareResult : compareResult;
+}
+
+function compareSortText(
+    left: string | null | undefined,
+    right: string | null | undefined,
+    order: AdminUsersSortOrder,
+): number {
+    return compareSortTextValue(
+        toSortTextValue(left),
+        toSortTextValue(right),
+        order,
+    );
+}
+
+function getUserRoleSortRank(row: AdminUserRow): number {
+    if (row.is_platform_admin) {
+        return 0;
+    }
+    if (row.permissions.app_role === "admin" || row.is_site_admin) {
+        return 1;
+    }
+    return 2;
+}
+
+function applyAdminUsersSort(params: {
+    items: AdminUserRow[];
+    sortBy: AdminUsersSortBy;
+    sortOrder: AdminUsersSortOrder;
+}): AdminUserRow[] {
+    if (params.sortBy === "email") {
+        return params.items;
+    }
+
+    const indexedRows = params.items.map((item, index) => ({
+        item,
+        index,
+    }));
+    indexedRows.sort((left, right) => {
+        if (params.sortBy === "username") {
+            const leftUsernameValue = toSortTextValue(
+                left.item.profile?.username,
+            );
+            const rightUsernameValue = toSortTextValue(
+                right.item.profile?.username,
+            );
+            if (leftUsernameValue.missing && rightUsernameValue.missing) {
+                return left.index - right.index;
+            }
+            const usernameDiff = compareSortTextValue(
+                leftUsernameValue,
+                rightUsernameValue,
+                params.sortOrder,
+            );
+            if (usernameDiff !== 0) {
+                return usernameDiff;
+            }
+            const emailDiff = compareSortText(
+                left.item.user.email,
+                right.item.user.email,
+                "asc",
+            );
+            if (emailDiff !== 0) {
+                return emailDiff;
+            }
+            return left.index - right.index;
+        }
+
+        const leftRoleRank = getUserRoleSortRank(left.item);
+        const rightRoleRank = getUserRoleSortRank(right.item);
+        if (leftRoleRank !== rightRoleRank) {
+            return params.sortOrder === "desc"
+                ? rightRoleRank - leftRoleRank
+                : leftRoleRank - rightRoleRank;
+        }
+        const usernameDiff = compareSortText(
+            left.item.profile?.username,
+            right.item.profile?.username,
+            "asc",
+        );
+        if (usernameDiff !== 0) {
+            return usernameDiff;
+        }
+        const emailDiff = compareSortText(
+            left.item.user.email,
+            right.item.user.email,
+            "asc",
+        );
+        if (emailDiff !== 0) {
+            return emailDiff;
+        }
+        return left.index - right.index;
+    });
+    return indexedRows.map((entry) => entry.item);
+}
+
 async function handleUsersList(context: APIContext): Promise<Response> {
-    const { page, limit, offset } = parsePagination(context.url);
+    const { page, limit, offset } = parsePagination(context.url, {
+        maxLimit: 200,
+    });
+    const sortBy = normalizeAdminUsersSortBy(
+        context.url.searchParams.get("sort_by") || "",
+    );
+    const sortOrder = normalizeAdminUsersSortOrder(
+        context.url.searchParams.get("sort_order") || "",
+    );
     const [users, registry] = await Promise.all([
         listDirectusUsers({
             limit,
             offset,
             search: context.url.searchParams.get("q") || undefined,
+            sort:
+                sortBy === "email"
+                    ? {
+                          field: "email",
+                          order: sortOrder,
+                      }
+                    : undefined,
         }),
         loadDirectusAccessRegistry(),
     ]);
@@ -421,20 +592,25 @@ async function handleUsersList(context: APIContext): Promise<Response> {
         profileMap.set(profile.user_id, profile);
     }
 
-    const items: AdminUserRow[] = users.map((user) => {
-        const snapshot = extractSnapshot(user, registry);
-        const profile = profileMap.get(user.id) || null;
-        return {
-            user,
-            profile: profile ? buildProfileView(profile, user) : null,
-            permissions: buildPermissionsFromDirectus({
-                roleName: snapshot.roleName,
-                policyNames: snapshot.policyNames,
-                isPlatformAdmin: snapshot.isPlatformAdmin,
-            }),
-            is_platform_admin: snapshot.isPlatformAdmin,
-            is_site_admin: snapshot.roleName === DIRECTUS_ROLE_NAME.siteAdmin,
-        };
+    const items = applyAdminUsersSort({
+        items: users.map((user) => {
+            const snapshot = extractSnapshot(user, registry);
+            const profile = profileMap.get(user.id) || null;
+            return {
+                user,
+                profile: profile ? buildProfileView(profile, user) : null,
+                permissions: buildPermissionsFromDirectus({
+                    roleName: snapshot.roleName,
+                    policyNames: snapshot.policyNames,
+                    isPlatformAdmin: snapshot.isPlatformAdmin,
+                }),
+                is_platform_admin: snapshot.isPlatformAdmin,
+                is_site_admin:
+                    snapshot.roleName === DIRECTUS_ROLE_NAME.siteAdmin,
+            };
+        }),
+        sortBy,
+        sortOrder,
     });
 
     return ok({
