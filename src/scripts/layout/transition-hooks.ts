@@ -123,8 +123,6 @@ function setNavigationPhase(
 }
 
 function stripOnloadAnimationsInDocument(targetDocument: Document): void {
-    // 客户端切页时只剥离高风险容器的 onload 关键帧，
-    // 避免骨架结束后再次触发“二次揭幕”造成抽动
     for (const id of ONLOAD_STRIP_SCOPE_IDS) {
         const scope = targetDocument.getElementById(id);
         if (scope instanceof HTMLElement) {
@@ -144,8 +142,6 @@ function dispatchNavigationSettledEvent(navigationToken: number): void {
         }),
     );
 }
-
-// ===== Before-preparation helpers =====
 
 function resetNavigationState(state: TransitionState): void {
     state.pendingBannerToSpecRoutePath = null;
@@ -257,8 +253,6 @@ function resetViewportForIncomingPage(): void {
 export function shouldResetViewportOnPreparation(
     shouldUseBannerToSpec: boolean,
 ): boolean {
-    // 首页 banner -> spec 需要保留当前视口位置，让“整页上推”从用户当下看到的区域立即开始，
-    // 否则准备阶段先回顶会露出 banner 原始首屏，破坏空间连续性。
     return !shouldUseBannerToSpec;
 }
 
@@ -277,8 +271,6 @@ export function resolvePreparationTransitionProxyPayload(
     }
 
     if (isTargetHome) {
-        // 返回首页时，点击瞬间与 swap 后都应沿用来源页的骨架壳，
-        // 不能回退成首页 fallback，否则会在过渡中途“换壳”。
         return {
             payload: resolveTransitionProxyPayloadFromDocument(
                 currentDocument,
@@ -287,9 +279,6 @@ export function resolvePreparationTransitionProxyPayload(
             preservePreparedPayload: true,
         };
     }
-
-    // 除首页 banner -> spec 的整页上推动画外，其余跨页导航都应在点击瞬间
-    // 先切入 proxy 骨架，包括 spec -> home，保证体感与 spec -> spec 一致。
     return {
         payload: resolveTransitionProxyPayloadFromPath(targetPathname),
         preservePreparedPayload: false,
@@ -320,8 +309,6 @@ export function resolvePreparationRouteState(
     };
 }
 
-// ===== Before-preparation event handler =====
-
 function handleBeforePreparation(
     e: BeforePreparationEvent,
     state: TransitionState,
@@ -330,13 +317,11 @@ function handleBeforePreparation(
     const runtimeWindow = window as RuntimeWindowWithTOC;
     const canceledAt = runtimeWindow.__cialliUnsavedNavigationCanceledAt ?? 0;
     if (Date.now() - canceledAt <= 1800) {
-        // 兜底：未保存拦截取消后若仍误触发准备阶段，直接复位并跳过骨架激活。
         forceResetTransitionState(state);
         return;
     }
 
     if (e.defaultPrevented) {
-        // 若导航在其他监听器中已被取消，需立即复位过渡状态，防止骨架屏残留。
         forceResetTransitionState(state);
         return;
     }
@@ -405,8 +390,7 @@ function handleBeforePreparation(
         ) {
             scheduleTransitionProxyEnter(state);
         }
-        // 立即在当前首页文档启动“全屏上滑”，
-        // 让代理骨架在加载阶段就可见，而不是等 incoming 文档 ready 后才开动。
+
         startBannerToSpecMoveTransition(state);
 
         const originalLoader = e.loader;
@@ -414,8 +398,6 @@ function handleBeforePreparation(
             try {
                 const motionPromise =
                     state.bannerToSpecMotionPromise ?? Promise.resolve();
-                // swap 进入前同时等待内容加载与宏观位移动画完成，
-                // 这样不会出现“旧页还没动，新页已经 ready”的空转窗口。
                 await Promise.all([originalLoader(), motionPromise]);
                 state.bannerToSpecLoaderSettled = true;
                 markBannerToSpecMotionCompleted(state);
@@ -451,9 +433,6 @@ function handleBeforePreparation(
         toc.classList.add("toc-not-ready");
     }
 
-    // 整页骨架只打到 incoming 文档，避免 outgoing 页面先闪成骨架。
-    // 仅非 banner -> spec 路径需要在准备阶段回顶，banner -> spec 则必须保留当前视口，
-    // 让宏观上推动画从当前所见区域直接开始。
     if (shouldResetViewportOnPreparation(shouldUseBannerToSpec)) {
         resetViewportForIncomingPage();
     }
@@ -522,7 +501,6 @@ function handleBeforeSwap(
     stripOnloadAnimationsInDocument(newDocument);
     setNavigationPhase("swapped", newDocument);
 
-    // spec -> home：在交换前就冻结 incoming body 布局态，避免交换瞬间出现一帧 navbar 尺寸闪动
     if (state.pendingSpecToBannerFreeze) {
         freezeSpecLayoutStateForHomeDocument(newDocument);
     }
@@ -608,8 +586,6 @@ async function finalizePageViewWhenReady(
     );
 }
 
-// ===== After-swap event handler =====
-
 function handleAfterSwap(state: TransitionState): void {
     state.didReplaceContentDuringVisit = true;
     setAwaitingReplaceState(false);
@@ -631,8 +607,6 @@ function handleAfterSwap(state: TransitionState): void {
         state.pendingBannerWaveAnimationSnapshot = null;
     }
 }
-
-// ===== Page-view finalization helpers =====
 
 function doVisitEndCleanup(
     state: TransitionState,
@@ -736,7 +710,6 @@ function finalizePageView(
         }
         setPageHeightExtendVisible(false);
 
-        // 过渡完成后再恢复重初始化任务，避免动画窗口内主线程抖动
         requestAnimationFrame(() => {
             if (navigationToken !== state.navigationToken) {
                 return;
@@ -799,8 +772,6 @@ function finalizePageView(
     finishAfterReveal();
 }
 
-// ===== Page-load event handler =====
-
 function handlePageLoad(
     state: TransitionState,
     transitionDeps: TransitionIntentDeps,
@@ -819,8 +790,6 @@ function handlePageLoad(
         navigationToken,
     );
 }
-
-// ===== Main setup function =====
 
 export function setupTransitionIntentSource(
     deps: TransitionIntentSourceDependencies,
@@ -864,7 +833,6 @@ export function setupTransitionIntentSource(
         url: deps.url,
     };
 
-    // Ensure spacer is always reset when tab visibility/lifecycle changes.
     document.addEventListener("visibilitychange", () => {
         if (document.visibilityState !== "visible") {
             setPageHeightExtendVisible(false);
@@ -891,7 +859,6 @@ export function setupTransitionIntentSource(
     });
 
     document.addEventListener("cialli:unsaved-navigation-cancel", () => {
-        // 未保存拦截取消后，确保所有过渡视觉态立即回收，避免骨架屏残留。
         forceResetTransitionState(state);
     });
 }
