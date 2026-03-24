@@ -412,7 +412,11 @@ const shouldRenderMobileDedicatedToc =
                   <>
                     <RightSideBar headings={headings} />
                     {shouldRenderDedicatedPostToc && (
-                      <div id="toc-wrapper" class="w-full transition-fade">
+                      <div
+                        id="toc-wrapper"
+                        class="w-full transition-fade"
+                        data-post-detail-toc="1"
+                      >
                         <div
                           id="toc-inner-wrapper"
                           class="w-full max-h-[calc(100vh-10rem)] overflow-hidden"
@@ -428,7 +432,11 @@ const shouldRenderMobileDedicatedToc =
                     )}
                   </>
                 ) : shouldRenderDedicatedPostToc ? (
-                  <div id="toc-wrapper" class="w-full transition-fade">
+                  <div
+                    id="toc-wrapper"
+                    class="w-full transition-fade"
+                    data-post-detail-toc="1"
+                  >
                     <div
                       id="toc-inner-wrapper"
                       class="w-full max-h-[calc(100vh-10rem)] overflow-hidden"
@@ -459,7 +467,7 @@ const shouldRenderMobileDedicatedToc =
                   <div
                     class="mobile-footer-sidebar-slot mb-4 lg:hidden"
                     data-responsive-sidebar-mobile-anchor
-                  ></div>
+                  />
                 )
               }
               {
@@ -553,7 +561,7 @@ const shouldRenderMobileDedicatedToc =
                 <span
                   class="iconify text-[1.45rem]"
                   data-icon="material-symbols:format-list-bulleted-rounded"
-                ></span>
+                />
               </span>
             </button>
             <div class="mobile-edge-drawer-layer">
@@ -562,7 +570,7 @@ const shouldRenderMobileDedicatedToc =
                 class="mobile-edge-drawer-backdrop"
                 data-mobile-edge-drawer-backdrop
                 aria-label="关闭目录与页面工具"
-              ></button>
+              />
               <aside
                 id="mobile-post-tools-panel"
                 class="mobile-edge-drawer-panel"
@@ -587,13 +595,10 @@ const shouldRenderMobileDedicatedToc =
                     <span
                       class="iconify text-[1.3rem]"
                       data-icon="material-symbols:close-rounded"
-                    ></span>
+                    />
                   </button>
                 </div>
                 <div class="mobile-edge-drawer-body">
-                  {hasRightSidebarComponents && (
-                    <RightSideBar headings={headings} />
-                  )}
                   {shouldRenderMobileDedicatedToc && (
                     <div class="card-base rounded-(--radius-large) pb-4">
                       <div
@@ -603,10 +608,16 @@ const shouldRenderMobileDedicatedToc =
                       >
                         目录
                       </div>
-                      <div class="px-4">
+                      <div
+                        class="px-4 max-h-[min(55dvh,24rem)] overflow-hidden"
+                        data-post-detail-toc="1"
+                      >
                         <TOC id="mobile-post-tools-toc" headings={headings} />
                       </div>
                     </div>
+                  )}
+                  {hasRightSidebarComponents && (
+                    <RightSideBar headings={headings} />
                   )}
                 </div>
               </aside>

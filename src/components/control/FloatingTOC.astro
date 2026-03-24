@@ -46,7 +46,7 @@ const useJapaneseBadge = resolvedSiteSettings.settings.toc.useJapaneseBadge;
       var(--back-to-top-bottom, 1rem) + var(--right-float-size, 3.75rem) +
         4.75rem
     );
-    z-index: 50;
+    z-index: var(--z-float-rail, 70);
     pointer-events: auto;
     transform: translateX(var(--right-float-shift-x, 0));
     display: none;
@@ -102,6 +102,7 @@ const useJapaneseBadge = resolvedSiteSettings.settings.toc.useJapaneseBadge;
     position: absolute;
     bottom: 4.5rem;
     right: 0;
+    z-index: var(--z-float-panel, 75);
     width: min(
       18rem,
       calc(

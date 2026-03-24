@@ -1,3 +1,5 @@
+import { reinitAllTocInstances } from "@/scripts/toc-runtime";
+
 type PasswordProtectionWindow = Window &
     typeof globalThis & {
         __ppFromBase64Url?: (input: unknown) => Uint8Array;
@@ -149,13 +151,10 @@ async function decryptPayloadV2(
 async function dispatchPostDecryptTasks(
     contentBodyDiv: HTMLElement,
 ): Promise<void> {
-    const tocElement = document.querySelector("table-of-contents") as
-        | (Element & { regenerateTOC?: () => void; init?: () => void })
-        | null;
-    if (tocElement && typeof tocElement.regenerateTOC === "function") {
-        tocElement.regenerateTOC();
-        tocElement.init?.();
-    }
+    reinitAllTocInstances();
+    (
+        window as typeof globalThis & { floatingTOCInit?: () => void }
+    ).floatingTOCInit?.();
 
     const fancybox = (window as unknown as Record<string, unknown>)[
         "Fancybox"

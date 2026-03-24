@@ -151,6 +151,10 @@ export const enAdmin: Record<string, string> = {
     [Key.adminSiteSettingsImageTooLargeWithLimit]:
         "Image is too large (limit {limit})",
     [Key.adminSiteSettingsInvalidInput]: "Invalid input",
+    [Key.adminSiteSettingsArticleLicenseInfo]: "Article license info",
+    [Key.adminSiteSettingsEnableLicenseBlock]: "Enable article license block",
+    [Key.adminSiteSettingsLicenseName]: "License name",
+    [Key.adminSiteSettingsLicenseUrl]: "License URL",
     [Key.adminSiteSettingsMarqueeSpeed]: "Marquee speed",
     [Key.adminSiteSettingsMusicServer]: "Music server",
     [Key.adminSiteSettingsMusicType]: "Music type",

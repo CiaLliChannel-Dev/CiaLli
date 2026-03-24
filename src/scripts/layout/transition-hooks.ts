@@ -11,6 +11,10 @@ import {
     syncEnterSkeletonStateToIncomingDocument,
 } from "./enter-skeleton";
 import type { TransitionProxyPayload } from "./enter-skeleton";
+import {
+    getTocRuntimeElements,
+    reinitAllTocInstances,
+} from "@/scripts/toc-runtime";
 import { scrollToHashBelowTocBaseline } from "@/utils/hash-scroll";
 import {
     isCurrentHomeRoute,
@@ -718,11 +722,8 @@ function finalizePageView(
             sourceDeps.checkKatex();
             sourceDeps.initKatexScrollbars();
 
-            const tocElement = document.querySelector("table-of-contents") as
-                | (HTMLElement & { init?: () => void })
-                | null;
             const hasAnyTOCRuntime =
-                typeof tocElement?.init === "function" ||
+                getTocRuntimeElements().length > 0 ||
                 typeof runtimeWindow.floatingTOCInit === "function";
 
             if (hasAnyTOCRuntime) {
@@ -730,7 +731,7 @@ function finalizePageView(
                     if (navigationToken !== state.navigationToken) {
                         return;
                     }
-                    tocElement?.init?.();
+                    reinitAllTocInstances();
                     runtimeWindow.floatingTOCInit?.();
                 }, 100);
             }

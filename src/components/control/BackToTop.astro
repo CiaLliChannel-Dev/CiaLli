@@ -34,6 +34,7 @@ import { Icon } from "astro-icon/components";
     font-weight: bold
     border: none
     position: fixed
+    z-index: var(--z-float-rail, 70)
     bottom: var(--back-to-top-bottom, 10rem)
     opacity: 1
     right: var(--right-float-right, 6rem)
@@ -54,7 +55,16 @@ import { Icon } from "astro-icon/components";
       transform: translateX(var(--right-float-shift-x, 5rem)) scale(0.9)
 
   @media (max-width: 1279px)
+    .back-to-top-wrapper
+      width: var(--mobile-float-size, 3.2rem)
+      height: var(--mobile-float-size, 3.2rem)
+
+    .back-to-top-btn-inner
+      width: var(--mobile-float-size, 3.2rem)
+      height: var(--mobile-float-size, 3.2rem)
+
     .back-to-top-btn
+      font-size: 2rem
       right: var(--mobile-float-rail-right, 1rem)
       bottom: calc(var(--mobile-float-rail-bottom, 1rem) + (var(--mobile-float-size, 3.75rem) + var(--mobile-float-gap, 0.75rem)) * var(--mobile-float-launcher-count, 0) + 0.85rem)
       transform: none

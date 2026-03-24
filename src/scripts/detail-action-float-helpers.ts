@@ -85,25 +85,27 @@ function tryMountToSidebar(rootEl: HTMLElement): boolean {
     return true;
 }
 
-function mountToDockAnchor(rootEl: HTMLElement): void {
+export function mountToFloatingAnchor(rootEl: HTMLElement): void {
     const dockAnchor = document.getElementById("detail-action-float-anchor");
     const canMount =
         dockAnchor instanceof HTMLElement && isElementVisible(dockAnchor);
 
     if (canMount && rootEl.parentElement !== dockAnchor) {
         dockAnchor.appendChild(rootEl);
-    } else if (!canMount && rootEl.parentElement !== document.body) {
+        return;
+    }
+    if (!canMount && rootEl.parentElement !== document.body) {
         document.body.appendChild(rootEl);
     }
-    rootEl.classList.remove("slot-mode");
-    rootEl.classList.add("fixed-mode");
 }
 
 export function resolveAndMountElement(ctx: DetailMountContext): void {
     const { rootEl, dockToBackTop } = ctx;
 
     if (dockToBackTop) {
-        mountToDockAnchor(rootEl);
+        mountToFloatingAnchor(rootEl);
+        rootEl.classList.remove("slot-mode");
+        rootEl.classList.add("fixed-mode");
         return;
     }
 

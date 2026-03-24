@@ -1,4 +1,5 @@
 import { syncMobileFloatStack } from "@/scripts/mobile-float-stack";
+import { reinitAllTocInstances } from "@/scripts/toc-runtime";
 
 type RuntimeWindow = Window &
     typeof globalThis & {
@@ -16,9 +17,11 @@ const MOBILE_MEDIA_QUERY = "(max-width: 1279px)";
 export const MOBILE_EDGE_DRAWER_OPEN_EVENT = "cialli:mobile-edge-drawer:open";
 
 function canUseDom(): boolean {
-    return (
-        typeof window !== "undefined" && typeof document !== "undefined"
-    );
+    return typeof window !== "undefined" && typeof document !== "undefined";
+}
+
+function resolveEventElement(event: Event): Element | null {
+    return event.target instanceof Element ? event.target : null;
 }
 
 function isMobileViewport(): boolean {
@@ -109,6 +112,13 @@ function openMobileEdgeDrawerRoot(root: HTMLElement): void {
 
     syncGlobalOpenState();
     syncMobileFloatStack();
+    // 抽屉打开后再按最终尺寸重算其中的 TOC，避免关闭态初始化导致可视区异常。
+    window.requestAnimationFrame(() => {
+        if (!root.classList.contains(OPEN_CLASS)) {
+            return;
+        }
+        reinitAllTocInstances(root);
+    });
     document.dispatchEvent(new CustomEvent(MOBILE_EDGE_DRAWER_OPEN_EVENT));
 }
 
@@ -149,8 +159,8 @@ function bindMobileEdgeDrawerBootstrap(): void {
     runtimeWindow.cialliCloseAllMobileEdgeDrawers = closeAllMobileEdgeDrawers;
 
     document.addEventListener("click", (event) => {
-        const target = event.target;
-        if (!(target instanceof HTMLElement)) {
+        const target = resolveEventElement(event);
+        if (!target) {
             return;
         }
 
@@ -171,11 +181,19 @@ function bindMobileEdgeDrawerBootstrap(): void {
         }
 
         if (
-            target.closest(BACKDROP_SELECTOR) ||
-            target.closest(CLOSE_SELECTOR)
+            target.closest<HTMLElement>(BACKDROP_SELECTOR) ||
+            target.closest<HTMLElement>(CLOSE_SELECTOR)
         ) {
             event.preventDefault();
-            closeMobileEdgeDrawerRoot(target);
+            const root =
+                target.closest<HTMLElement>(ROOT_SELECTOR) ??
+                target.closest<HTMLElement>(PANEL_SELECTOR) ??
+                target.closest<HTMLElement>(BACKDROP_SELECTOR) ??
+                target.closest<HTMLElement>(CLOSE_SELECTOR);
+            if (!root) {
+                return;
+            }
+            closeMobileEdgeDrawerRoot(root);
         }
     });
 

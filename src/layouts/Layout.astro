@@ -500,8 +500,6 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
         PAGE_WIDTH,
         PAGE_SCALE_MIN_WIDTH,
         configHue,
-        DESKTOP_MIN_WIDTH,
-        themeColorFixed: siteConfig.themeColor.fixed,
         pageScaling: siteConfig.pageScaling,
       }}
     >
@@ -542,38 +540,18 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
 
       // 自动缩放逻辑（从 MainGridLayout 前移，尽早执行）
       (function () {
-        if (pageScaling && pageScaling.enable) {
-          function adjustPageScale() {
-            const currentWidth = document.documentElement.clientWidth;
-            // 仅在宽屏下启用整体缩放，避免影响移动端与平板端的原生响应式布局。
-            if (currentWidth < PAGE_SCALE_MIN_WIDTH) {
-              document.documentElement.style.fontSize = "";
-              return;
-            }
-            const targetWidth = pageScaling.targetWidth || 2000;
-            let scale = currentWidth / targetWidth;
-            if (scale > 1) scale = 1;
-            if (scale < 0.85) scale = 0.85;
-            document.documentElement.style.fontSize = `${scale * 100}%`;
-          }
-
-          // 立即执行一次
-          adjustPageScale();
-
-          // 监听窗口尺寸变化
-          window.addEventListener("resize", adjustPageScale);
-
-          // 页面切换后也需要检查
-          document.addEventListener("astro:page-load", adjustPageScale);
+        const targetWidth = Number(pageScaling?.targetWidth || 0);
+        if (!Number.isFinite(targetWidth) || targetWidth <= 0) {
+          return;
         }
 
         function adjustPageScale() {
           const currentWidth = document.documentElement.clientWidth;
-          if (currentWidth < DESKTOP_MIN_WIDTH) {
+          // 仅在宽屏下启用整体缩放，避免影响移动端与平板端的原生响应式布局。
+          if (currentWidth < PAGE_SCALE_MIN_WIDTH) {
             document.documentElement.style.fontSize = "";
             return;
           }
-          const targetWidth = pageScaling.targetWidth || 2000;
           let scale = currentWidth / targetWidth;
           if (scale > 1) scale = 1;
           if (scale < 0.85) scale = 0.85;

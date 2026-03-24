@@ -577,19 +577,20 @@
     <button
       type="button"
       class="music-player-mobile-backdrop"
-      hidden={isDesktopViewport || isHidden || !isExpanded}
-      class:pointer-events-none={isDesktopViewport || isHidden || !isExpanded}
+      class:mobile-backdrop-active={!isDesktopViewport &&
+        isExpanded &&
+        !isHidden}
       on:click={closeMobileDrawer}
       aria-label="关闭音乐播放器"
+      aria-hidden={!isDesktopViewport && isExpanded && !isHidden
+        ? "false"
+        : "true"}
     ></button>
 
     <!-- 隐藏状态的小圆球 -->
     <div
       class="orb-player w-12 h-12 bg-(--primary) rounded-full shadow-2xl cursor-pointer transition-all duration-500 ease-in-out flex items-center justify-center hover:scale-110 active:scale-95"
-      hidden={!isHidden}
-      class:opacity-0={!isHidden}
-      class:scale-0={!isHidden}
-      class:pointer-events-none={!isHidden}
+      class:orb-player-active={isHidden}
       data-mobile-float-launcher
       data-mobile-float-order="1"
       on:click={toggleHidden}
@@ -625,10 +626,10 @@
     <!-- 收缩状态的迷你播放器 -->
     <div
       class="mini-player card-base bg-(--float-panel-bg) shadow-2xl rounded-2xl p-3 transition-all duration-500 ease-in-out"
-      hidden={isExpanded || isHidden || !isDesktopViewport}
-      class:opacity-0={isExpanded || isHidden || !isDesktopViewport}
-      class:scale-95={isExpanded || isHidden || !isDesktopViewport}
-      class:pointer-events-none={isExpanded || isHidden || !isDesktopViewport}
+      class:mini-player-active={!isExpanded && !isHidden && isDesktopViewport}
+      aria-hidden={!isExpanded && !isHidden && isDesktopViewport
+        ? "false"
+        : "true"}
     >
       <div class="flex items-center gap-3">
         <div
@@ -716,11 +717,9 @@
     <!-- 展开状态的完整播放器 -->
     <div
       class="expanded-player transition-all duration-500 ease-in-out"
-      hidden={!isExpanded || isHidden}
-      class:opacity-0={!isExpanded}
-      class:scale-95={!isExpanded}
-      class:pointer-events-none={!isExpanded}
+      class:expanded-player-active={isExpanded && !isHidden}
       class:music-player-mobile-panel={!isDesktopViewport}
+      aria-hidden={isExpanded && !isHidden ? "false" : "true"}
     >
       {#if showPlaylist}
         <MusicPlayerPlaylist

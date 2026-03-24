@@ -305,6 +305,7 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
 
     &.fixed-mode
       position: fixed
+      z-index: var(--z-float-rail, 70)
       right: var(--right-float-right, 6rem)
       bottom: calc(var(--back-to-top-bottom, 10rem) + var(--right-float-size, 3.75rem) + var(--right-float-gap, 0.75rem))
       top: auto
@@ -392,7 +393,7 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
 
   .detail-action-float-mobile
     position: relative
-    z-index: 65
+    z-index: var(--z-float-rail, 70)
 
   .detail-mobile-action-list,
   .detail-mobile-manage-list
@@ -412,9 +413,9 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     padding: .9rem 1rem
     background: unquote("color-mix(in oklch, var(--card-bg) 72%, var(--btn-plain-bg-hover) 28%)")
     border: 1px solid unquote("color-mix(in oklch, var(--line-divider) 78%, var(--primary) 22%)")
+    color: var(--deep-text)
 
   .detail-mobile-manage-btn
-    color: var(--text-90)
     text-align: left
 
   .detail-mobile-manage-btn-danger
@@ -427,7 +428,7 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     min-width: 0
     font-size: .95rem
     font-weight: 600
-    color: var(--text-90)
+    color: var(--deep-text)
 
   .detail-mobile-action-icon
     font-size: 1.35rem
@@ -444,11 +445,18 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     font-weight: 700
     text-transform: uppercase
     letter-spacing: .12em
-    color: var(--text-50)
+    color: var(--content-meta)
+
+  .detail-action-float-mobile .mobile-edge-drawer-panel
+    color: var(--deep-text)
+
+  .detail-action-float-mobile .mobile-edge-drawer-head
+    color: var(--deep-text)
 
   @media (max-width: 1279px)
     .detail-action-count
       font-size: .88rem
+      color: var(--content-meta)
 </style>
 
 <script>
@@ -456,10 +464,12 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
   import type { AuthState } from "@/scripts/auth-state";
   import { showAuthRequiredDialog } from "@/scripts/dialogs";
   import { closeMobileEdgeDrawerRoot } from "@/scripts/mobile-edge-drawer";
+  import { syncMobileFloatStack } from "@/scripts/mobile-float-stack";
   import { navigateToPage } from "@/utils/navigation-utils";
   import {
     queryDetailElements,
     resolveAndMountElement,
+    mountToFloatingAnchor,
     handleDeleteAction,
     handleLikeAction,
   } from "@/scripts/detail-action-float-helpers";
@@ -472,13 +482,23 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     button.textContent = label;
   }
 
+  function scheduleMobileFloatSync(): void {
+    window.requestAnimationFrame(() => {
+      syncMobileFloatStack();
+    });
+  }
+
   // 同一组件同时承载桌面浮条与移动端抽屉，需要在绑定时分流布局行为。
   // eslint-disable-next-line complexity -- 该组件需在单一绑定点整合多种交互状态
   function bindDetailRoot(rootEl: HTMLElement): void {
     rootEl.dataset.bound = "1";
     const dockToBackTop = rootEl.dataset.dockToBackTop === "1";
     const isMobileDrawer = rootEl.dataset.mobileDrawer === "1";
-    if (!isMobileDrawer) {
+    if (isMobileDrawer) {
+      // 移动端浮层也要脱离正文滤镜层，否则 fixed 按钮会被文章层级吞掉。
+      mountToFloatingAnchor(rootEl);
+      scheduleMobileFloatSync();
+    } else {
       resolveAndMountElement({ rootEl, dockToBackTop });
     }
 
@@ -534,6 +554,17 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
       if (drawerRoot) {
         closeMobileEdgeDrawerRoot(drawerRoot);
       }
+    }
+
+    function runAfterMobileDrawerClose(task: () => void): void {
+      closeMobileDrawer();
+      if (!isMobileDrawer) {
+        task();
+        return;
+      }
+      window.requestAnimationFrame(() => {
+        task();
+      });
     }
 
     function applyLikeUI(): void {
@@ -661,7 +692,9 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
       if (likeState.likePending || !contentId) return;
       const auth = getAuthState();
       if (!auth.isLoggedIn) {
-        showAuthRequiredDialog();
+        runAfterMobileDrawerClose(() => {
+          showAuthRequiredDialog();
+        });
         return;
       }
       if (!likeBtn) return;
@@ -679,20 +712,23 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     commentBtn?.addEventListener("click", () => {
       const commentRoot = document.getElementById("comment-root");
       if (commentRoot) {
-        closeMobileDrawer();
-        commentRoot.scrollIntoView({ behavior: "smooth", block: "start" });
+        runAfterMobileDrawerClose(() => {
+          commentRoot.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
         return;
       }
-      closeMobileDrawer();
-      navigateToPage(`${window.location.pathname}#comment-root`);
+      runAfterMobileDrawerClose(() => {
+        navigateToPage(`${window.location.pathname}#comment-root`);
+      });
     });
 
     shareBtn?.addEventListener("click", () => {
       if (!shareDialogId) {
         return;
       }
-      closeMobileDrawer();
-      runtimeWindow.cialliOpenArticleShareDialog?.(shareDialogId);
+      runAfterMobileDrawerClose(() => {
+        runtimeWindow.cialliOpenArticleShareDialog?.(shareDialogId);
+      });
     });
   }
 

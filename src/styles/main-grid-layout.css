@@ -20,6 +20,10 @@
   --right-float-right: max(1rem, env(safe-area-inset-right, 0px) + 1rem);
   --right-float-shift-x: 0;
   --back-to-top-bottom: calc(env(safe-area-inset-bottom, 0px) + 1rem);
+  --z-float-rail: 70;
+  --z-float-backdrop: 72;
+  --z-float-panel: 75;
+  --z-float-toast: 80;
 }
 
 @media (min-width: 1280px) {
@@ -93,9 +97,14 @@
 }
 
 @media (max-width: 1279px) {
+  :root {
+    --mobile-float-size: clamp(2.65rem, 10vw, 3.2rem);
+    --mobile-float-gap: 0.65rem;
+  }
+
   .mobile-edge-drawer-root {
     position: relative;
-    z-index: 65;
+    z-index: var(--z-float-rail, 70);
   }
 
   .mobile-edge-launcher {
@@ -104,12 +113,12 @@
     bottom: calc(var(--mobile-float-rail-bottom) + (var(--mobile-float-size) + var(--mobile-float-gap)) * var(--mobile-float-index, 0));
     width: var(--mobile-float-size);
     height: var(--mobile-float-size);
-    border-radius: 1rem;
+    border-radius: 0.9rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     color: var(--primary);
-    z-index: 70;
+    z-index: var(--z-float-rail, 70);
     pointer-events: auto;
   }
 
@@ -122,6 +131,7 @@
   .mobile-edge-drawer-layer {
     position: fixed;
     inset: 0;
+    z-index: var(--z-float-backdrop, 72);
     opacity: 0;
     visibility: hidden;
     pointer-events: none;
@@ -146,6 +156,9 @@
     top: 0;
     right: 0;
     bottom: 0;
+    z-index: var(--z-float-panel, 75);
+    display: flex;
+    flex-direction: column;
     width: min(22rem, calc(100vw - max(1.5rem, env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px) + 1.5rem)));
     max-width: calc(100vw - env(safe-area-inset-left, 0px));
     padding: calc(env(safe-area-inset-top, 0px) + 1rem) 0 calc(env(safe-area-inset-bottom, 0px) + 1rem) 0;
@@ -174,7 +187,8 @@
 
   .mobile-edge-drawer-body {
     width: 100%;
-    height: 100%;
+    flex: 1 1 auto;
+    min-height: 0;
     overflow: auto;
     display: flex;
     flex-direction: column;
@@ -287,6 +301,7 @@
   .main-panel-transition-proxy-sidebar,
   .main-panel-transition-proxy-right {
     grid-column: 1 / -1 !important;
+    grid-row: auto !important;
     max-width: none !important;
   }
 
@@ -300,6 +315,23 @@
 
   .main-panel-transition-proxy-sidebar {
     order: 3;
+  }
+}
+
+@media (min-width: 1280px) {
+  /* 过渡代理层在桌面端要沿用真实双侧栏的固定观感，避免切页时侧栏跟随正文滚动。 */
+  .main-panel-transition-proxy-scroll {
+    overflow: visible;
+  }
+
+  .main-panel-transition-proxy-sidebar,
+  .main-panel-transition-proxy-right {
+    position: sticky;
+    top: 5.5rem;
+    align-self: start;
+    max-height: calc(100dvh - 6.5rem);
+    overflow-y: auto;
+    scrollbar-width: thin;
   }
 }
 
@@ -603,36 +635,46 @@ body[data-layout-mode="collapsed"] .waves > .parallax use {
     max-height: calc(100dvh - 8rem) !important;
   }
 
-  body[data-layout-mode="banner"][data-route-home="true"] #sidebar,
-  body[data-layout-mode="none"] #sidebar,
+  /* 左侧栏的 sticky 必须挂在桌面列宿主上。
+     如果直接挂在 #sidebar，本体会被 responsive-sidebar-node 包住，
+     父容器高度等于内容自身，sticky 没有可粘附区间，滚动时会直接跟着正文走。 */
+  body[data-layout-mode="banner"][data-route-home="true"] [data-responsive-sidebar-desktop-anchor],
+  body[data-layout-mode="none"] [data-responsive-sidebar-desktop-anchor],
+  body[data-layout-mode="collapsed"] [data-responsive-sidebar-desktop-anchor],
   body[data-layout-mode="none"] #right-sidebar,
-  body[data-layout-mode="collapsed"] #sidebar,
   body[data-layout-mode="collapsed"] #right-sidebar {
     position: sticky;
     top: 5.5rem;
     align-self: start;
   }
 
-  body[data-layout-mode="banner"][data-route-home="true"] #sidebar[data-scrollable="true"],
-  body[data-layout-mode="none"] #sidebar[data-scrollable="true"],
+  body[data-layout-mode="banner"][data-route-home="true"] [data-responsive-sidebar-desktop-anchor] #sidebar[data-scrollable="true"],
+  body[data-layout-mode="none"] [data-responsive-sidebar-desktop-anchor] #sidebar[data-scrollable="true"],
+  body[data-layout-mode="collapsed"] [data-responsive-sidebar-desktop-anchor] #sidebar[data-scrollable="true"],
   body[data-layout-mode="none"] #right-sidebar,
-  body[data-layout-mode="collapsed"] #sidebar[data-scrollable="true"],
   body[data-layout-mode="collapsed"] #right-sidebar {
     max-height: calc(100dvh - 6.5rem);
     overflow-y: auto;
     scrollbar-width: thin;
   }
 
-  body[data-layout-mode="banner"][data-route-home="true"] #sidebar[data-scrollable="false"],
-  body[data-layout-mode="none"] #sidebar[data-scrollable="false"],
-  body[data-layout-mode="collapsed"] #sidebar[data-scrollable="false"] {
+  body[data-layout-mode="banner"][data-route-home="true"] [data-responsive-sidebar-desktop-anchor] #sidebar[data-scrollable="false"],
+  body[data-layout-mode="none"] [data-responsive-sidebar-desktop-anchor] #sidebar[data-scrollable="false"],
+  body[data-layout-mode="collapsed"] [data-responsive-sidebar-desktop-anchor] #sidebar[data-scrollable="false"] {
     overflow-y: hidden;
   }
 
-  body[data-layout-mode="banner"][data-route-home="true"] #sidebar #sidebar-sticky,
-  body[data-layout-mode="none"] #sidebar #sidebar-sticky,
+  body[data-layout-mode="banner"][data-route-home="true"] [data-responsive-sidebar-desktop-anchor] #sidebar,
+  body[data-layout-mode="none"] [data-responsive-sidebar-desktop-anchor] #sidebar,
+  body[data-layout-mode="collapsed"] [data-responsive-sidebar-desktop-anchor] #sidebar {
+    position: static;
+    top: auto;
+  }
+
+  body[data-layout-mode="banner"][data-route-home="true"] [data-responsive-sidebar-desktop-anchor] #sidebar #sidebar-sticky,
+  body[data-layout-mode="none"] [data-responsive-sidebar-desktop-anchor] #sidebar #sidebar-sticky,
+  body[data-layout-mode="collapsed"] [data-responsive-sidebar-desktop-anchor] #sidebar #sidebar-sticky,
   body[data-layout-mode="none"] #right-sidebar #right-sidebar-sticky,
-  body[data-layout-mode="collapsed"] #sidebar #sidebar-sticky,
   body[data-layout-mode="collapsed"] #right-sidebar #right-sidebar-sticky {
     position: relative;
     top: auto;

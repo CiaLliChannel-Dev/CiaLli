@@ -8,9 +8,7 @@ const LAUNCHER_SELECTOR = "[data-mobile-float-launcher]";
 const MOBILE_MEDIA_QUERY = "(max-width: 1279px)";
 
 function canUseDom(): boolean {
-    return (
-        typeof window !== "undefined" && typeof document !== "undefined"
-    );
+    return typeof window !== "undefined" && typeof document !== "undefined";
 }
 
 function isLauncherVisible(element: HTMLElement): boolean {

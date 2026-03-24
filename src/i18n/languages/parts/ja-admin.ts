@@ -149,6 +149,10 @@ export const jaAdmin: Record<string, string> = {
     [Key.adminSiteSettingsImageTooLargeWithLimit]:
         "画像サイズが大きすぎます（上限 {limit}）",
     [Key.adminSiteSettingsInvalidInput]: "入力が無効です",
+    [Key.adminSiteSettingsArticleLicenseInfo]: "記事ライセンス情報",
+    [Key.adminSiteSettingsEnableLicenseBlock]: "記事ライセンスブロックを有効化",
+    [Key.adminSiteSettingsLicenseName]: "ライセンス名",
+    [Key.adminSiteSettingsLicenseUrl]: "ライセンス URL",
     [Key.adminSiteSettingsMarqueeSpeed]: "スクロール速度",
     [Key.adminSiteSettingsMusicServer]: "音楽サーバー",
     [Key.adminSiteSettingsMusicType]: "音楽タイプ",
