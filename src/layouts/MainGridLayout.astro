@@ -358,7 +358,7 @@ const shouldRenderMobileDedicatedToc =
     </div>
     <TransitionProxySkeletonTemplates />
     <div
-      class={`relative pointer-events-auto ${isPostEditorPage ? "w-full px-4 post-editor-workbench-inner" : "max-w-(--page-width) mx-auto"}`}
+      class={`relative pointer-events-auto ${isPostEditorPage ? "w-full md:px-4 post-editor-workbench-inner" : "max-w-(--page-width) mx-auto"}`}
     >
       <div
         class:list={[
@@ -370,7 +370,7 @@ const shouldRenderMobileDedicatedToc =
       >
         <div
           id="main-grid"
-          class={`transition duration-700 w-full left-0 right-0 grid ${gridCols} grid-rows-none mx-auto gap-4 ${isPostEditorPage ? "post-editor-workbench-grid" : "px-4"}`}
+          class={`transition duration-700 w-full left-0 right-0 grid ${gridCols} grid-rows-none mx-auto gap-4 ${isPostEditorPage ? "post-editor-workbench-grid" : "md:px-4"}`}
         >
           {
             desktopShowLeftSidebar ? (

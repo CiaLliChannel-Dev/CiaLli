@@ -26,7 +26,7 @@ const feedModes = ["rss-page", "atom-page"] as const;
 <template data-transition-proxy-shell="sidebar-main">
   <div class="relative max-w-(--page-width) mx-auto">
     <div
-      class="main-panel-transition-proxy-grid grid grid-cols-[17.5rem_minmax(0,1fr)] gap-4 px-4"
+      class="main-panel-transition-proxy-grid grid grid-cols-[17.5rem_minmax(0,1fr)] gap-4 md:px-4"
     >
       <div
         class="main-panel-transition-proxy-sidebar mb-4 max-w-[17.5rem] col-start-1 col-end-2 row-start-1 row-end-2"
@@ -47,7 +47,7 @@ const feedModes = ["rss-page", "atom-page"] as const;
 </template>
 
 <template data-transition-proxy-shell="auth-login-split">
-  <div class="relative max-w-(--page-width) mx-auto px-4">
+  <div class="relative max-w-(--page-width) mx-auto md:px-4">
     <AuthLoginShell
       proxyMainSlot={true}
       contentClass="main-panel-transition-proxy-content"
@@ -56,7 +56,7 @@ const feedModes = ["rss-page", "atom-page"] as const;
 </template>
 
 <template data-transition-proxy-shell="main-only">
-  <div class="relative max-w-(--page-width) mx-auto px-4">
+  <div class="relative max-w-(--page-width) mx-auto md:px-4">
     <main
       class="main-panel-transition-proxy-main transition-fade overflow-clip w-full relative"
     >
@@ -72,7 +72,7 @@ const feedModes = ["rss-page", "atom-page"] as const;
 <template data-transition-proxy-shell="sidebar-main-right-default">
   <div class="relative max-w-(--page-width) mx-auto">
     <div
-      class="main-panel-transition-proxy-grid grid grid-cols-[17.5rem_minmax(0,1fr)_17.5rem] gap-4 px-4"
+      class="main-panel-transition-proxy-grid grid grid-cols-[17.5rem_minmax(0,1fr)_17.5rem] gap-4 md:px-4"
     >
       <div
         class="main-panel-transition-proxy-sidebar mb-4 max-w-[17.5rem] col-start-1 col-end-2 row-start-1 row-end-2"
@@ -100,7 +100,7 @@ const feedModes = ["rss-page", "atom-page"] as const;
 <template data-transition-proxy-shell="sidebar-main-right-archive">
   <div class="relative max-w-(--page-width) mx-auto">
     <div
-      class="main-panel-transition-proxy-grid grid grid-cols-[17.5rem_minmax(0,1fr)_17.5rem] gap-4 px-4"
+      class="main-panel-transition-proxy-grid grid grid-cols-[17.5rem_minmax(0,1fr)_17.5rem] gap-4 md:px-4"
     >
       <div
         class="main-panel-transition-proxy-sidebar mb-4 max-w-[17.5rem] col-start-1 col-end-2 row-start-1 row-end-2"
@@ -181,7 +181,7 @@ const feedModes = ["rss-page", "atom-page"] as const;
 <template data-transition-proxy-shell="sidebar-main-right-bangumi">
   <div class="relative max-w-(--page-width) mx-auto">
     <div
-      class="main-panel-transition-proxy-grid grid grid-cols-[17.5rem_minmax(0,1fr)_17.5rem] gap-4 px-4"
+      class="main-panel-transition-proxy-grid grid grid-cols-[17.5rem_minmax(0,1fr)_17.5rem] gap-4 md:px-4"
     >
       <div
         class="main-panel-transition-proxy-sidebar mb-4 max-w-[17.5rem] col-start-1 col-end-2 row-start-1 row-end-2"
@@ -244,7 +244,7 @@ const feedModes = ["rss-page", "atom-page"] as const;
 <template data-transition-proxy-shell="sidebar-main-right-albums">
   <div class="relative max-w-(--page-width) mx-auto">
     <div
-      class="main-panel-transition-proxy-grid grid grid-cols-[17.5rem_minmax(0,1fr)_17.5rem] gap-4 px-4"
+      class="main-panel-transition-proxy-grid grid grid-cols-[17.5rem_minmax(0,1fr)_17.5rem] gap-4 md:px-4"
     >
       <div
         class="main-panel-transition-proxy-sidebar mb-4 max-w-[17.5rem] col-start-1 col-end-2 row-start-1 row-end-2"
@@ -315,7 +315,9 @@ const feedModes = ["rss-page", "atom-page"] as const;
 </template>
 
 <template data-transition-proxy-shell="full-width-post-editor">
-  <div class="relative w-full px-4 post-editor-workbench-inner h-full min-h-0">
+  <div
+    class="relative w-full md:px-4 post-editor-workbench-inner h-full min-h-0"
+  >
     <div
       class="main-panel-transition-proxy-grid w-full grid grid-cols-1 gap-4 post-editor-workbench-grid h-full min-h-0"
     >
