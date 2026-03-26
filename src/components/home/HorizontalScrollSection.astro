@@ -17,13 +17,15 @@ const className = Astro.props.class;
   data-horizontal-scroll-section
 >
   <!-- 标题栏 -->
-  <div class="flex items-center justify-between px-6 pt-5 pb-3">
-    <h2 class="text-xl font-semibold text-90">{title}</h2>
+  <div
+    class="flex items-center justify-between gap-3 px-4 pt-4 pb-3 sm:px-6 sm:pt-5"
+  >
+    <h2 class="min-w-0 text-lg font-semibold text-90 sm:text-xl">{title}</h2>
     {
       moreHref && (
         <a
           href={moreHref}
-          class="text-sm text-50 hover:text-(--primary) transition-colors flex items-center gap-1"
+          class="shrink-0 inline-flex min-h-11 items-center gap-1 rounded-full px-2 text-sm text-black/55 transition-colors hover:text-(--primary) dark:text-white/70"
         >
           查看更多
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
@@ -59,7 +61,7 @@ const className = Astro.props.class;
     </button>
 
     <div
-      class="scroll-container flex gap-4 overflow-x-auto px-6 pb-5 snap-x snap-mandatory"
+      class="scroll-container flex gap-3 overflow-x-auto px-4 pb-4 snap-x snap-mandatory sm:gap-4 sm:px-6 sm:pb-5"
     >
       <slot />
 
@@ -68,7 +70,7 @@ const className = Astro.props.class;
         moreHref && (
           <a
             href={moreHref}
-            class="shrink-0 w-[42vw] max-w-[140px] min-h-[160px] rounded-xl border-2 border-dashed border-black/15 dark:border-white/20 flex flex-col items-center justify-center gap-2 text-50 hover:text-(--primary) hover:border-(--primary) transition-colors snap-start sm:w-[140px]"
+            class="shrink-0 flex min-h-[10.5rem] w-[40vw] min-w-[8.75rem] max-w-[9.5rem] flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed border-black/15 text-black/55 transition-colors snap-start hover:text-(--primary) hover:border-(--primary) dark:border-white/20 dark:text-white/70 sm:w-[140px]"
           >
             <svg class="w-8 h-8" viewBox="0 0 24 24" fill="currentColor">
               <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z" />
@@ -85,7 +87,7 @@ const className = Astro.props.class;
   .scroll-container {
     scrollbar-width: none;
     -ms-overflow-style: none;
-    scroll-padding-inline: 1.5rem;
+    scroll-padding-inline: 1rem;
   }
   .scroll-container::-webkit-scrollbar {
     display: none;
@@ -93,6 +95,12 @@ const className = Astro.props.class;
   .scroll-arrow.visible {
     opacity: 1;
     pointer-events: auto;
+  }
+
+  @media (min-width: 640px) {
+    .scroll-container {
+      scroll-padding-inline: 1.5rem;
+    }
   }
 
   @media (hover: none) and (pointer: coarse) {

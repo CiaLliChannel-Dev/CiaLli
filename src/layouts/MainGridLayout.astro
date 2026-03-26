@@ -29,6 +29,7 @@ interface Props {
   lang?: string;
   setOGTypeArticle?: boolean;
   headings?: MarkdownHeading[];
+  mobileLeftSidebarPlacement?: "footer" | "hidden";
 }
 
 const resolvedSiteSettings =
@@ -46,6 +47,7 @@ const {
   lang,
   setOGTypeArticle,
   headings = [],
+  mobileLeftSidebarPlacement = "footer",
 } = Astro.props;
 
 const hasCustomRightSidebar = Astro.slots.has("sidebar-right");
@@ -80,6 +82,10 @@ const shouldRenderMobilePostToolsDrawer =
   (hasRightSidebarComponents || (siteConfig.toc.enable && headings.length > 0));
 const shouldRenderMobileDedicatedToc =
   siteConfig.toc.enable && headings.length > 0 && !hasRightSidebarTocWidget;
+const shouldRenderMobileLeftSidebarAnchor =
+  !isPostEditorPage &&
+  desktopShowLeftSidebar &&
+  mobileLeftSidebarPlacement === "footer";
 ---
 
 <Layout
@@ -463,7 +469,7 @@ const shouldRenderMobileDedicatedToc =
             >
               <slot />
               {
-                !isPostEditorPage && desktopShowLeftSidebar && (
+                shouldRenderMobileLeftSidebarAnchor && (
                   <div
                     class="mobile-footer-sidebar-slot mb-4 lg:hidden"
                     data-responsive-sidebar-mobile-anchor
