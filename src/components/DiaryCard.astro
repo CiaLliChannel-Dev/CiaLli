@@ -106,14 +106,18 @@ function resolveDiaryImageSrc(image: AppDiaryImage): string {
   data-author-id={author_id}
   data-author-handle={authorHandle}
 >
-  <div class="pl-9 pr-2 pt-7 pb-6 relative">
-    <a href={diaryUrl} class="block space-y-3">
-      <p class="transition text-75 pr-4 line-clamp-2 text-base leading-7">
+  <div
+    class="diary-card-body relative flex flex-col gap-4 px-5 py-5 lg:pl-9 lg:pr-2 lg:pt-7 lg:pb-6"
+  >
+    <a href={diaryUrl} class="flex flex-col gap-3">
+      <p
+        class="diary-card-excerpt transition text-75 pr-0 line-clamp-2 text-base leading-7 lg:pr-4"
+      >
         {excerpt}
       </p>
       {
         visibleImages.length > 0 && (
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
             {visibleImages.map((img) => (
               <ExternalImage
                 src={resolveDiaryImageSrc(img)}
@@ -131,24 +135,24 @@ function resolveDiaryImageSrc(image: AppDiaryImage): string {
       class="flex flex-col items-start gap-3 mt-4 lg:flex-row lg:items-center lg:justify-between"
     >
       <div
-        class="flex min-w-0 flex-wrap items-center gap-1.5 text-50 text-sm font-medium leading-none"
+        class="diary-card-meta diary-card-muted-text flex min-w-0 flex-wrap items-center gap-1.5 text-sm font-medium leading-none"
       >
         <div class="max-w-[14rem] min-w-0 inline-flex items-baseline gap-1">
           <a
             href={`/${authorHandle}`}
-            class="truncate text-90 border-b border-transparent hover:border-current"
+            class="diary-card-primary-text truncate border-b border-transparent hover:border-current"
           >
             {authorDisplayName}
           </a>
           <a
             href={`/${authorHandle}`}
-            class="shrink-0 text-60 hover:text-(--primary) transition-colors"
+            class="diary-card-secondary-text shrink-0 hover:text-(--primary) transition-colors"
           >
             {"@"}
             {authorHandle}
           </a>
         </div>
-        <span class="text-(--meta-divider)" aria-hidden="true">&middot;</span>
+        <span class="diary-card-muted-text" aria-hidden="true">&middot;</span>
         <span>{publishedDate}</span>
       </div>
       <div
@@ -157,7 +161,7 @@ function resolveDiaryImageSrc(image: AppDiaryImage): string {
         <button
           type="button"
           class:list={[
-            "inline-flex h-6 items-center gap-1.5 text-base font-medium hover:text-(--primary) transition-colors post-card-action-btn",
+            "diary-card-action-control inline-flex h-6 items-center gap-1.5 text-base font-medium hover:text-(--primary) transition-colors post-card-action-btn",
             {
               "text-(--primary)": viewerState.hasLiked,
               "diary-card-muted-text": !viewerState.hasLiked,
@@ -168,22 +172,31 @@ function resolveDiaryImageSrc(image: AppDiaryImage): string {
           data-like-count={like_count}
           aria-label="切换点赞"
         >
-          <Icon name="material-symbols:thumb-up-rounded" class="text-xl" />
+          <Icon
+            name="material-symbols:thumb-up-rounded"
+            class="diary-card-action-icon text-xl"
+          />
           <span data-like-count>{like_count}</span>
         </button>
         <a
           href={`${diaryUrl}#comment-root`}
-          class="diary-card-muted-text inline-flex h-6 items-center gap-1.5 text-base font-medium hover:text-(--primary) transition-colors"
+          class="diary-card-action-control diary-card-muted-text inline-flex h-6 items-center gap-1.5 text-base font-medium hover:text-(--primary) transition-colors"
         >
-          <Icon name="material-symbols:comment-rounded" class="text-xl" />
+          <Icon
+            name="material-symbols:comment-rounded"
+            class="diary-card-action-icon text-xl"
+          />
           <span>{comment_count}</span>
         </a>
         <details class="relative post-card-menu">
           <summary
-            class="diary-card-muted-text list-none cursor-pointer inline-flex items-center justify-center w-8 h-8 rounded-lg hover:text-(--primary) hover:bg-(--btn-plain-bg-hover) active:bg-(--btn-plain-bg-active) transition-colors"
+            class="diary-card-action-menu diary-card-muted-text list-none cursor-pointer inline-flex items-center justify-center w-8 h-8 rounded-lg hover:text-(--primary) hover:bg-(--btn-plain-bg-hover) active:bg-(--btn-plain-bg-active) transition-colors"
             aria-label="更多操作"
           >
-            <Icon name="material-symbols:more-horiz" class="text-xl" />
+            <Icon
+              name="material-symbols:more-horiz"
+              class="diary-card-action-icon text-xl"
+            />
           </summary>
           <div
             class="absolute right-0 bottom-full mb-2 z-30 min-w-[10rem] rounded-xl border border-black/5 dark:border-white/10 bg-(--float-panel-bg) p-1.5 shadow-xl dark:shadow-none"
@@ -236,12 +249,28 @@ function resolveDiaryImageSrc(image: AppDiaryImage): string {
 </div>
 
 <style>
+  .diary-card-primary-text {
+    color: rgb(0 0 0 / 0.9);
+  }
+
+  .diary-card-secondary-text {
+    color: rgb(0 0 0 / 0.6);
+  }
+
   .diary-card-muted-text {
     color: rgb(0 0 0 / 0.5);
   }
 
   .diary-card-panel-text {
     color: rgb(0 0 0 / 0.75);
+  }
+
+  :global(:root.dark) .diary-card-primary-text {
+    color: rgb(255 255 255 / 0.9);
+  }
+
+  :global(:root.dark) .diary-card-secondary-text {
+    color: rgb(255 255 255 / 0.6);
   }
 
   :global(:root.dark) .diary-card-muted-text {
@@ -254,5 +283,49 @@ function resolveDiaryImageSrc(image: AppDiaryImage): string {
 
   .post-card-menu summary::-webkit-details-marker {
     display: none;
+  }
+
+  @media (max-width: 639px) {
+    .diary-card-action-control {
+      gap: 0.375rem;
+      height: 1.25rem;
+      font-size: 0.875rem;
+    }
+
+    .diary-card-action-icon {
+      font-size: 1rem;
+    }
+
+    .diary-card-action-menu {
+      width: 1.75rem;
+      height: 1.75rem;
+    }
+  }
+
+  @media (max-width: 1279px) {
+    .diary-card-body {
+      padding: 1rem;
+    }
+
+    .diary-card-excerpt {
+      font-size: 0.875rem;
+      line-height: 1.5rem;
+    }
+
+    .diary-card-meta {
+      font-size: 0.75rem;
+      line-height: 1.25rem;
+    }
+  }
+
+  @media (min-width: 640px) and (max-width: 1279px) {
+    .diary-card-body {
+      padding: 1.25rem;
+    }
+
+    .diary-card-meta {
+      font-size: 0.875rem;
+      line-height: 1;
+    }
   }
 </style>
