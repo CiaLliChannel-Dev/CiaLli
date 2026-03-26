@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- 用户管理聚合了角色、策略、资料与删除清理编排 */
 import type { APIContext } from "astro";
 
 import type {

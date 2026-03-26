@@ -113,3 +113,9 @@ body[data-layout-mode="none"] #navbar > div,
 body[data-layout-mode="collapsed"] #navbar > div {
   border-radius: 0 !important;
 }
+
+@media (max-width: 1279px) {
+  #navbar.scrolled > div {
+    border-radius: 0 !important;
+  }
+}

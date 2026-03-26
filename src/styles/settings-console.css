@@ -1,0 +1,235 @@
+@layer components {
+  [data-ui-density="settings-console"] {
+    --settings-console-card-padding: clamp(1.5rem, 1.3rem + 0.45vw, 1.9rem);
+    --settings-console-header-padding-inline: clamp(1.6rem, 1.35rem + 0.55vw, 2.1rem);
+    --settings-console-header-padding-block: clamp(1.45rem, 1.2rem + 0.4vw, 1.8rem);
+    --settings-console-input-height: 2.5rem;
+    --settings-console-btn-height: 2.3rem;
+    --settings-console-font-base: 0.9rem;
+    --settings-console-font-sm: 0.8125rem;
+  }
+
+  [data-ui-density="settings-console"] :is(section.card-base, a.card-base).settings-console-card {
+    padding: var(--settings-console-card-padding) !important;
+  }
+
+  [data-ui-density="settings-console"] [data-enter-skeleton-inline-placeholder] section.card-base {
+    padding: var(--settings-console-card-padding) !important;
+  }
+
+  [data-ui-density="settings-console"] [data-enter-skeleton-inline-placeholder] > section.card-base:first-child {
+    padding: var(--settings-console-header-padding-block) var(--settings-console-header-padding-inline) !important;
+  }
+
+  [data-ui-density="settings-console"] .settings-console-header-card {
+    padding: var(--settings-console-header-padding-block) var(--settings-console-header-padding-inline) !important;
+  }
+
+  [data-ui-density="settings-console"] .settings-console-header-title {
+    font-size: clamp(1.55rem, 1.3rem + 0.65vw, 1.9rem) !important;
+    line-height: 1.16 !important;
+  }
+
+  [data-ui-density="settings-console"] .settings-console-header-title::before {
+    height: 1.35rem !important;
+  }
+
+  [data-ui-density="settings-console"] .settings-console-header-copy {
+    font-size: 0.9rem !important;
+    line-height: 1.6 !important;
+  }
+
+  [data-ui-density="settings-console"] h2.text-2xl {
+    font-size: 1.2rem !important;
+    line-height: 1.35 !important;
+  }
+
+  [data-ui-density="settings-console"] h2.text-xl {
+    font-size: 1.05rem !important;
+    line-height: 1.4 !important;
+  }
+
+  [data-ui-density="settings-console"] h3.text-xl {
+    font-size: 0.95rem !important;
+    line-height: 1.45 !important;
+  }
+
+  [data-ui-density="settings-console"] :is(h3.text-lg, h4.text-base) {
+    font-size: 0.95rem !important;
+    line-height: 1.45 !important;
+  }
+
+  [data-ui-density="settings-console"] [class~="text-base"] {
+    font-size: var(--settings-console-font-base) !important;
+    line-height: 1.6 !important;
+  }
+
+  [data-ui-density="settings-console"] :is(input:not([type="checkbox"]):not([type="file"]):not([type="hidden"]):not([type="range"]), select, textarea) {
+    font-size: var(--settings-console-font-base) !important;
+    line-height: 1.45 !important;
+  }
+
+  [data-ui-density="settings-console"] :is(input:not([type="checkbox"]):not([type="file"]):not([type="hidden"]):not([type="range"]), select) {
+    min-height: var(--settings-console-input-height) !important;
+    padding: 0.55rem 0.85rem !important;
+  }
+
+  [data-ui-density="settings-console"] textarea {
+    padding: 0.7rem 0.85rem !important;
+  }
+
+  [data-ui-density="settings-console"] button {
+    font-size: var(--settings-console-font-sm) !important;
+    line-height: 1.35 !important;
+  }
+
+  [data-ui-density="settings-console"] button[class~="h-9"] {
+    height: var(--settings-console-btn-height) !important;
+  }
+
+  [data-ui-density="settings-console"] button[class~="h-10"] {
+    height: 2.45rem !important;
+  }
+
+  [data-ui-density="settings-console"] button[class~="h-11"] {
+    height: 2.55rem !important;
+  }
+
+  [data-ui-density="settings-console"] button:not(.settings-console-toolbar-btn)[class~="px-4"] {
+    padding-inline: 0.8rem !important;
+  }
+
+  [data-ui-density="settings-console"] button:not(.settings-console-toolbar-btn)[class~="px-3"] {
+    padding-inline: 0.7rem !important;
+  }
+
+  [data-ui-density="settings-console"] button:not(.settings-console-toolbar-btn):is([class~="py-2"], [class~="py-2.5"], [class~="py-3"]) {
+    padding-block: 0.55rem !important;
+  }
+
+  [data-ui-density="settings-console"] .settings-console-toggle-label {
+    gap: 0.75rem;
+    font-size: var(--settings-console-font-base);
+  }
+
+  [data-ui-density="settings-console"] .toggle-track {
+    width: 2.45rem;
+    height: 1.35rem;
+  }
+
+  [data-ui-density="settings-console"] .toggle-knob {
+    left: 0.175rem;
+    width: 1rem;
+    height: 1rem;
+  }
+
+  [data-ui-density="settings-console"] .toggle-checkbox:checked + .toggle-track .toggle-knob {
+    transform: translateX(1.08rem);
+  }
+
+  [data-ui-density="settings-console"] .settings-console-toolbar-btn {
+    width: 2.25rem !important;
+    height: 2.25rem !important;
+  }
+
+  [data-ui-density="settings-console"] .settings-console-drag-row {
+    gap: 0.75rem;
+    padding: 0.75rem 0.875rem;
+    border-radius: 0.875rem;
+  }
+
+  [data-ui-density="settings-console"] .settings-console-drag-handle {
+    font-size: 1rem;
+    line-height: 1;
+  }
+
+  [data-ui-density="settings-console"] .settings-console-inline-select {
+    min-height: var(--settings-console-input-height);
+  }
+
+  [data-ui-density="settings-console"] .settings-console-table-shell table {
+    font-size: 0.875rem;
+  }
+
+  .overlay-dialog-card.settings-console-dialog-card {
+    --overlay-dialog-card-padding-inline: 1.75rem;
+    --overlay-dialog-card-padding-block: 1.9rem;
+  }
+
+  .overlay-dialog-card.settings-console-dialog-card .overlay-dialog-message {
+    margin-bottom: 1.25rem;
+    font-size: 1rem;
+    line-height: 1.55;
+  }
+
+  .overlay-dialog-body.settings-console-dialog-body {
+    padding-bottom: 0.75rem;
+  }
+
+  .overlay-dialog-card.settings-console-dialog-card :is(.overlay-dialog-content-label, .overlay-dialog-table-message, .overlay-dialog-error) {
+    font-size: 0.8125rem;
+  }
+
+  .overlay-dialog-card.settings-console-dialog-card :is(.overlay-dialog-content-value, .overlay-dialog-field-control) {
+    font-size: 0.875rem;
+  }
+
+  .overlay-dialog-actions.settings-console-dialog-actions {
+    gap: 0.625rem;
+    padding: 0.75rem var(--overlay-dialog-card-padding-inline) max(0.75rem, env(safe-area-inset-bottom));
+  }
+
+  .overlay-dialog-actions.settings-console-dialog-actions a,
+  .overlay-dialog-actions.settings-console-dialog-actions button {
+    max-width: 148px;
+    padding: 0.5625rem 1rem;
+    border-radius: 0.625rem;
+    font-size: 0.875rem;
+  }
+
+  .overlay-dialog-card.settings-console-dialog-card-data-table {
+    max-width: min(95vw, 980px);
+  }
+
+  .overlay-dialog-card.settings-console-dialog-card-data-table .overlay-dialog-table th,
+  .overlay-dialog-card.settings-console-dialog-card-data-table .overlay-dialog-table td {
+    padding: 0.625rem 0.75rem;
+    font-size: 0.8125rem;
+  }
+
+  .overlay-dialog-card.settings-console-dialog-card-data-table .overlay-dialog-sort-btn {
+    font-size: 0.8125rem;
+  }
+
+  .overlay-dialog-card.settings-console-dialog-card-data-table .overlay-dialog-sort-indicator {
+    font-size: 0.72rem;
+  }
+
+  @media (max-width: 1279px) {
+    [data-ui-density="settings-console"] {
+      --settings-console-card-padding: 1.25rem;
+      --settings-console-header-padding-inline: 1.2rem;
+      --settings-console-header-padding-block: 1.15rem;
+    }
+
+    [data-ui-density="settings-console"] .settings-console-header-title {
+      font-size: 1.45rem !important;
+    }
+
+    .overlay-dialog-card.settings-console-dialog-card {
+      --overlay-dialog-card-padding-inline: 1.25rem;
+      --overlay-dialog-card-padding-block: 1.35rem;
+      width: min(94vw, 100%);
+    }
+
+    .overlay-dialog-actions.settings-console-dialog-actions {
+      flex-wrap: wrap;
+    }
+
+    .overlay-dialog-actions.settings-console-dialog-actions a,
+    .overlay-dialog-actions.settings-console-dialog-actions button {
+      max-width: none;
+      min-width: 0;
+    }
+  }
+}

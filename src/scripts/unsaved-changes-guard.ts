@@ -1,4 +1,3 @@
-/* eslint-disable max-lines-per-function -- 未保存导航协调器需集中处理 click、popstate 与程序化导航三个入口。 */
 import { navigate } from "astro:transitions/client";
 import { showUnsavedChangesDialog } from "@/scripts/dialogs";
 import {

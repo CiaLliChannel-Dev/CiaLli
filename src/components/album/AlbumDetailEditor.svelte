@@ -1,5 +1,4 @@
 <script lang="ts">
-  /* eslint-disable max-lines -- 文件行数较长，按页面驱动与模块边界保留当前结构 */
   import { onDestroy, onMount, tick } from "svelte";
   import { showConfirmDialog, showNoticeDialog } from "@/scripts/dialogs";
   import {

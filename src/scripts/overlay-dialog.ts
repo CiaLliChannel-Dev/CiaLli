@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- 通用弹窗需要集中维护字段、内容与动作渲染，避免状态分散。 */
 export type OverlayDialogActionVariant = "primary" | "secondary" | "danger";
 export type OverlayDialogActionKind = "button" | "link";
 

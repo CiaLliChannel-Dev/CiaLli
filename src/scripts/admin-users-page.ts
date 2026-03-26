@@ -234,6 +234,9 @@ const showRegistrationDetailDialog = async (
         ariaLabel: t(I18nKey.adminUsersRegistrationDetail),
         message: t(I18nKey.adminUsersRegistrationDetail),
         dismissKey: "close",
+        cardClassName: "settings-console-dialog-card",
+        bodyClassName: "settings-console-dialog-body",
+        actionsClassName: "settings-console-dialog-actions",
         content,
         contentColumns: 2,
         fields: canReview
@@ -360,7 +363,8 @@ function updateUsersSortButtons(session: UsersDialogSession): void {
 
 function createUsersDialogSession(): UsersDialogSession {
     const container = document.createElement("section");
-    container.className = "overlay-dialog-table-shell";
+    container.className =
+        "overlay-dialog-table-shell settings-console-table-shell";
 
     const tableScroll = document.createElement("div");
     tableScroll.className = "overlay-dialog-table-scroll";
@@ -620,6 +624,9 @@ const handleDeleteUser = async (
         message: t(I18nKey.adminUsersDeleteConfirmMessage),
         confirmText: t(I18nKey.adminUsersDeleteConfirmButton),
         confirmVariant: "danger",
+        cardClassName: "settings-console-dialog-card",
+        bodyClassName: "settings-console-dialog-body",
+        actionsClassName: "settings-console-dialog-actions",
         manualConfirm: {
             expectedText,
             placeholder: expectedText,
@@ -733,8 +740,11 @@ async function openUsersListDialog(): Promise<void> {
                 node: session.container,
                 className: "overlay-dialog-custom-content-data-table",
             },
-            cardClassName: "overlay-dialog-card-data-table",
-            bodyClassName: "overlay-dialog-body-data-table",
+            cardClassName:
+                "overlay-dialog-card-data-table settings-console-dialog-card settings-console-dialog-card-data-table",
+            bodyClassName:
+                "overlay-dialog-body-data-table settings-console-dialog-body",
+            actionsClassName: "settings-console-dialog-actions",
             actions: [
                 {
                     key: "close",

@@ -53,7 +53,7 @@ export const INPUT_CLS =
 export const BTN_DELETE_CLS =
     "px-3 py-1.5 rounded-lg border border-(--line-divider) text-sm text-75 hover:text-red-500 hover:border-red-300 transition-colors";
 export const DRAG_HANDLE_CLS =
-    "cursor-grab active:cursor-grabbing text-30 hover:text-60 transition-colors select-none text-base leading-none";
+    "settings-console-drag-handle cursor-grab active:cursor-grabbing text-30 hover:text-60 transition-colors select-none text-base leading-none";
 export const PREVIEW_IMG_CLS =
     "h-20 w-36 rounded-lg border border-(--line-divider) object-cover bg-black/5";
 export const PREVIEW_ICON_CLS =

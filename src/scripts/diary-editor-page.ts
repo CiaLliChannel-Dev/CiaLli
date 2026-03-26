@@ -1,4 +1,4 @@
-/* eslint-disable max-lines, max-lines-per-function -- 文件与入口函数较长，按页面驱动与现有模块边界保留当前结构 */
+/* eslint-disable max-lines-per-function -- 文件与入口函数较长，按页面驱动与现有模块边界保留当前结构 */
 import { UPLOAD_LIMIT_LABELS, UPLOAD_LIMITS } from "@/constants/upload-limits";
 import I18nKey from "@/i18n/i18nKey";
 import { t, tFmt } from "@/scripts/i18n-runtime";

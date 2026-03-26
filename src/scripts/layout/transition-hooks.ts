@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- 该文件集中承载导航过渡状态机与 Astro 生命周期衔接逻辑。 */
 import type { LayoutController } from "./layout-controller";
 import {
     applySidebarProfilePatch,

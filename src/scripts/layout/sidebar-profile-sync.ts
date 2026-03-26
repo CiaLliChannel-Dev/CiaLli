@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- 文件行数较长，按页面驱动与模块边界保留当前结构 */
 import { SOCIAL_PLATFORM_META } from "@constants/social-platforms";
 
 type SidebarSocialMode = "single" | "multi";

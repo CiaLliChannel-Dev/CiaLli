@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- 文章接口需在同一文件内集中处理预览、工作草稿、CRUD 与文件可见性同步。 */
 import type { APIContext } from "astro";
 import { performance } from "node:perf_hooks";
 

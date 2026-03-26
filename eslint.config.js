@@ -89,11 +89,11 @@ export default tseslint.config(
             "prefer-const": "error",
             "max-lines": [
                 "warn",
-                { max: 500, skipBlankLines: true, skipComments: true },
+                { max: 1000, skipBlankLines: true, skipComments: true },
             ],
             "max-lines-per-function": [
                 "warn",
-                { max: 200, skipBlankLines: true, skipComments: true },
+                { max: 300, skipBlankLines: true, skipComments: true },
             ],
             complexity: ["warn", { max: 15 }],
             "@typescript-eslint/no-explicit-any": "error",

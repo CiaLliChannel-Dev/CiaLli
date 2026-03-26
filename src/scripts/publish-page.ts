@@ -1,4 +1,4 @@
-/* eslint-disable max-lines, max-lines-per-function -- 文件与入口函数较长，按页面驱动与模块边界保留当前结构 */
+/* eslint-disable max-lines-per-function -- 文件与入口函数较长，按页面驱动与模块边界保留当前结构 */
 /**
  * 发布中心页面逻辑 — 纯文章编辑器
  *

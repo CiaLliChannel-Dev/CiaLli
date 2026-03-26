@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Directus 客户端集中维护 service/public/user 三类访问模型 */
 import { AsyncLocalStorage } from "node:async_hooks";
 
 import {

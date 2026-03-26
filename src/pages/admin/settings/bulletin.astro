@@ -16,17 +16,20 @@ export const prerender = false;
   <div
     data-enter-skeleton-page="admin-bulletin-settings"
     data-enter-skeleton-target="admin-bulletin-settings"
+    data-ui-density="settings-console"
   >
     <div data-enter-skeleton-inline-content class="space-y-4 text-75">
-      <section class="card-base px-9 py-6 rounded-(--radius-large)">
+      <section
+        class="card-base settings-console-card settings-console-header-card rounded-(--radius-large)"
+      >
         <h1
-          class="text-4xl font-bold text-black/90 dark:text-white/90 mb-2 relative
+          class="settings-console-header-title text-4xl font-bold text-black/90 dark:text-white/90 mb-2 relative
             before:w-1 before:h-8 before:rounded-md before:bg-(--primary)
             before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
         >
           {i18n(I18nKey.adminBulletinTitle)}
         </h1>
-        <p class="text-base text-70">
+        <p class="settings-console-header-copy text-base text-70">
           {i18n(I18nKey.adminBulletinDescription)}
         </p>
       </section>

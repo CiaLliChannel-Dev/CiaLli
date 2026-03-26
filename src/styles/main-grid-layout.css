@@ -72,6 +72,16 @@
   font-size: clamp(1rem, 4vw, 1.875rem);
 }
 
+@media (max-width: 1279px) {
+  .banner-title {
+    font-size: clamp(2.25rem, 8.5vw, 5rem);
+  }
+
+  .banner-subtitle {
+    font-size: clamp(0.875rem, 3.25vw, 1.5rem);
+  }
+}
+
 @keyframes fadeInUp {
   from {
     opacity: 0;

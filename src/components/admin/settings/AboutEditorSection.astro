@@ -4,7 +4,9 @@ import { i18n } from "@i18n/translation";
 import { Icon } from "astro-icon/components";
 ---
 
-<section class="card-base p-8 rounded-(--radius-large) space-y-4">
+<section
+  class="card-base settings-console-card rounded-(--radius-large) space-y-4"
+>
   <form id="about-form" class="space-y-4">
     <label class="space-y-1.5 block">
       <span class="text-sm text-60"
@@ -67,7 +69,7 @@ import { Icon } from "astro-icon/components";
       <div id="about-toolbar" class="flex flex-wrap items-center gap-2">
         <button
           type="button"
-          class="about-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
+          class="about-toolbar-btn settings-console-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
           data-md-action="bold"
           aria-label={i18n(I18nKey.adminMarkdownBold)}
           title={i18n(I18nKey.adminMarkdownBold)}
@@ -76,7 +78,7 @@ import { Icon } from "astro-icon/components";
         </button>
         <button
           type="button"
-          class="about-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
+          class="about-toolbar-btn settings-console-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
           data-md-action="italic"
           aria-label={i18n(I18nKey.adminMarkdownItalic)}
           title={i18n(I18nKey.adminMarkdownItalic)}
@@ -85,7 +87,7 @@ import { Icon } from "astro-icon/components";
         </button>
         <button
           type="button"
-          class="about-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
+          class="about-toolbar-btn settings-console-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
           data-md-action="underline"
           aria-label={i18n(I18nKey.adminMarkdownUnderline)}
           title={i18n(I18nKey.adminMarkdownUnderline)}
@@ -97,7 +99,7 @@ import { Icon } from "astro-icon/components";
         </button>
         <button
           type="button"
-          class="about-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
+          class="about-toolbar-btn settings-console-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
           data-md-action="strike"
           aria-label={i18n(I18nKey.adminMarkdownStrike)}
           title={i18n(I18nKey.adminMarkdownStrike)}
@@ -109,7 +111,7 @@ import { Icon } from "astro-icon/components";
         </button>
         <button
           type="button"
-          class="about-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
+          class="about-toolbar-btn settings-console-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
           data-md-action="quote"
           aria-label={i18n(I18nKey.adminMarkdownQuote)}
           title={i18n(I18nKey.adminMarkdownQuote)}
@@ -118,7 +120,7 @@ import { Icon } from "astro-icon/components";
         </button>
         <button
           type="button"
-          class="about-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
+          class="about-toolbar-btn settings-console-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
           data-md-action="inline-code"
           aria-label={i18n(I18nKey.adminMarkdownInlineCode)}
           title={i18n(I18nKey.adminMarkdownInlineCode)}
@@ -127,7 +129,7 @@ import { Icon } from "astro-icon/components";
         </button>
         <button
           type="button"
-          class="about-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
+          class="about-toolbar-btn settings-console-toolbar-btn btn-plain scale-animation w-9 h-9 rounded-lg border border-(--line-divider) text-75 hover:text-90"
           data-md-action="code-block"
           aria-label={i18n(I18nKey.adminMarkdownCodeBlock)}
           title={i18n(I18nKey.adminMarkdownCodeBlock)}

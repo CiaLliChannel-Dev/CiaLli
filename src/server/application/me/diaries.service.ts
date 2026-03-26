@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- 日记主体与图片子资源共用文件以保证行为一致 */
 import type { APIContext } from "astro";
 import { performance } from "node:perf_hooks";
 

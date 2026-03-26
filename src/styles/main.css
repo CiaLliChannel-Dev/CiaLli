@@ -7,6 +7,7 @@
 @import "./gradient-buttons.css";
 /* 通用弹层 */
 @import "./overlay-dialog.css";
+@import "./settings-console.css";
 @import "./toggle.css";
 @import "tailwindcss";
 
@@ -14,7 +15,16 @@
 
 /* 确保平滑滚动 */
 html {
+  /* 全站字号基线统一从这里控制，避免模板层写死后覆盖响应式策略 */
+  font-size: 16px;
   scroll-behavior: smooth;
+}
+
+@media (max-width: 1279px) {
+  html {
+    /* 手机与平板统一下调基线字号，让 rem 与 Tailwind 字号一起缩小 */
+    font-size: 14px;
+  }
 }
 
 /* Date picker icon theme adaptation (light/dark). */

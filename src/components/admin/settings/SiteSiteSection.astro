@@ -12,7 +12,9 @@ const supportedTimeZones = getSupportedSiteTimeZones();
 ---
 
 <!-- ===== Section 1: 站点信息 ===== -->
-<section class="card-base p-8 rounded-(--radius-large) space-y-4">
+<section
+  class="card-base settings-console-card rounded-(--radius-large) space-y-4"
+>
   <h2 class="text-2xl font-semibold text-90">
     {i18n(I18nKey.adminSiteSettingsSectionSite)}
   </h2>
@@ -154,7 +156,7 @@ const supportedTimeZones = getSupportedSiteTimeZones();
       {i18n(I18nKey.adminSiteSettingsUmamiTitle)}
     </h3>
     <label
-      class="flex items-center gap-3 text-75 cursor-pointer select-none lg:col-span-2"
+      class="settings-console-toggle-label flex items-center gap-3 text-75 cursor-pointer select-none lg:col-span-2"
     >
       <input type="checkbox" id="ss-umami-enabled" class="toggle-checkbox" />
       <span class="toggle-track"><span class="toggle-knob"></span></span>
