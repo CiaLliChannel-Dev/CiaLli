@@ -20,10 +20,12 @@ interface Props {
   };
   username: string;
   viewerState?: HomeFeedViewerState;
+  titleSerif?: boolean;
 }
 
 const { entry, username } = Astro.props;
 const className = Astro.props.class;
+const titleSerif = Astro.props.titleSerif === true;
 const viewerState: HomeFeedViewerState = Astro.props.viewerState ?? {
   hasLiked: false,
   canDeleteOwn: false,
@@ -111,7 +113,12 @@ function resolveDiaryImageSrc(image: AppDiaryImage): string {
   >
     <a href={diaryUrl} class="flex flex-col gap-3">
       <p
-        class="diary-card-excerpt transition text-75 pr-0 line-clamp-2 text-base leading-7 lg:pr-4"
+        class:list={[
+          "diary-card-excerpt transition text-75 pr-0 line-clamp-2 text-base leading-7 lg:pr-4",
+          {
+            "font-content-serif": titleSerif,
+          },
+        ]}
       >
         {excerpt}
       </p>

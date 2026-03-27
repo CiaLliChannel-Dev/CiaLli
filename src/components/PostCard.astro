@@ -14,10 +14,12 @@ interface Props {
   entry: DirectusPostEntry;
   style?: string;
   viewerState?: HomeFeedViewerState;
+  titleSerif?: boolean;
 }
 
 const { entry, style } = Astro.props;
 const className = Astro.props.class;
+const titleSerif = Astro.props.titleSerif === true;
 const viewerState: HomeFeedViewerState = Astro.props.viewerState ?? {
   hasLiked: false,
   canDeleteOwn: false,
@@ -101,13 +103,12 @@ const adminDeleteLabel = i18n(I18nKey.interactionCommonDeleteAdmin);
     >
       <a
         href={url}
-        class="post-card-title post-card-primary-text relative z-20 transition w-full block font-bold text-2xl lg:text-3xl
-          hover:text-(--primary) dark:hover:text-(--primary)
-          active:text-(--title-active) dark:active:text-(--title-active)
-          before:content-[''] before:absolute before:-left-4
-          before:top-[0.18em] before:bottom-[0.18em]
-          before:w-1 before:rounded-md before:bg-(--primary)
-          lg:before:-left-[1.125rem]"
+        class:list={[
+          "post-card-title post-card-primary-text relative z-20 transition w-full block font-bold text-2xl lg:text-3xl hover:text-(--primary) dark:hover:text-(--primary) active:text-(--title-active) dark:active:text-(--title-active) before:content-[''] before:absolute before:-left-4 before:top-[0.18em] before:bottom-[0.18em] before:w-1 before:rounded-md before:bg-(--primary) lg:before:-left-[1.125rem]",
+          {
+            "font-content-serif": titleSerif,
+          },
+        ]}
       >
         {
           pinned && (

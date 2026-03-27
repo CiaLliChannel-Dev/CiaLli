@@ -5,6 +5,19 @@
     @apply text-3xl;
   }
 
+  /* 内容详情与预览区使用局部衬线排版，不改全站默认无衬线界面。 */
+  &.content-serif {
+    :is(h1, h2, h3, h4, h5, h6, p, li, blockquote, figcaption, th, td) {
+      font-family: var(--font-serif-content);
+    }
+
+    /* 正文衬线字重与字号略微抬高，避免 Garamond 在正文场景下观感过细。 */
+    :is(p, li, blockquote, figcaption, td) {
+      font-weight: 500;
+      font-size: 1.0625em;
+    }
+  }
+
   :is(h1, h2, h3, h4, h5, h6) {
     .anchor {
       @apply transition -m-0.5 ms-[0.2ch] p-0.5 select-none opacity-0 no-underline;

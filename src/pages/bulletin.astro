@@ -45,7 +45,7 @@ if (!bodyHtml) {
         <article class="card-base z-10 px-9 py-6 relative w-full space-y-6">
           <header class="space-y-3">
             <h1
-              class="text-4xl font-bold text-black/90 dark:text-white/90 relative
+              class="font-content-serif text-4xl font-bold text-black/90 dark:text-white/90 relative
                 before:w-1 before:h-8 before:rounded-md before:bg-(--primary)
                 before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
             >
@@ -60,7 +60,7 @@ if (!bodyHtml) {
             }
           </header>
 
-          <Markdown class="mt-2">
+          <Markdown class="mt-2 content-serif">
             <Fragment set:html={bodyHtml} />
           </Markdown>
         </article>

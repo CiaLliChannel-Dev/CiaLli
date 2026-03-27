@@ -16,6 +16,8 @@
 :root {
   --font-sans: "Noto Sans SC", "Noto Sans JP", "Noto Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "Noto Sans Mono", ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  /* 内容型标题与正文专用衬线字体：英文优先 Garamond，中文按简繁体 Serif 回退。 */
+  --font-serif-content: "EB Garamond", "Noto Serif SC", "Noto Serif TC", serif;
 
   --font-banner-display: "Long Cang", "Noto Sans SC", "Noto Sans JP", sans-serif;
 }
@@ -174,6 +176,10 @@ html[data-theme="github-dark"] input[type="date"].date-picker-input::-webkit-cal
 
   .card-base {
     @apply rounded-(--radius-large) overflow-hidden bg-(--card-bg) transition-colors duration-150;
+  }
+  /* 仅用于文章/日记等内容型标题，避免影响全站界面字体。 */
+  .font-content-serif {
+    font-family: var(--font-serif-content);
   }
   .card-base-transparent {
     @apply rounded-(--radius-large) overflow-hidden bg-(--card-bg) transition-colors duration-150;

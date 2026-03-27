@@ -71,6 +71,7 @@ const siteDateContext = buildSiteDateFormatContext(resolvedSiteSettings);
             entry={item.entry}
             class:list="onload-animation"
             viewerState={item.viewerState}
+            titleSerif={true}
           />
         ) : (
           <DiaryCard
@@ -78,6 +79,7 @@ const siteDateContext = buildSiteDateFormatContext(resolvedSiteSettings);
             username={authorHandle}
             class:list="onload-animation"
             viewerState={item.viewerState}
+            titleSerif={true}
           />
         )}
       </div>

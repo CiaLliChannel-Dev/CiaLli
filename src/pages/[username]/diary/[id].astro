@@ -219,7 +219,7 @@ const diaryMetaText = formatSiteDateTime(diary?.date_created, siteDateContext);
                   {i18n(I18nKey.contentDiaryBackToList)}
                 </a>
                 <header class="mb-4 space-y-2">
-                  <h1 class="text-3xl font-bold text-90">
+                  <h1 class="text-3xl font-bold text-90 font-content-serif">
                     {i18n(I18nKey.contentDiaryDetailTitle)}
                   </h1>
                   <div class="text-sm text-60 flex flex-wrap items-center gap-3">
@@ -231,7 +231,7 @@ const diaryMetaText = formatSiteDateTime(diary?.date_created, siteDateContext);
                   </div>
                 </header>
 
-                <Markdown class="markdown-content mb-6 prose-lg">
+                <Markdown class="markdown-content mb-6 prose-lg content-serif">
                   <Fragment set:html={html} />
                 </Markdown>
 
