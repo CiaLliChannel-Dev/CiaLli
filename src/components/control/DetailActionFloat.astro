@@ -47,7 +47,10 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
 ---
 
 <div
-  class:list={["detail-action-float", dockToBackTop && "fixed-mode"]}
+  class:list={[
+    "detail-action-float detail-action-float-desktop hidden lg:block",
+    dockToBackTop && "fixed-mode",
+  ]}
   data-content-type={contentType}
   data-content-id={contentId}
   data-author-id={authorId}
@@ -132,8 +135,89 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
   </div>
 </div>
 
+<div
+  class="detail-action-float detail-action-float-mobile lg:hidden"
+  data-mobile-bar="1"
+  data-content-type={contentType}
+  data-content-id={contentId}
+  data-author-id={authorId}
+  data-like-count={String(likeCount)}
+  data-comment-count={String(commentCount)}
+  data-liked={likedByViewer ? "1" : "0"}
+  data-dock-to-back-top={dockToBackTop ? "1" : "0"}
+  data-share-dialog-id={sharePayload ? "article-share-dialog" : ""}
+  data-edit-href={editHref}
+  data-delete-endpoint={deleteEndpoint}
+  data-admin-delete-endpoint={adminDeleteEndpoint}
+  data-delete-confirm-message={deleteConfirmMessage}
+  data-admin-delete-confirm-message={adminDeleteConfirmMessage}
+  data-delete-label={deleteLabel}
+  data-admin-delete-label={adminDeleteLabel}
+  data-delete-success-href={deleteSuccessHref}
+>
+  <div class="detail-mobile-bar card-base rounded-full" data-mobile-bar-shell>
+    {
+      showCommentAction && (
+        <button
+          type="button"
+          class="detail-action-btn detail-mobile-comment-entry"
+          aria-label="发布评论"
+        >
+          <span class="detail-mobile-comment-entry-text">发布评论</span>
+        </button>
+      )
+    }
+
+    <div class="detail-mobile-action-trailing">
+      {
+        showLikeAction && (
+          <button
+            type="button"
+            class="detail-action-btn detail-like-btn detail-mobile-icon-btn detail-mobile-like-btn"
+            aria-label="点赞"
+          >
+            <Icon
+              name="material-symbols:thumb-up-rounded"
+              class="detail-icon"
+            />
+            <span class="detail-mobile-count-badge" data-like-count-text>
+              {likeCount}
+            </span>
+          </button>
+        )
+      }
+      {
+        showCommentAction && (
+          <button
+            type="button"
+            class="detail-action-btn detail-comment-btn detail-mobile-icon-btn detail-mobile-comment-btn"
+            aria-label="跳转到评论区"
+          >
+            <Icon name="material-symbols:comment-rounded" class="detail-icon" />
+            <span class="detail-mobile-count-badge">{commentCount}</span>
+          </button>
+        )
+      }
+      {
+        sharePayload && (
+          <button
+            type="button"
+            class:list={[
+              "detail-action-btn detail-share-btn detail-mobile-icon-btn",
+              sharePayload.hiddenUntilDecrypt && "encrypted-hidden",
+            ]}
+            aria-label={i18n(I18nKey.contentShareArticle)}
+          >
+            <Icon name="material-symbols:share" class="detail-icon" />
+          </button>
+        )
+      }
+    </div>
+  </div>
+</div>
+
 <style lang="stylus">
-  .detail-action-float
+  .detail-action-float-desktop
     position: relative
     width: var(--right-float-size, 3.75rem)
     margin-top: 9.5rem
@@ -144,6 +228,7 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
 
     &.fixed-mode
       position: fixed
+      z-index: var(--z-float-rail, 70)
       right: var(--right-float-right, 6rem)
       bottom: calc(var(--back-to-top-bottom, 10rem) + var(--right-float-size, 3.75rem) + var(--right-float-gap, 0.75rem))
       top: auto
@@ -165,16 +250,8 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     border: 1px solid var(--line-divider)
 
   .detail-action-btn
-    width: 100%
-    min-height: 3.35rem
     border: none
     background: transparent
-    border-radius: .85rem
-    display: flex
-    flex-direction: column
-    align-items: center
-    justify-content: center
-    gap: .25rem
     color: var(--btn-content)
     transition: background-color .2s ease, color .2s ease
 
@@ -187,6 +264,16 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     &:disabled
       opacity: .65
       cursor: not-allowed
+
+  .detail-action-float-desktop .detail-action-btn
+    width: 100%
+    min-height: 3.35rem
+    border-radius: .85rem
+    display: flex
+    flex-direction: column
+    align-items: center
+    justify-content: center
+    gap: .25rem
 
   .detail-icon
     font-size: 1.65rem
@@ -219,14 +306,135 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
       transform: translate(0, 0) scale(1)
       pointer-events: auto
 
-  .detail-action-float.fixed-mode .detail-manage-panel
+  .detail-action-float-desktop.fixed-mode .detail-manage-panel
     left: auto
     right: calc(100% + .4rem)
     transform: translate(6px, 6px) scale(0.95)
 
-  .detail-action-float.fixed-mode .detail-manage-panel.show
+  .detail-action-float-desktop.fixed-mode .detail-manage-panel.show
     transform: translate(0, 0) scale(1)
 
+  .detail-action-float-mobile
+    position: fixed
+    left: 50%
+    bottom: unquote("var(--detail-mobile-bar-bottom, calc(env(safe-area-inset-bottom, 0px) + .75rem))")
+    width: unquote("min(40rem, calc(100vw - max(1rem, env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px) + 1rem)))")
+    z-index: var(--z-float-panel, 75)
+    pointer-events: auto
+    transform: translate3d(-50%, 0, 0)
+    transition: transform .42s cubic-bezier(.2, .84, .32, 1), opacity .32s ease
+    will-change: transform, opacity
+
+    &.is-hidden-by-scroll,
+    &.is-hidden-near-footer
+      opacity: 0
+      pointer-events: none
+      transform: translate3d(-50%, calc(100% + .35rem), 0) scale(.985)
+
+  .detail-mobile-bar
+    position: relative
+    display: flex
+    align-items: center
+    gap: .65rem
+    width: 100%
+    min-height: var(--detail-mobile-bar-height, 4.2rem)
+    padding: .55rem .65rem
+    border: 1px solid var(--line-divider)
+    box-shadow: 0 14px 36px rgba(15, 23, 42, 0.18)
+    backdrop-filter: blur(12px)
+    overflow: visible
+
+  .detail-mobile-comment-entry
+    flex: 1 1 auto
+    min-width: 0
+    min-height: 3rem
+    border-radius: 999px
+    display: inline-flex
+    align-items: center
+    justify-content: flex-start
+    padding: 0 1rem
+    background: unquote("color-mix(in oklch, var(--card-bg) 78%, var(--btn-plain-bg-hover) 22%)")
+    border: 1px solid unquote("color-mix(in oklch, var(--line-divider) 84%, var(--primary) 16%)")
+    color: var(--deep-text)
+
+  .detail-mobile-comment-entry-text
+    width: 100%
+    overflow: hidden
+    text-overflow: ellipsis
+    white-space: nowrap
+    font-size: .95rem
+    color: var(--content-meta)
+
+  .detail-mobile-action-trailing
+    display: inline-flex
+    align-items: center
+    justify-content: flex-end
+    gap: .4rem
+    flex-shrink: 0
+
+  .detail-mobile-icon-btn
+    position: relative
+    width: 2.9rem
+    height: 2.9rem
+    border-radius: 999px
+    display: inline-flex
+    align-items: center
+    justify-content: center
+    background: unquote("color-mix(in oklch, var(--card-bg) 82%, var(--btn-plain-bg-hover) 18%)")
+    border: 1px solid unquote("color-mix(in oklch, var(--line-divider) 84%, var(--primary) 16%)")
+
+  .detail-mobile-count-badge
+    position: absolute
+    right: -.1rem
+    bottom: -.1rem
+    min-width: 1.2rem
+    height: 1.2rem
+    padding: 0 .25rem
+    border-radius: 999px
+    display: inline-flex
+    align-items: center
+    justify-content: center
+    background: var(--card-bg)
+    border: 1px solid var(--line-divider)
+    font-size: .68rem
+    line-height: 1
+    color: var(--content-meta)
+
+  .detail-action-float-mobile .detail-manage-panel
+    left: auto
+    right: .25rem
+    bottom: calc(100% + .55rem)
+    min-width: 11rem
+    z-index: 2
+    transform: translateY(.7rem) scale(.96)
+    box-shadow: 0 14px 32px rgba(15, 23, 42, 0.22)
+
+  .detail-action-float-mobile .detail-manage-panel.show
+    transform: translateY(0) scale(1)
+
+  @media (max-width: 1279px)
+    .detail-action-count
+      font-size: .88rem
+      color: var(--content-meta)
+
+    .detail-icon
+      font-size: 1.4rem
+
+  @media (max-width: 767px)
+    .detail-action-float-mobile
+      width: unquote("calc(100vw - max(1rem, env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px) + 1rem))")
+
+    .detail-mobile-bar
+      min-height: 4rem
+      padding: .5rem .55rem
+
+    .detail-mobile-comment-entry
+      min-height: 2.85rem
+      padding: 0 .9rem
+
+    .detail-mobile-icon-btn
+      width: 2.8rem
+      height: 2.8rem
 </style>
 
 <script>
@@ -237,6 +445,7 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
   import {
     queryDetailElements,
     resolveAndMountElement,
+    mountToFloatingAnchor,
     handleDeleteAction,
     handleLikeAction,
   } from "@/scripts/detail-action-float-helpers";
@@ -249,11 +458,32 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     button.textContent = label;
   }
 
+  function syncDetailMobileBarState(): void {
+    // 统一给全局布局打标，供底部留白和右下角浮动轨道抬升复用。
+    const hasMobileBar = Boolean(
+      document.querySelector(
+        ".detail-action-float-mobile[data-mobile-bar='1']",
+      ),
+    );
+    document.documentElement.classList.toggle(
+      "has-detail-mobile-bar",
+      hasMobileBar,
+    );
+    document.body.classList.toggle("has-detail-mobile-bar", hasMobileBar);
+  }
+
+  // 同一组件同时承载桌面浮条与移动端底部浮条，需要在绑定时分流布局行为。
   // eslint-disable-next-line complexity -- 该组件需在单一绑定点整合多种交互状态
   function bindDetailRoot(rootEl: HTMLElement): void {
     rootEl.dataset.bound = "1";
     const dockToBackTop = rootEl.dataset.dockToBackTop === "1";
-    resolveAndMountElement({ rootEl, dockToBackTop });
+    const isMobileBar = rootEl.dataset.mobileBar === "1";
+    if (isMobileBar) {
+      // 移动端浮条也要脱离正文滤镜层，否则 fixed 容器会被文章层级吞掉。
+      mountToFloatingAnchor(rootEl);
+    } else {
+      resolveAndMountElement({ rootEl, dockToBackTop });
+    }
 
     const contentType = String(rootEl.dataset.contentType || "");
     const contentId = String(rootEl.dataset.contentId || "");
@@ -286,6 +516,7 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
       editBtn,
       deleteBtn,
       likeCountText,
+      commentEntryBtn,
     } = els;
 
     const likeState: LikeActionState = {
@@ -295,6 +526,48 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     };
     let currentAuthState: AuthState = getAuthState();
     let isOpen = false;
+    let mobileBarHiddenByScroll = false;
+    let mobileBarHiddenNearFooter = false;
+    let lastScrollY = Math.max(
+      window.scrollY || document.documentElement.scrollTop || 0,
+      0,
+    );
+    let mobileBarScrollTicking = false;
+
+    function syncManageA11yState(): void {
+      manageBtn?.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      panel?.setAttribute("aria-hidden", isOpen ? "false" : "true");
+    }
+
+    function syncMobileBarHiddenState(): void {
+      if (!isMobileBar) {
+        return;
+      }
+      rootEl.classList.toggle("is-hidden-by-scroll", mobileBarHiddenByScroll);
+      rootEl.classList.toggle(
+        "is-hidden-near-footer",
+        mobileBarHiddenNearFooter,
+      );
+    }
+
+    function setMobileBarHiddenByScroll(hidden: boolean): void {
+      if (!isMobileBar || mobileBarHiddenByScroll === hidden) {
+        return;
+      }
+      mobileBarHiddenByScroll = hidden;
+      syncMobileBarHiddenState();
+    }
+
+    function setMobileBarHiddenNearFooter(hidden: boolean): void {
+      if (!isMobileBar || mobileBarHiddenNearFooter === hidden) {
+        return;
+      }
+      mobileBarHiddenNearFooter = hidden;
+      if (hidden && isOpen) {
+        closePanel();
+      }
+      syncMobileBarHiddenState();
+    }
 
     function applyLikeUI(): void {
       const count = Math.max(0, likeState.likeCount);
@@ -305,6 +578,10 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
       likeBtn?.classList.toggle("is-pending", likeState.likePending);
       if (likeBtn) {
         likeBtn.disabled = likeState.likePending;
+        likeBtn.setAttribute(
+          "aria-pressed",
+          likeState.liked ? "true" : "false",
+        );
       }
       if (likeCountText) {
         likeCountText.textContent = String(count);
@@ -321,12 +598,10 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
       const canDelete = isOwner || isAdminOnly;
       const canOpenPanel = canEdit || canDelete;
 
-      manageBtn?.classList.toggle("hidden", !canOpenPanel);
       editBtn?.classList.toggle("hidden", !canEdit);
       deleteBtn?.classList.toggle("hidden", !canDelete);
 
       if (deleteBtn) {
-        // 管理员删除与作者删除走不同链路，按钮文案同步标识当前模式。
         const deleteMode = isAdminOnly ? "admin" : "owner";
         deleteBtn.dataset.deleteMode = deleteMode;
         applyDeleteButtonLabel(
@@ -335,27 +610,165 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
         );
       }
 
+      manageBtn?.classList.toggle("hidden", !canOpenPanel);
       if (!canOpenPanel && isOpen) {
-        panel?.classList.remove("show");
-        isOpen = false;
+        closePanel();
       }
     }
 
     function openPanel(): void {
       isOpen = true;
+      setMobileBarHiddenByScroll(false);
       panel?.classList.add("show");
       manageBtn?.classList.add("active");
+      syncManageA11yState();
     }
 
     function closePanel(): void {
       isOpen = false;
       panel?.classList.remove("show");
       manageBtn?.classList.remove("active");
+      syncManageA11yState();
+    }
+
+    function openCommentEditorFromPrimaryEntry(): boolean {
+      // 直接触发评论区已有按钮，避免复制登录校验与弹层打开逻辑。
+      const openEditorBtn = document.getElementById("comment-open-editor");
+      if (!(openEditorBtn instanceof HTMLButtonElement)) {
+        return false;
+      }
+      openEditorBtn.click();
+      return true;
+    }
+
+    function jumpToCommentAnchor(): void {
+      const commentHash = "#comment-root";
+      if (window.location.hash === commentHash) {
+        navigateToPage(commentHash);
+        return;
+      }
+      navigateToPage(
+        `${window.location.pathname}${window.location.search}${commentHash}`,
+      );
+    }
+
+    function bindMobileBarVisibility(): void {
+      if (!isMobileBar) {
+        return;
+      }
+
+      let footerObserver: IntersectionObserver | null = null;
+
+      function cleanupMobileBarBindings(): void {
+        window.removeEventListener("scroll", onMobileBarScroll);
+        window.removeEventListener("resize", onMobileBarResize);
+        footerObserver?.disconnect();
+        footerObserver = null;
+      }
+
+      function observeFooterVisibility(): void {
+        footerObserver?.disconnect();
+        footerObserver = null;
+
+        if (typeof IntersectionObserver === "undefined") {
+          return;
+        }
+
+        const footer = document.querySelector("#content-wrapper > .footer");
+        if (!(footer instanceof HTMLElement)) {
+          setMobileBarHiddenNearFooter(false);
+          return;
+        }
+
+        // 在页脚真正贴近底部浮条前就提前隐藏，避免与 footer 发生遮挡。
+        const footerHideOffset = Math.ceil(
+          rootEl.getBoundingClientRect().height,
+        );
+        footerObserver = new IntersectionObserver(
+          (entries) => {
+            if (!rootEl.isConnected) {
+              cleanupMobileBarBindings();
+              return;
+            }
+            const nearFooter = entries.some((entry) => entry.isIntersecting);
+            setMobileBarHiddenNearFooter(nearFooter);
+          },
+          {
+            threshold: 0.01,
+            rootMargin: `0px 0px ${footerHideOffset}px 0px`,
+          },
+        );
+        footerObserver.observe(footer);
+      }
+
+      // 仅在滚动方向稳定后切换显隐，避免轻微抖动导致浮条频繁闪烁。
+      const updateVisibility = (): void => {
+        mobileBarScrollTicking = false;
+        if (!rootEl.isConnected) {
+          cleanupMobileBarBindings();
+          return;
+        }
+
+        const nextScrollY = Math.max(
+          window.scrollY || document.documentElement.scrollTop || 0,
+          0,
+        );
+        const delta = nextScrollY - lastScrollY;
+        if (Math.abs(delta) < 12) {
+          return;
+        }
+        lastScrollY = nextScrollY;
+
+        if (isOpen || nextScrollY <= 48) {
+          setMobileBarHiddenByScroll(false);
+          return;
+        }
+        if (delta > 0 && nextScrollY > 96) {
+          setMobileBarHiddenByScroll(true);
+          return;
+        }
+        if (delta < 0) {
+          setMobileBarHiddenByScroll(false);
+        }
+      };
+
+      const onMobileBarScroll = (): void => {
+        if (mobileBarScrollTicking) {
+          return;
+        }
+        mobileBarScrollTicking = true;
+        window.requestAnimationFrame(updateVisibility);
+      };
+
+      const onMobileBarResize = (): void => {
+        if (!rootEl.isConnected) {
+          cleanupMobileBarBindings();
+          return;
+        }
+        if (window.innerWidth >= 1280) {
+          setMobileBarHiddenByScroll(false);
+          setMobileBarHiddenNearFooter(false);
+          footerObserver?.disconnect();
+          footerObserver = null;
+          return;
+        }
+        lastScrollY = Math.max(
+          window.scrollY || document.documentElement.scrollTop || 0,
+          0,
+        );
+        observeFooterVisibility();
+      };
+
+      window.addEventListener("scroll", onMobileBarScroll, { passive: true });
+      window.addEventListener("resize", onMobileBarResize, { passive: true });
+      observeFooterVisibility();
     }
 
     applyLikeUI();
+    syncManageA11yState();
     applyActionVisibility(getAuthState());
     subscribeAuthState((state) => applyActionVisibility(state));
+    bindMobileBarVisibility();
 
     manageBtn?.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -408,6 +821,7 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     });
 
     likeBtn?.addEventListener("click", () => {
+      closePanel();
       if (likeState.likePending || !contentId) return;
       const auth = getAuthState();
       if (!auth.isLoggedIn) {
@@ -426,16 +840,18 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
       });
     });
 
+    commentEntryBtn?.addEventListener("click", () => {
+      closePanel();
+      openCommentEditorFromPrimaryEntry();
+    });
+
     commentBtn?.addEventListener("click", () => {
-      const commentRoot = document.getElementById("comment-root");
-      if (commentRoot) {
-        commentRoot.scrollIntoView({ behavior: "smooth", block: "start" });
-        return;
-      }
-      navigateToPage(`${window.location.pathname}#comment-root`);
+      closePanel();
+      jumpToCommentAnchor();
     });
 
     shareBtn?.addEventListener("click", () => {
+      closePanel();
       if (!shareDialogId) {
         return;
       }
@@ -444,10 +860,12 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
   }
 
   function initDetailActionFloat(): void {
+    syncDetailMobileBarState();
     const roots = document.querySelectorAll<HTMLElement>(
       ".detail-action-float:not([data-bound='1'])",
     );
     roots.forEach((rootEl) => bindDetailRoot(rootEl));
+    syncDetailMobileBarState();
   }
 
   type DetailActionRuntimeWindow = Window &
@@ -469,7 +887,6 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
 
   if (!runtimeWindow.__detailActionSettledInitBound) {
     runtimeWindow.__detailActionSettledInitBound = true;
-    // 统一在导航最终稳定后初始化，避免骨架阶段重复绑定引发二次动画体感
     document.addEventListener(NAVIGATION_SETTLED_EVENT, initDetailActionFloat);
   }
 </script>

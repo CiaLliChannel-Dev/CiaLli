@@ -100,7 +100,7 @@ export const renderUsersRows = (
             const safeRoleLabel = escapeHtml(roleLabel);
             const roleCell = `<span class="inline-flex items-center rounded-full px-2 py-1 text-xs ${resolveRoleBadgeClass(roleLabel)}">${safeRoleLabel}</span>`;
             return `
-					<tr class="border-b border-(--line-divider) text-75">
+					<tr class="overlay-dialog-table-row border-b border-(--line-divider) text-75">
 						<td class="py-2 pr-2">${safeUserEmail}</td>
 						<td class="py-2 pr-2">${safeUsername}</td>
 						<td class="py-2 pr-2">${roleCell}</td>

@@ -15,17 +15,20 @@ export const prerender = false;
   <div
     data-enter-skeleton-page="admin-site-settings"
     data-enter-skeleton-target="admin-site-settings"
+    data-ui-density="settings-console"
   >
     <div data-enter-skeleton-inline-content class="space-y-4 text-75">
-      <section class="card-base px-9 py-6 rounded-(--radius-large)">
+      <section
+        class="card-base settings-console-card settings-console-header-card rounded-(--radius-large)"
+      >
         <h1
-          class="text-4xl font-bold text-black/90 dark:text-white/90 mb-2 relative
+          class="settings-console-header-title text-4xl font-bold text-black/90 dark:text-white/90 mb-2 relative
 				before:w-1 before:h-8 before:rounded-md before:bg-(--primary)
 				before:absolute before:top-1/2 before:-translate-y-1/2 before:-left-4"
         >
           {i18n(I18nKey.adminSiteSettingsTitle)}
         </h1>
-        <p class="text-base text-70">
+        <p class="settings-console-header-copy text-base text-70">
           {i18n(I18nKey.adminSiteSettingsPageIntro)}
         </p>
       </section>
@@ -35,7 +38,9 @@ export const prerender = false;
         <SiteSiteSection />
 
         <!-- ===== Section 2: 导航栏 ===== -->
-        <section class="card-base p-8 rounded-(--radius-large) space-y-4">
+        <section
+          class="card-base settings-console-card rounded-(--radius-large) space-y-4"
+        >
           <h2 class="text-2xl font-semibold text-90">
             {i18n(I18nKey.adminSiteSettingsSectionNav)}
           </h2>
@@ -97,13 +102,13 @@ export const prerender = false;
                 <option value="semifull">semifull</option>
               </select>
             </label>
-            <div class="col-span-2 space-y-1.5">
+            <div class="lg:col-span-2 space-y-1.5">
               <span class="text-sm text-60">
                 {i18n(I18nKey.adminSiteSettingsNavLinks)}
               </span>
               <div id="ss-nav-links-list" class="space-y-2"></div>
             </div>
-            <div class="col-span-2 flex items-center gap-2 pt-2">
+            <div class="lg:col-span-2 flex items-center gap-2 pt-2">
               <button
                 type="submit"
                 class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
@@ -118,7 +123,9 @@ export const prerender = false;
         <SiteHomeSection />
 
         <!-- ===== Section 4: 文章设置 ===== -->
-        <section class="card-base p-8 rounded-(--radius-large) space-y-4">
+        <section
+          class="card-base settings-console-card rounded-(--radius-large) space-y-4"
+        >
           <h2 class="text-2xl font-semibold text-90">
             {i18n(I18nKey.adminSiteSettingsSectionArticle)}
           </h2>
@@ -127,7 +134,7 @@ export const prerender = false;
             class="grid grid-cols-1 lg:grid-cols-2 gap-4 text-base"
           >
             <label
-              class="flex items-center gap-3 text-75 cursor-pointer select-none"
+              class="settings-console-toggle-label flex items-center gap-3 text-75 cursor-pointer select-none"
             >
               <input
                 type="checkbox"
@@ -139,7 +146,7 @@ export const prerender = false;
               {i18n(I18nKey.adminSiteSettingsEnableArticleToc)}
             </label>
             <label
-              class="flex items-center gap-3 text-75 cursor-pointer select-none"
+              class="settings-console-toggle-label flex items-center gap-3 text-75 cursor-pointer select-none"
             >
               <input type="checkbox" id="ss-toc-jp" class="toggle-checkbox" />
               <span class="toggle-track"><span class="toggle-knob"></span></span
@@ -171,7 +178,43 @@ export const prerender = false;
                 <option value="3">3</option>
               </select>
             </label>
-            <div class="col-span-2 flex items-center gap-2 pt-2">
+            <hr class="border-(--line-divider) lg:col-span-2" />
+            <h3 class="text-lg font-medium text-75 lg:col-span-2">
+              {i18n(I18nKey.adminSiteSettingsArticleLicenseInfo)}
+            </h3>
+            <label
+              class="settings-console-toggle-label flex items-center gap-3 text-75 cursor-pointer select-none lg:col-span-2"
+            >
+              <input
+                type="checkbox"
+                id="ss-license-enable"
+                class="toggle-checkbox"
+              />
+              <span class="toggle-track"><span class="toggle-knob"></span></span
+              >
+              {i18n(I18nKey.adminSiteSettingsEnableLicenseBlock)}
+            </label>
+            <label class="space-y-1.5">
+              <span class="text-sm text-60">
+                {i18n(I18nKey.adminSiteSettingsLicenseName)}
+              </span>
+              <input
+                id="ss-license-name"
+                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75 placeholder:text-50"
+                placeholder="CC BY-NC-SA 4.0"
+              />
+            </label>
+            <label class="space-y-1.5">
+              <span class="text-sm text-60">
+                {i18n(I18nKey.adminSiteSettingsLicenseUrl)}
+              </span>
+              <input
+                id="ss-license-url"
+                class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75 placeholder:text-50"
+                placeholder="https://creativecommons.org/licenses/by-nc-sa/4.0/"
+              />
+            </label>
+            <div class="lg:col-span-2 flex items-center gap-2 pt-2">
               <button
                 type="submit"
                 class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
@@ -183,7 +226,9 @@ export const prerender = false;
         </section>
 
         <!-- ===== Section 5: 其它设置 ===== -->
-        <section class="card-base p-8 rounded-(--radius-large) space-y-4">
+        <section
+          class="card-base settings-console-card rounded-(--radius-large) space-y-4"
+        >
           <h2 class="text-2xl font-semibold text-90">
             {i18n(I18nKey.adminSiteSettingsSectionOther)}
           </h2>
@@ -191,11 +236,11 @@ export const prerender = false;
             id="ss-other-form"
             class="grid grid-cols-1 lg:grid-cols-2 gap-4"
           >
-            <h3 class="text-lg font-medium text-75 col-span-2">
+            <h3 class="text-lg font-medium text-75 lg:col-span-2">
               {i18n(I18nKey.coreMusicPlayer)}
             </h3>
             <label
-              class="flex items-center gap-3 text-75 cursor-pointer select-none col-span-2"
+              class="settings-console-toggle-label flex items-center gap-3 text-75 cursor-pointer select-none lg:col-span-2"
             >
               <input
                 type="checkbox"
@@ -256,12 +301,12 @@ export const prerender = false;
                 placeholder="30"
               />
             </label>
-            <hr class="border-(--line-divider) col-span-2" />
-            <h3 class="text-lg font-medium text-75 col-span-2">
+            <hr class="border-(--line-divider) lg:col-span-2" />
+            <h3 class="text-lg font-medium text-75 lg:col-span-2">
               {i18n(I18nKey.adminSiteSettingsSakuraEffect)}
             </h3>
             <label
-              class="flex items-center gap-3 text-75 cursor-pointer select-none"
+              class="settings-console-toggle-label flex items-center gap-3 text-75 cursor-pointer select-none"
             >
               <input
                 type="checkbox"
@@ -272,7 +317,7 @@ export const prerender = false;
               >
               {i18n(I18nKey.adminSiteSettingsEnableSakura)}
             </label>
-            <div class="col-span-2 flex items-center gap-2 pt-2">
+            <div class="lg:col-span-2 flex items-center gap-2 pt-2">
               <button
                 type="submit"
                 class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
@@ -308,7 +353,7 @@ export const prerender = false;
               {Array.from({ length: index === 0 ? 6 : 4 }).map(() => (
                 <div class="md3-skeleton-block h-10 rounded-lg" />
               ))}
-              <div class="md3-skeleton-block h-24 rounded-lg col-span-2" />
+              <div class="md3-skeleton-block h-24 rounded-lg lg:col-span-2" />
             </div>
             <div class="flex items-center gap-2 pt-2">
               <div class="md3-skeleton-block h-10 w-28 rounded-lg" />
@@ -328,10 +373,10 @@ export const prerender = false;
   >
     <div
       id="ss-image-crop-panel"
-      class="overlay-dialog-card overlay-dialog-card-crop w-full max-w-2xl border border-(--line-divider) text-75"
+      class="overlay-dialog-card overlay-dialog-card-crop settings-console-dialog-card w-full max-w-2xl border border-(--line-divider) text-75"
       style="text-align: left;"
     >
-      <div class="overlay-dialog-body">
+      <div class="overlay-dialog-body settings-console-dialog-body">
         <div class="flex items-center gap-2">
           <h3 id="ss-image-crop-title" class="text-lg font-semibold text-90">
             {i18n(I18nKey.interactionCommonCropImage)}
@@ -379,7 +424,9 @@ export const prerender = false;
         <span id="ss-image-crop-msg" class="text-sm text-red-500"></span>
       </div>
 
-      <div class="overlay-dialog-actions overlay-dialog-actions-crop">
+      <div
+        class="overlay-dialog-actions overlay-dialog-actions-crop settings-console-dialog-actions"
+      >
         <input
           id="ss-image-crop-file"
           type="file"

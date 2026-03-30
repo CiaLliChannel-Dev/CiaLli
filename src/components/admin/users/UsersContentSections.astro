@@ -3,12 +3,16 @@ import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 ---
 
-<section class="card-base p-6 rounded-(--radius-large) space-y-3">
+<section
+  class="card-base settings-console-card rounded-(--radius-large) space-y-3"
+>
   <h2 class="text-xl font-semibold text-90">
     {i18n(I18nKey.adminUsersRegisterSwitchTitle)}
   </h2>
   <div class="pt-2 flex flex-wrap items-center gap-3">
-    <label class="flex items-center gap-3 text-75 cursor-pointer select-none">
+    <label
+      class="settings-console-toggle-label flex items-center gap-3 text-75 cursor-pointer select-none"
+    >
       <input
         type="checkbox"
         id="admin-register-enabled"
@@ -21,7 +25,9 @@ import { i18n } from "@i18n/translation";
   </div>
 </section>
 
-<section class="card-base p-6 rounded-(--radius-large) space-y-3">
+<section
+  class="card-base settings-console-card rounded-(--radius-large) space-y-3"
+>
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h2 class="text-xl font-semibold text-90">
       {i18n(I18nKey.adminUsersRegistrationsTitle)}
@@ -62,29 +68,21 @@ import { i18n } from "@i18n/translation";
   <div id="admin-registration-msg" class="text-xs text-60"></div>
 </section>
 
-<section class="card-base p-6 rounded-(--radius-large) space-y-3">
+<section
+  class="card-base settings-console-card rounded-(--radius-large) space-y-3"
+>
   <div class="flex items-center justify-between gap-3">
     <h2 class="text-xl font-semibold text-90">
       {i18n(I18nKey.adminUsersListTitle)}
     </h2>
-    <button
-      id="admin-users-refresh"
-      class="px-3 py-2 rounded-lg border border-(--line-divider) text-sm text-75 hover:bg-(--btn-plain-bg-hover) transition-colors"
-    >
-      {i18n(I18nKey.interactionCommonRefresh)}
-    </button>
   </div>
-  <div class="overflow-auto">
-    <table class="w-full text-sm min-w-[720px] text-75">
-      <thead>
-        <tr class="text-left text-60 border-b border-(--line-divider)">
-          <th class="py-2">{i18n(I18nKey.authEmailLabel)}</th>
-          <th class="py-2">{i18n(I18nKey.meSettingsUsernameLabel)}</th>
-          <th class="py-2">{i18n(I18nKey.adminUsersRole)}</th>
-          <th class="py-2">{i18n(I18nKey.adminUsersActions)}</th>
-        </tr>
-      </thead>
-      <tbody id="admin-users-table"></tbody>
-    </table>
+  <div class="flex items-center gap-2 pt-2">
+    <button
+      id="admin-users-open-list"
+      type="button"
+      class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"
+    >
+      {i18n(I18nKey.adminUsersOpenListButton)}
+    </button>
   </div>
 </section>

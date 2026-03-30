@@ -34,10 +34,10 @@ const dateStr = album.date
 
 <a
   href={href}
-  class="shrink-0 w-[240px] rounded-xl overflow-hidden bg-black/5 dark:bg-white/5 hover:bg-black/8 dark:hover:bg-white/8 transition-colors snap-start block group"
+  class="block shrink-0 w-[62vw] min-w-[14rem] max-w-[17rem] snap-start overflow-hidden rounded-xl bg-black/5 transition-colors group hover:bg-black/8 dark:bg-white/5 dark:hover:bg-white/8 sm:w-[240px] sm:min-w-0 sm:max-w-[240px]"
 >
   <!-- 封面区域 -->
-  <div class="h-40 overflow-hidden relative">
+  <div class="relative h-36 overflow-hidden sm:h-40">
     {
       hasCover ? (
         album.layout === "masonry" ? (
@@ -72,17 +72,19 @@ const dateStr = album.date
   </div>
 
   <!-- 信息区域 -->
-  <div class="p-3">
+  <div class="p-3 sm:p-3.5">
     <h3
       class="text-sm font-medium text-90 line-clamp-1 leading-snug mb-1 group-hover:text-(--primary) transition-colors"
     >
       {album.title}
     </h3>
-    <p class="text-xs text-50 flex items-center gap-1">
+    <p class="flex flex-wrap items-center gap-x-1 gap-y-1 text-xs text-50">
       {
         album.location && (
           <>
-            <span class="truncate max-w-[120px]">{album.location}</span>
+            <span class="truncate max-w-[9rem] sm:max-w-[120px]">
+              {album.location}
+            </span>
             {dateStr && <span aria-hidden="true">·</span>}
           </>
         )

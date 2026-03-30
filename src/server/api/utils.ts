@@ -2,19 +2,29 @@ import type { JsonObject, JsonValue } from "@/types/json";
 import { badRequest } from "@/server/api/errors";
 import { isJsonObject } from "@/utils/json-utils";
 
-export function parsePagination(url: URL): {
+export function parsePagination(
+    url: URL,
+    options?: {
+        maxLimit?: number;
+        defaultLimit?: number;
+    },
+): {
     page: number;
     limit: number;
     offset: number;
 } {
+    const maxLimit = options?.maxLimit ?? 100;
+    const defaultLimit = options?.defaultLimit ?? 20;
     const pageRaw = Number(url.searchParams.get("page") || "1");
-    const limitRaw = Number(url.searchParams.get("limit") || "20");
+    const limitRaw = Number(
+        url.searchParams.get("limit") || String(defaultLimit),
+    );
     const page =
         Number.isFinite(pageRaw) && pageRaw > 0 ? Math.floor(pageRaw) : 1;
     const limit =
         Number.isFinite(limitRaw) && limitRaw > 0
-            ? Math.min(100, Math.floor(limitRaw))
-            : 20;
+            ? Math.min(maxLimit, Math.floor(limitRaw))
+            : defaultLimit;
     const offset = (page - 1) * limit;
     return { page, limit, offset };
 }

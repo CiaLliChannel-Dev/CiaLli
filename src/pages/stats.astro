@@ -127,7 +127,7 @@ const stats = [
           <div class="divider mb-8"></div>
 
           <!-- 统计网格 -->
-          <div class="grid grid-cols-2 grid-cols-4 gap-3 gap-5">
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
             {
               stats.map((stat, index) => (
                 <div class:list={["card-enter", `card-delay-${index}`]}>
@@ -185,7 +185,7 @@ const stats = [
           </div>
         </div>
         <div class="divider mb-8"></div>
-        <div class="grid grid-cols-2 grid-cols-4 gap-3 gap-5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5">
           {
             Array.from({ length: 4 }).map(() => (
               <div class="stat-surface">

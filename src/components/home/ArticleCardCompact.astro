@@ -35,10 +35,10 @@ const dateStr = publishedDate
 
 <a
   href={href}
-  class="shrink-0 w-[240px] rounded-xl overflow-hidden bg-black/5 dark:bg-white/5 hover:bg-black/8 dark:hover:bg-white/8 transition-colors snap-start block group"
+  class="block shrink-0 w-[62vw] min-w-[14rem] max-w-[17rem] snap-start overflow-hidden rounded-xl bg-black/5 transition-colors group hover:bg-black/8 dark:bg-white/5 dark:hover:bg-white/8 sm:w-[240px] sm:min-w-0 sm:max-w-[240px]"
 >
   <!-- 封面区域 -->
-  <div class="h-36 overflow-hidden relative">
+  <div class="relative h-32 overflow-hidden sm:h-36">
     {
       hasCover ? (
         <ExternalImage
@@ -62,13 +62,13 @@ const dateStr = publishedDate
   </div>
 
   <!-- 信息区域 -->
-  <div class="p-3">
+  <div class="p-3 sm:p-3.5">
     <h3
       class="text-sm font-medium text-90 line-clamp-2 leading-snug mb-1.5 group-hover:text-(--primary) transition-colors"
     >
       {article.title}
     </h3>
-    <p class="text-xs text-50 flex items-center gap-1">
+    <p class="flex flex-wrap items-center gap-x-1 gap-y-1 text-xs text-50">
       {
         article.category && (
           <>

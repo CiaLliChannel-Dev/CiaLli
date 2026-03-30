@@ -7,7 +7,7 @@ import { url } from "@utils/url-utils";
   <a
     id="auth-login"
     href={url("/auth/login")}
-    class="btn-plain scale-animation rounded-lg w-11 h-11 active:scale-90 flex items-center justify-center"
+    class="auth-status-btn btn-plain scale-animation rounded-lg w-11 h-11 active:scale-90 flex items-center justify-center"
     aria-label="Login"
     title="登录"
   >
@@ -16,11 +16,11 @@ import { url } from "@utils/url-utils";
 
   <div
     id="auth-user"
-    class="hidden min-w-0 items-center gap-2 pl-2 pr-1 h-11 rounded-lg border border-(--line-divider) bg-(--card-bg)/50"
+    class="hidden min-w-0 items-center gap-1.5 pl-1.5 pr-1 h-11 rounded-lg border border-(--line-divider) bg-(--card-bg)/50 lg:gap-2 lg:pl-2"
   >
     <a
       id="auth-account"
-      href="/me"
+      href={url("/__user__")}
       class="flex items-center justify-center w-8 h-8 rounded-md overflow-hidden bg-black/5 dark:bg-white/10"
       aria-label="Account Settings"
       title="账户设置"
@@ -42,13 +42,13 @@ import { url } from "@utils/url-utils";
 
     <span
       id="auth-user-name"
-      class="block max-w-[7rem] text-sm text-black/70 dark:text-white/70 truncate"
+      class="hidden lg:block max-w-[7rem] text-sm text-black/70 dark:text-white/70 truncate"
     ></span>
 
     <a
       id="auth-admin"
       href="/admin"
-      class="auth-admin-only btn-plain scale-animation rounded-lg w-9 h-9 active:scale-90 items-center justify-center"
+      class="auth-status-btn auth-admin-only btn-plain scale-animation rounded-lg w-9 h-9 active:scale-90 items-center justify-center"
       aria-label="Admin"
       title="管理台"
     >
@@ -61,7 +61,7 @@ import { url } from "@utils/url-utils";
     <button
       id="auth-logout"
       type="button"
-      class="btn-plain scale-animation rounded-lg w-9 h-9 active:scale-90 flex items-center justify-center"
+      class="auth-status-btn btn-plain scale-animation rounded-lg w-9 h-9 active:scale-90 flex items-center justify-center"
       aria-label="Logout"
       title="退出"
     >
@@ -69,6 +69,16 @@ import { url } from "@utils/url-utils";
     </button>
   </div>
 </div>
+
+<style>
+  .auth-status-btn {
+    color: rgb(0 0 0 / 0.75);
+  }
+
+  :global(:root.dark) .auth-status-btn {
+    color: rgb(255 255 255 / 0.75);
+  }
+</style>
 
 <script>
   import { emitAuthState } from "@/scripts/auth-state";

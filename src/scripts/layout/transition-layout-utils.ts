@@ -78,8 +78,6 @@ export const ROOT_RUNTIME_STYLE_PROPERTIES_TO_PRESERVE = [
     BANNER_TO_SPEC_TRANSITION_DURATION_VAR,
 ] as const;
 export const ROOT_RUNTIME_DATA_ATTRIBUTES_TO_PRESERVE = [
-    "data-desktop-unsupported",
-    "data-desktop-force-browse",
     "data-enter-skeleton-mode",
     "data-nav-phase",
     BANNER_TO_SPEC_PROXY_MODE_ATTR,
@@ -109,13 +107,7 @@ type BannerToSpecTransitionEligibility = {
 // ===== Navigation target / pathname utils =====
 
 export function isCurrentHomeRoute(body: HTMLElement): boolean {
-    if (body.dataset.routeHome === "true") {
-        return true;
-    }
-    if (body.dataset.routeHome === "false") {
-        return false;
-    }
-    return body.classList.contains("lg:is-home");
+    return body.dataset.routeHome === "true";
 }
 
 export function normalizePathname(pathname: string): string {
@@ -737,7 +729,6 @@ export function freezeSpecLayoutStateForHomeDocument(
     }
     body.dataset.layoutMode = "none";
     body.dataset.routeHome = "false";
-    body.classList.remove("lg:is-home");
     body.classList.remove("enable-banner");
     body.classList.remove("scroll-collapsed-banner");
     body.classList.add("no-banner-mode");
@@ -754,7 +745,6 @@ export function primeBannerLayoutStateForIncomingDocument(
 
     body.dataset.layoutMode = "banner";
     body.dataset.routeHome = "true";
-    body.classList.add("lg:is-home");
     body.classList.add("enable-banner");
     body.classList.remove("no-banner-mode");
     body.classList.remove("waves-paused");

@@ -82,6 +82,7 @@ import { requireAdmin } from "@/server/api/v1/shared";
 import { loadDirectusAccessRegistry } from "@/server/auth/directus-registry";
 import {
     deleteDirectusUser,
+    listDirectusUsers,
     readMany,
     readOneById,
     updateOne,
@@ -101,6 +102,7 @@ import {
 const mockedRequireAdmin = vi.mocked(requireAdmin);
 const mockedLoadDirectusAccessRegistry = vi.mocked(loadDirectusAccessRegistry);
 const mockedDeleteDirectusUser = vi.mocked(deleteDirectusUser);
+const mockedListDirectusUsers = vi.mocked(listDirectusUsers);
 const mockedReadMany = vi.mocked(readMany);
 const mockedReadOneById = vi.mocked(readOneById);
 const mockedUpdateOne = vi.mocked(updateOne);
@@ -135,6 +137,306 @@ function createDirectusUser(overrides: Partial<AppUser> = {}): AppUser {
         ...overrides,
     };
 }
+
+describe("GET /admin/users", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockedRequireAdmin.mockResolvedValue({
+            access: {
+                isAdmin: true,
+                user: mockSessionUser({ id: "admin-1" }),
+            },
+            accessToken: "admin-access-token",
+        } as never);
+        mockedLoadDirectusAccessRegistry.mockResolvedValue({
+            policyNameById: new Map<string, string>(),
+            policyIdByName: new Map<string, string>(),
+            roleIdByName: new Map<string, string>(),
+        } as never);
+    });
+
+    it("默认列表请求返回成功", async () => {
+        mockedReadOneById.mockResolvedValueOnce(
+            createDirectusUser({
+                id: "admin-1",
+                role: {
+                    id: "role-site-admin",
+                    name: DIRECTUS_ROLE_NAME.siteAdmin,
+                },
+            }) as never,
+        );
+        mockedListDirectusUsers.mockResolvedValueOnce([
+            createDirectusUser({
+                id: "user-a",
+                email: "a@example.com",
+            }),
+        ] as never);
+        mockedReadMany.mockResolvedValueOnce([
+            mockProfile({
+                id: "profile-a",
+                user_id: "user-a",
+                username: "alpha",
+            }),
+        ] as never);
+
+        const ctx = createMockAPIContext({
+            method: "GET",
+            url: "http://localhost:4321/api/v1/admin/users?page=1&limit=20",
+            params: {
+                segments: "admin/users",
+            },
+        });
+
+        const response = await handleAdminUsers(ctx as unknown as APIContext, [
+            "users",
+        ]);
+
+        expect(response.status).toBe(200);
+        expect(mockedListDirectusUsers).toHaveBeenCalledWith({
+            limit: 20,
+            offset: 0,
+            search: undefined,
+            sort: {
+                field: "email",
+                order: "asc",
+            },
+        });
+        const body = await parseResponseJson<{
+            ok: boolean;
+            items: Array<{
+                user: { id: string };
+                profile: { username: string };
+            }>;
+            page: number;
+            limit: number;
+        }>(response);
+        expect(body.ok).toBe(true);
+        expect(body.page).toBe(1);
+        expect(body.limit).toBe(20);
+        expect(body.items).toHaveLength(1);
+        expect(body.items[0]?.user.id).toBe("user-a");
+        expect(body.items[0]?.profile.username).toBe("alpha");
+    });
+
+    it("email 排序参数会透传到 Directus 查询", async () => {
+        mockedReadOneById.mockResolvedValueOnce(
+            createDirectusUser({
+                id: "admin-1",
+                role: {
+                    id: "role-site-admin",
+                    name: DIRECTUS_ROLE_NAME.siteAdmin,
+                },
+            }) as never,
+        );
+        mockedListDirectusUsers.mockResolvedValueOnce([] as never);
+        mockedReadMany.mockResolvedValueOnce([] as never);
+
+        const ctx = createMockAPIContext({
+            method: "GET",
+            url: "http://localhost:4321/api/v1/admin/users?sort_by=email&sort_order=desc",
+            params: {
+                segments: "admin/users",
+            },
+        });
+
+        const response = await handleAdminUsers(ctx as unknown as APIContext, [
+            "users",
+        ]);
+
+        expect(response.status).toBe(200);
+        expect(mockedListDirectusUsers).toHaveBeenCalledWith({
+            limit: 20,
+            offset: 0,
+            search: undefined,
+            sort: {
+                field: "email",
+                order: "desc",
+            },
+        });
+    });
+
+    it("username 排序在缺失与空字符串场景下保持稳定", async () => {
+        mockedReadOneById.mockResolvedValueOnce(
+            createDirectusUser({
+                id: "admin-1",
+                role: {
+                    id: "role-site-admin",
+                    name: DIRECTUS_ROLE_NAME.siteAdmin,
+                },
+            }) as never,
+        );
+        mockedListDirectusUsers.mockResolvedValueOnce([
+            createDirectusUser({
+                id: "user-a",
+                email: "z@example.com",
+            }),
+            createDirectusUser({
+                id: "user-b",
+                email: "b@example.com",
+            }),
+            createDirectusUser({
+                id: "user-c",
+                email: "c@example.com",
+            }),
+            createDirectusUser({
+                id: "user-d",
+                email: "d@example.com",
+            }),
+        ] as never);
+        mockedReadMany.mockResolvedValueOnce([
+            mockProfile({
+                id: "profile-a",
+                user_id: "user-a",
+                username: "",
+            }),
+            mockProfile({
+                id: "profile-b",
+                user_id: "user-b",
+                username: "beta",
+            }),
+            mockProfile({
+                id: "profile-c",
+                user_id: "user-c",
+                username: "alpha",
+            }),
+        ] as never);
+
+        const ctx = createMockAPIContext({
+            method: "GET",
+            url: "http://localhost:4321/api/v1/admin/users?sort_by=username&sort_order=asc",
+            params: {
+                segments: "admin/users",
+            },
+        });
+
+        const response = await handleAdminUsers(ctx as unknown as APIContext, [
+            "users",
+        ]);
+
+        expect(response.status).toBe(200);
+        const body = await parseResponseJson<{
+            items: Array<{ user: { id: string } }>;
+        }>(response);
+        expect(body.items.map((item) => item.user.id)).toEqual([
+            "user-c",
+            "user-b",
+            "user-a",
+            "user-d",
+        ]);
+    });
+
+    it("role 排序对平台管理员/站点管理员/普通成员稳定", async () => {
+        mockedLoadDirectusAccessRegistry.mockResolvedValue({
+            policyNameById: new Map<string, string>(),
+            policyIdByName: new Map<string, string>(),
+            roleIdByName: new Map<string, string>(),
+        } as never);
+        mockedReadOneById.mockResolvedValueOnce(
+            createDirectusUser({
+                id: "admin-1",
+                role: {
+                    id: "role-site-admin",
+                    name: DIRECTUS_ROLE_NAME.siteAdmin,
+                },
+            }) as never,
+        );
+        mockedListDirectusUsers.mockResolvedValueOnce([
+            createDirectusUser({
+                id: "member-1",
+                email: "member-1@example.com",
+                role: {
+                    id: "role-member",
+                    name: DIRECTUS_ROLE_NAME.member,
+                },
+            }),
+            createDirectusUser({
+                id: "platform-admin",
+                email: "platform-admin@example.com",
+                role: {
+                    id: "role-admin",
+                    name: DIRECTUS_ROLE_NAME.administrator,
+                },
+            }),
+            createDirectusUser({
+                id: "site-admin",
+                email: "site-admin@example.com",
+                role: {
+                    id: "role-site-admin",
+                    name: DIRECTUS_ROLE_NAME.siteAdmin,
+                },
+            }),
+            createDirectusUser({
+                id: "member-2",
+                email: "member-2@example.com",
+                role: {
+                    id: "role-member",
+                    name: DIRECTUS_ROLE_NAME.member,
+                },
+            }),
+        ] as never);
+        mockedReadMany.mockResolvedValueOnce([] as never);
+
+        const ctx = createMockAPIContext({
+            method: "GET",
+            url: "http://localhost:4321/api/v1/admin/users?sort_by=role&sort_order=asc",
+            params: {
+                segments: "admin/users",
+            },
+        });
+
+        const response = await handleAdminUsers(ctx as unknown as APIContext, [
+            "users",
+        ]);
+
+        expect(response.status).toBe(200);
+        const body = await parseResponseJson<{
+            items: Array<{ user: { id: string } }>;
+        }>(response);
+        expect(body.items.map((item) => item.user.id)).toEqual([
+            "platform-admin",
+            "site-admin",
+            "member-1",
+            "member-2",
+        ]);
+    });
+
+    it("非法排序参数会回退默认排序", async () => {
+        mockedReadOneById.mockResolvedValueOnce(
+            createDirectusUser({
+                id: "admin-1",
+                role: {
+                    id: "role-site-admin",
+                    name: DIRECTUS_ROLE_NAME.siteAdmin,
+                },
+            }) as never,
+        );
+        mockedListDirectusUsers.mockResolvedValueOnce([] as never);
+        mockedReadMany.mockResolvedValueOnce([] as never);
+
+        const ctx = createMockAPIContext({
+            method: "GET",
+            url: "http://localhost:4321/api/v1/admin/users?sort_by=unknown&sort_order=bad",
+            params: {
+                segments: "admin/users",
+            },
+        });
+
+        const response = await handleAdminUsers(ctx as unknown as APIContext, [
+            "users",
+        ]);
+
+        expect(response.status).toBe(200);
+        expect(mockedListDirectusUsers).toHaveBeenCalledWith({
+            limit: 20,
+            offset: 0,
+            search: undefined,
+            sort: {
+                field: "email",
+                order: "asc",
+            },
+        });
+    });
+});
 
 describe("PATCH /admin/users/:id", () => {
     beforeEach(() => {

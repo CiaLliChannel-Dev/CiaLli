@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- Monaco 适配集中承载 worker/theme/layout 恢复逻辑，保持单模块更便于排查切页问题。 */
 /**
  * 发布页 Monaco 编辑器初始化与适配。
  *

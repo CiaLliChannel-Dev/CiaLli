@@ -27,8 +27,8 @@
 {:else}
   <div
     class={layout === "masonry"
-      ? "dc-album-gallery columns-3 gap-3"
-      : "dc-album-gallery grid grid-cols-2 lg:grid-cols-4 gap-3"}
+      ? "dc-album-gallery columns-1 md:columns-2 lg:columns-3 gap-3"
+      : "dc-album-gallery grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"}
   >
     {#each photos as photo, index (photo.id)}
       <figure

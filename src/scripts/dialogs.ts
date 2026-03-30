@@ -14,6 +14,9 @@ type ConfirmDialogOptions = {
     confirmText?: string;
     cancelText?: string;
     confirmVariant?: OverlayDialogActionVariant;
+    cardClassName?: string;
+    bodyClassName?: string;
+    actionsClassName?: string;
     manualConfirm?: {
         expectedText: string;
         label?: string;
@@ -105,6 +108,9 @@ async function showSimpleConfirmDialog(
             options.ariaLabel || t(I18nKey.interactionDialogConfirmTitle),
         message: options.message,
         dismissKey: "cancel",
+        cardClassName: options.cardClassName,
+        bodyClassName: options.bodyClassName,
+        actionsClassName: options.actionsClassName,
         actions: [
             {
                 key: "confirm",
@@ -164,6 +170,9 @@ async function showManualConfirmDialog(
             options.ariaLabel || t(I18nKey.interactionDialogConfirmTitle),
         message: options.message,
         dismissKey: "cancel",
+        cardClassName: options.cardClassName,
+        bodyClassName: options.bodyClassName,
+        actionsClassName: options.actionsClassName,
         fields: [
             {
                 name: "manual_confirm_text",

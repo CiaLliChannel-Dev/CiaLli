@@ -22,7 +22,7 @@ const { contentClass = "", proxyMainSlot = false } = Astro.props;
 <style>
   .auth-login-shell {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 17.5rem;
+    grid-template-columns: minmax(0, 1fr);
     gap: 1rem;
     align-items: start;
   }
@@ -36,6 +36,17 @@ const { contentClass = "", proxyMainSlot = false } = Astro.props;
   }
 
   .auth-login-sidebar-placeholder {
+    display: none;
     min-width: 0;
+  }
+
+  @media (min-width: 1280px) {
+    .auth-login-shell {
+      grid-template-columns: minmax(0, 1fr) 17.5rem;
+    }
+
+    .auth-login-sidebar-placeholder {
+      display: block;
+    }
   }
 </style>

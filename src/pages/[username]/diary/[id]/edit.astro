@@ -73,7 +73,7 @@ Astro.locals.sidebarProfile = profileToSidebarData(profile);
           id="diary-editor-content"
           rows="18"
           placeholder={i18n(I18nKey.contentDiaryContentPlaceholder)}
-          class="w-full h-[18rem] overflow-y-auto rounded-xl border border-(--line-divider) bg-transparent px-4 py-3 text-90 font-mono focus:outline-none focus:border-(--primary) resize-none"
+          class="w-full min-h-[18rem] max-h-[60dvh] overflow-y-auto rounded-xl border border-(--line-divider) bg-transparent px-4 py-3 text-90 font-mono focus:outline-none focus:border-(--primary) resize-y"
         ></textarea>
       </label>
 
@@ -123,7 +123,7 @@ Astro.locals.sidebarProfile = profileToSidebarData(profile);
         </div>
       </div>
 
-      <section class="space-y-2 w-[60%]">
+      <section class="space-y-2 w-full">
         <h2 class="text-sm text-60">
           {i18n(I18nKey.interactionCommonImageOrder)}
         </h2>

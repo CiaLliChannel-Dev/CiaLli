@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- 管理设置入口暂集中处理 site/bulletin/about 三类配置 */
 import type { APIContext } from "astro";
 import { performance } from "node:perf_hooks";
 

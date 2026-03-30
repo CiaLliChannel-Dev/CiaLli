@@ -173,7 +173,7 @@ function appendNavInputs(row: HTMLElement, item: NavBarLinkObj): void {
 function appendNavExternalToggle(row: HTMLElement, item: NavBarLinkObj): void {
     const extLabel = document.createElement("label");
     extLabel.className =
-        "flex items-center gap-2 text-xs text-60 cursor-pointer select-none";
+        "settings-console-toggle-label flex items-center gap-2 text-xs text-60 cursor-pointer select-none";
     const extCheck = document.createElement("input");
     extCheck.type = "checkbox";
     extCheck.className = "toggle-checkbox";

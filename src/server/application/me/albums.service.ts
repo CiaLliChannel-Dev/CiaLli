@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- 相册与照片编辑链路共用单文件以维持上下文一致 */
 import type { APIContext } from "astro";
 
 import type { AppAlbum, AppAlbumPhoto } from "@/types/app";

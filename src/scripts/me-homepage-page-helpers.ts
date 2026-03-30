@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- 文件行数较长，按页面驱动与模块边界保留当前结构 */
 /**
  * /me/homepage 页面辅助函数 — 纯逻辑、可共享
  */
@@ -292,13 +291,13 @@ export function createSectionRowEl(
     const info = SECTION_LABELS[key] || { icon: "📋", name: key };
     const row = document.createElement("div");
     row.className =
-        "flex items-center gap-3 px-4 py-3 rounded-lg border border-(--line-divider) bg-black/3 dark:bg-white/3 cursor-grab active:cursor-grabbing select-none";
+        "settings-console-drag-row flex items-center gap-3 px-4 py-3 rounded-lg border border-(--line-divider) bg-black/3 dark:bg-white/3 cursor-grab active:cursor-grabbing select-none";
     row.dataset.sectionKey = key;
     row.draggable = true;
 
     const handle = document.createElement("span");
     handle.className =
-        "text-30 hover:text-60 transition-colors text-lg leading-none";
+        "settings-console-drag-handle text-30 hover:text-60 transition-colors text-lg leading-none";
     handle.textContent = "≡";
 
     const icon = document.createElement("span");

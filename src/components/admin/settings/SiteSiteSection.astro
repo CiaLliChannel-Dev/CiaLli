@@ -12,7 +12,9 @@ const supportedTimeZones = getSupportedSiteTimeZones();
 ---
 
 <!-- ===== Section 1: 站点信息 ===== -->
-<section class="card-base p-8 rounded-(--radius-large) space-y-4">
+<section
+  class="card-base settings-console-card rounded-(--radius-large) space-y-4"
+>
   <h2 class="text-2xl font-semibold text-90">
     {i18n(I18nKey.adminSiteSettingsSectionSite)}
   </h2>
@@ -85,7 +87,7 @@ const supportedTimeZones = getSupportedSiteTimeZones();
         placeholder="blog, tech, life"
       />
     </label>
-    <p class="col-span-2 text-xs text-50">
+    <p class="lg:col-span-2 text-xs text-50">
       {i18n(I18nKey.adminSiteSettingsTimeZoneHint)}
     </p>
     <label class="space-y-1.5">
@@ -110,11 +112,11 @@ const supportedTimeZones = getSupportedSiteTimeZones();
         placeholder={i18n(I18nKey.adminSiteSettingsProfileNamePlaceholder)}
       />
     </label>
-    <hr class="border-(--line-divider) col-span-2" />
-    <h3 class="text-lg font-medium text-75 col-span-2">
+    <hr class="border-(--line-divider) lg:col-span-2" />
+    <h3 class="text-lg font-medium text-75 lg:col-span-2">
       {i18n(I18nKey.adminSiteSettingsFaviconTitle)}
     </h3>
-    <div class="col-span-2 space-y-2">
+    <div class="lg:col-span-2 space-y-2">
       <div class="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -149,12 +151,12 @@ const supportedTimeZones = getSupportedSiteTimeZones();
       </div>
       <div id="ss-favicon-list" class="space-y-2"></div>
     </div>
-    <hr class="border-(--line-divider) col-span-2" />
-    <h3 class="text-lg font-medium text-75 col-span-2">
+    <hr class="border-(--line-divider) lg:col-span-2" />
+    <h3 class="text-lg font-medium text-75 lg:col-span-2">
       {i18n(I18nKey.adminSiteSettingsUmamiTitle)}
     </h3>
     <label
-      class="flex items-center gap-3 text-75 cursor-pointer select-none col-span-2"
+      class="settings-console-toggle-label flex items-center gap-3 text-75 cursor-pointer select-none lg:col-span-2"
     >
       <input type="checkbox" id="ss-umami-enabled" class="toggle-checkbox" />
       <span class="toggle-track"><span class="toggle-knob"></span></span>
@@ -168,15 +170,15 @@ const supportedTimeZones = getSupportedSiteTimeZones();
         placeholder="https://umami.example.com"
       />
     </label>
-    <label class="space-y-1.5 col-span-2">
+    <label class="space-y-1.5 lg:col-span-2">
       <span class="text-sm text-60">Umami Scripts</span>
       <textarea
         id="ss-umami-scripts"
         class="w-full min-h-24 rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75 font-mono text-xs placeholder:text-50"
         placeholder="<script ...></script>"></textarea>
     </label>
-    <hr class="border-(--line-divider) col-span-2" />
-    <h3 class="text-lg font-medium text-75 col-span-2">
+    <hr class="border-(--line-divider) lg:col-span-2" />
+    <h3 class="text-lg font-medium text-75 lg:col-span-2">
       {i18n(I18nKey.adminSiteSettingsAnalyticsTitle)}
     </h3>
     <label class="space-y-1.5">
@@ -195,10 +197,10 @@ const supportedTimeZones = getSupportedSiteTimeZones();
         placeholder="abcd1234ef"
       />
     </label>
-    <p class="col-span-2 text-xs text-50">
+    <p class="lg:col-span-2 text-xs text-50">
       {i18n(I18nKey.adminSiteSettingsAnalyticsHint)}
     </p>
-    <div class="col-span-2 flex items-center gap-2 pt-2">
+    <div class="lg:col-span-2 flex items-center gap-2 pt-2">
       <button
         type="submit"
         class="px-4 py-2 rounded-lg bg-(--btn-regular-bg) text-(--btn-content) text-sm"

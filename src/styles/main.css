@@ -1,3 +1,7 @@
+/* 必须先声明全局 layer 顺序，避免本地组件样式先创建 components 层，
+ * 导致 Tailwind base 里的按钮重置反过来覆盖 .btn-card 等共享按钮样式。 */
+@layer theme, base, components, utilities;
+
 /* 导入相册样式 */
 @import "./albums.css";
 /* 导入追番页面样式 */
@@ -7,14 +11,37 @@
 @import "./gradient-buttons.css";
 /* 通用弹层 */
 @import "./overlay-dialog.css";
+@import "./settings-console.css";
 @import "./toggle.css";
 @import "tailwindcss";
 
 @config "../../tailwind.config.mjs";
 
+:root {
+  --font-sans: "Noto Sans SC", "Noto Sans JP", "Noto Sans", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "Noto Sans Mono", ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  /* 内容型标题与正文专用衬线字体：英文优先 Garamond，中文按简繁体 Serif 回退。 */
+  --font-serif-content: "EB Garamond", "Noto Serif SC", "Noto Serif TC", serif;
+
+  --font-banner-display: "Long Cang", "Noto Sans SC", "Noto Sans JP", sans-serif;
+}
+
 /* 确保平滑滚动 */
 html {
+  /* 全站字号基线统一从这里控制，避免模板层写死后覆盖响应式策略 */
+  font-size: 16px;
   scroll-behavior: smooth;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+@media (max-width: 1279px) {
+  html {
+    /* 手机与平板统一下调基线字号，让 rem 与 Tailwind 字号一起缩小 */
+    font-size: 14px;
+  }
 }
 
 /* Date picker icon theme adaptation (light/dark). */
@@ -153,6 +180,10 @@ html[data-theme="github-dark"] input[type="date"].date-picker-input::-webkit-cal
 
   .card-base {
     @apply rounded-(--radius-large) overflow-hidden bg-(--card-bg) transition-colors duration-150;
+  }
+  /* 仅用于文章/日记等内容型标题，避免影响全站界面字体。 */
+  .font-content-serif {
+    font-family: var(--font-serif-content);
   }
   .card-base-transparent {
     @apply rounded-(--radius-large) overflow-hidden bg-(--card-bg) transition-colors duration-150;

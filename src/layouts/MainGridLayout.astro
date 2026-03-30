@@ -3,9 +3,12 @@ import BackToTop from "@components/control/BackToTop.astro";
 import FloatingTOC from "@components/control/FloatingTOC.astro";
 import Footer from "@components/Footer.astro";
 import RightSideBar from "@components/layout/RightSideBar.astro";
+import ResponsiveSidebarPanel from "@components/layout/ResponsiveSidebarPanel.astro";
 import TransitionProxySkeletonTemplates from "@components/layout/TransitionProxySkeletonTemplates.astro";
 import Navbar from "@components/Navbar.astro";
 import SideBar from "@components/widget/SideBar.astro";
+import SideBarComponentList from "@components/widget/SideBarComponentList.astro";
+import { Icon } from "astro-icon/components";
 import type { MarkdownHeading } from "astro";
 import IconifyLoader from "../components/misc/IconifyLoader.astro";
 import ImageWrapper from "../components/misc/ImageWrapper.astro";
@@ -17,7 +20,11 @@ import { BANNER_HEIGHT_EXTEND } from "../constants/constants";
 import Layout from "@layouts/Layout.astro";
 import {
   buildMainGridLayoutState,
+  hasSidebarComponents,
   getBannerImages,
+  resolveLeftSidebarMobileBuckets,
+  type LeftSidebarMobilePreset,
+  type RightSidebarMobilePreset,
 } from "@utils/main-grid-layout-utils";
 import "@/styles/main-grid-layout.css";
 
@@ -28,6 +35,9 @@ interface Props {
   lang?: string;
   setOGTypeArticle?: boolean;
   headings?: MarkdownHeading[];
+  leftSidebarMobilePreset?: LeftSidebarMobilePreset;
+  rightSidebarMobilePreset?: RightSidebarMobilePreset;
+  hasCustomRightSidebarContent?: boolean;
 }
 
 const resolvedSiteSettings =
@@ -45,11 +55,20 @@ const {
   lang,
   setOGTypeArticle,
   headings = [],
+  leftSidebarMobilePreset = "footer",
+  rightSidebarMobilePreset = "panel",
+  hasCustomRightSidebarContent: hasCustomRightSidebarContentProp,
 } = Astro.props;
 
-const hasCustomRightSidebar = Astro.slots.has("sidebar-right");
+const hasCustomRightSidebarSlot = Astro.slots.has("sidebar-right");
+// 允许页面显式声明右侧栏是否有内容，避免条件 slot 被编译期误判为“非空”。
+const hasCustomRightSidebarContent =
+  typeof hasCustomRightSidebarContentProp === "boolean"
+    ? hasCustomRightSidebarContentProp
+    : hasCustomRightSidebarSlot;
 const {
   isFloatTOC,
+  isPostDetailPage,
   isPostEditorPage,
   showHomeText,
   initialWallpaperMode,
@@ -63,12 +82,56 @@ const {
   mainContentClass,
   hasCarousel,
   hasRightSidebarComponents,
+  leftSidebarBuckets,
+  rightSidebarBuckets,
 } = buildMainGridLayoutState(
   siteConfig,
   bannerImages,
   Astro.url.pathname,
-  hasCustomRightSidebar,
+  hasCustomRightSidebarContent,
 );
+const mobileLeftSidebarBuckets = resolveLeftSidebarMobileBuckets(
+  leftSidebarBuckets,
+  leftSidebarMobilePreset,
+);
+const shouldRenderMobileLeftSidebarList =
+  !isPostEditorPage &&
+  leftSidebarMobilePreset !== "footer" &&
+  hasSidebarComponents(mobileLeftSidebarBuckets);
+// 仅在移动端内联补充区里包含 Profile 卡片时补顶部分隔，避免个人资料与正文直接贴住。
+const shouldApplyMobileLeftSidebarTopGap =
+  shouldRenderMobileLeftSidebarList &&
+  [
+    ...mobileLeftSidebarBuckets.topComponents,
+    ...mobileLeftSidebarBuckets.stickyComponents,
+  ].some((component) => component.type === "profile");
+const rightSidebarPanelTitle = shouldRenderDedicatedPostToc
+  ? "目录与页面工具"
+  : "页面工具";
+const shouldRenderMobileArticleTocDrawer =
+  rightSidebarMobilePreset === "drawer" &&
+  !isPostEditorPage &&
+  siteConfig.toc.enable &&
+  isPostDetailPage;
+const shouldRenderMobileRightSidebarDrawer =
+  rightSidebarMobilePreset === "drawer" &&
+  !isPostEditorPage &&
+  !isPostDetailPage &&
+  (hasCustomRightSidebarContent || hasRightSidebarComponents);
+const rightSidebarMobileVisibilityClass =
+  rightSidebarMobilePreset === "panel" ? "" : "hidden lg:block";
+const shouldRenderMobileLeftSidebarAnchor =
+  !isPostEditorPage &&
+  desktopShowLeftSidebar &&
+  leftSidebarMobilePreset === "footer";
+// 让右侧栏卡片与移动端抽屉按钮共用同一套图标决策，避免不同页面分叉。
+const rightSidebarPanelIcon = shouldRenderDedicatedPostToc
+  ? "material-symbols:format-list-bulleted-rounded"
+  : "material-symbols:tune-rounded";
+// 右侧栏在移动抽屉模式下只保留一个真实实例，避免桌面/移动双渲染造成重复 ID。
+const shouldRelocateRightSidebarContent =
+  shouldRenderMobileRightSidebarDrawer &&
+  (hasCustomRightSidebarContent || hasRightSidebarComponents);
 ---
 
 <Layout
@@ -185,7 +248,7 @@ const {
           <div
             class={`banner-text-overlay absolute inset-0 z-20 flex items-center justify-center ${!showHomeText ? "hidden" : ""}`}
           >
-            <div class="w-3/4 text-center mb-0">
+            <div class="mb-0 w-[88%] max-w-[72rem] text-center">
               <div class="flex flex-col">
                 {siteConfig.banner.homeText?.title && (
                   <h1 class="banner-title text-8xl text-white drop-shadow-lg mb-4">
@@ -347,7 +410,7 @@ const {
     </div>
     <TransitionProxySkeletonTemplates />
     <div
-      class={`relative pointer-events-auto ${isPostEditorPage ? "w-full px-4 post-editor-workbench-inner" : "max-w-(--page-width) mx-auto"}`}
+      class={`relative pointer-events-auto ${isPostEditorPage ? "w-full md:px-4 post-editor-workbench-inner" : "max-w-(--page-width) mx-auto"}`}
     >
       <div
         class:list={[
@@ -359,11 +422,22 @@ const {
       >
         <div
           id="main-grid"
-          class={`transition duration-700 w-full left-0 right-0 grid ${gridCols} grid-rows-none mx-auto gap-4 ${isPostEditorPage ? "post-editor-workbench-grid" : "px-4"}`}
+          class={`transition duration-700 w-full left-0 right-0 grid ${gridCols} grid-rows-none mx-auto gap-4 ${isPostEditorPage ? "post-editor-workbench-grid" : "md:px-4"}`}
         >
           {
             desktopShowLeftSidebar ? (
-              <SideBar class={sidebarClass} headings={headings} />
+              <div
+                class:list={["hidden lg:block", sidebarClass]}
+                data-responsive-sidebar-desktop-anchor
+              >
+                <div data-responsive-sidebar-node class="w-full min-w-0">
+                  <SideBar
+                    headings={headings}
+                    topComponents={leftSidebarBuckets.topComponents}
+                    stickyComponents={leftSidebarBuckets.stickyComponents}
+                  />
+                </div>
+              </div>
             ) : (
               // 保证 sidebar 容器在全宽页也存在，确保布局结构一致。
               <div
@@ -379,40 +453,84 @@ const {
 
           <div
             id="right-sidebar-slot"
-            class={`right-sidebar-container self-start ${shouldFixRightSidebarSlot ? "right-sidebar-toc-fixed" : ""} ${rightSidebarClass}`}
+            class={`right-sidebar-container self-start ${shouldFixRightSidebarSlot ? "right-sidebar-toc-fixed" : ""} ${rightSidebarClass} ${rightSidebarMobileVisibilityClass}`}
           >
-            {
-              hasCustomRightSidebar ? (
-                <slot name="sidebar-right" />
-              ) : hasRightSidebarComponents ? (
-                <>
-                  <RightSideBar headings={headings} />
-                  {shouldRenderDedicatedPostToc && (
-                    <div id="toc-wrapper" class="w-full transition-fade">
-                      <div
-                        id="toc-inner-wrapper"
-                        class="w-full max-h-[calc(100vh-10rem)] overflow-hidden"
-                      >
-                        <div id="toc-container" class="w-full transition-fade">
-                          <TOC headings={headings} />
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </>
-              ) : shouldRenderDedicatedPostToc ? (
-                <div id="toc-wrapper" class="w-full transition-fade">
+            <ResponsiveSidebarPanel
+              title={rightSidebarPanelTitle}
+              icon={rightSidebarPanelIcon}
+            >
+              {
+                shouldRelocateRightSidebarContent ? (
                   <div
-                    id="toc-inner-wrapper"
-                    class="w-full max-h-[calc(100vh-10rem)] overflow-hidden"
+                    class="w-full min-w-0"
+                    data-responsive-right-sidebar-desktop-anchor
                   >
-                    <div id="toc-container" class="w-full transition-fade">
-                      <TOC headings={headings} />
+                    <div
+                      class="w-full min-w-0"
+                      data-responsive-right-sidebar-node
+                    >
+                      {hasCustomRightSidebarContent ? (
+                        <slot name="sidebar-right" />
+                      ) : (
+                        hasRightSidebarComponents && (
+                          <RightSideBar
+                            headings={headings}
+                            topComponents={rightSidebarBuckets.topComponents}
+                            stickyComponents={
+                              rightSidebarBuckets.stickyComponents
+                            }
+                          />
+                        )
+                      )}
                     </div>
                   </div>
-                </div>
-              ) : null
-            }
+                ) : hasCustomRightSidebarContent ? (
+                  <slot name="sidebar-right" />
+                ) : hasRightSidebarComponents ? (
+                  <>
+                    <RightSideBar
+                      headings={headings}
+                      topComponents={rightSidebarBuckets.topComponents}
+                      stickyComponents={rightSidebarBuckets.stickyComponents}
+                    />
+                    {shouldRenderDedicatedPostToc && (
+                      <div
+                        id="toc-wrapper"
+                        class="w-full transition-fade"
+                        data-post-detail-toc="1"
+                      >
+                        <div
+                          id="toc-inner-wrapper"
+                          class="w-full max-h-[calc(100vh-10rem)] overflow-hidden"
+                        >
+                          <div
+                            id="toc-container"
+                            class="w-full transition-fade"
+                          >
+                            <TOC headings={headings} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                ) : shouldRenderDedicatedPostToc ? (
+                  <div
+                    id="toc-wrapper"
+                    class="w-full transition-fade"
+                    data-post-detail-toc="1"
+                  >
+                    <div
+                      id="toc-inner-wrapper"
+                      class="w-full max-h-[calc(100vh-10rem)] overflow-hidden"
+                    >
+                      <div id="toc-container" class="w-full transition-fade">
+                        <TOC headings={headings} />
+                      </div>
+                    </div>
+                  </div>
+                ) : null
+              }
+            </ResponsiveSidebarPanel>
           </div>
 
           <main
@@ -426,6 +544,41 @@ const {
               class={`onload-animation transition-leaving ${isPostEditorPage ? "post-editor-content-wrapper" : ""}`}
             >
               <slot />
+              {
+                shouldRenderMobileLeftSidebarAnchor && (
+                  <div
+                    class="mobile-footer-sidebar-slot lg:hidden"
+                    data-responsive-sidebar-mobile-anchor
+                  />
+                )
+              }
+              {
+                shouldRenderMobileLeftSidebarList && (
+                  <section
+                    class:list={[
+                      "mb-4 lg:hidden",
+                      {
+                        "mt-4": shouldApplyMobileLeftSidebarTopGap,
+                      },
+                    ]}
+                  >
+                    <div class="flex flex-col gap-4">
+                      {mobileLeftSidebarBuckets.topComponents.length > 0 && (
+                        <SideBarComponentList
+                          components={mobileLeftSidebarBuckets.topComponents}
+                          headings={headings}
+                        />
+                      )}
+                      {mobileLeftSidebarBuckets.stickyComponents.length > 0 && (
+                        <SideBarComponentList
+                          components={mobileLeftSidebarBuckets.stickyComponents}
+                          headings={headings}
+                        />
+                      )}
+                    </div>
+                  </section>
+                )
+              }
               {
                 !isPostEditorPage && (
                   <div class="footer col-span-full onload-animation block">
@@ -497,8 +650,170 @@ const {
         避免被 filter/transform 捕获或被 overlay 事件策略影响。
       -->
       <div id="detail-action-float-anchor" aria-hidden="true"></div>
+      {
+        shouldRenderMobileArticleTocDrawer && (
+          <div
+            class="mobile-edge-drawer-root lg:hidden"
+            data-mobile-edge-drawer-root
+            data-mobile-post-toc-root
+            hidden
+          >
+            <button
+              type="button"
+              class="mobile-edge-launcher btn-card"
+              data-mobile-edge-drawer-toggle
+              data-mobile-post-toc-launcher
+              data-mobile-float-launcher
+              data-mobile-float-order="2"
+              aria-label="打开文章目录"
+              aria-controls="mobile-post-toc-panel"
+              aria-expanded="false"
+            >
+              <span
+                class="mobile-edge-launcher-progress"
+                data-mobile-post-toc-progress
+              >
+                0
+              </span>
+            </button>
+            <div class="mobile-edge-drawer-layer">
+              <button
+                type="button"
+                class="mobile-edge-drawer-backdrop"
+                data-mobile-edge-drawer-backdrop
+                aria-label="关闭文章目录"
+              />
+              <aside
+                id="mobile-post-toc-panel"
+                class="mobile-edge-drawer-panel"
+                data-mobile-edge-drawer-panel
+                aria-hidden="true"
+              >
+                <div class="mobile-edge-drawer-head">
+                  <div class="space-y-1">
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-50">
+                      TOC
+                    </p>
+                    <p class="text-base font-semibold text-90">文章目录</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn-plain scale-animation flex h-10 w-10 items-center justify-center rounded-lg active:scale-90"
+                    data-mobile-edge-drawer-close
+                    aria-label="关闭文章目录"
+                  >
+                    <Icon
+                      name="material-symbols:close-rounded"
+                      class="text-[1.3rem]"
+                    />
+                  </button>
+                </div>
+                <div class="mobile-edge-drawer-body mobile-post-toc-drawer-body">
+                  <div class="mobile-post-toc-card">
+                    <div
+                      class="mobile-post-toc-title font-bold transition text-lg text-neutral-900 dark:text-neutral-100 relative ml-8 mt-4 mb-2 flex items-center
+                        before:w-1 before:h-4 before:rounded-md before:bg-(--primary)
+                        before:absolute before:left-[-16px] before:top-[5.5px]"
+                    >
+                      目录
+                    </div>
+                    <div class="mobile-post-toc-shell" data-post-detail-toc="1">
+                      <TOC
+                        id="mobile-post-toc"
+                        class="mobile-post-toc-list"
+                        headings={headings}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </aside>
+            </div>
+          </div>
+        )
+      }
+      {
+        shouldRenderMobileRightSidebarDrawer && (
+          <div
+            class="mobile-edge-drawer-root lg:hidden"
+            data-mobile-edge-drawer-root
+          >
+            <button
+              type="button"
+              class="mobile-edge-launcher btn-card"
+              data-mobile-edge-drawer-toggle
+              data-mobile-float-launcher
+              data-mobile-float-order="2"
+              aria-label="打开页面工具"
+              aria-controls="mobile-post-tools-panel"
+              aria-expanded="false"
+            >
+              <span class="mobile-edge-launcher-icon">
+                <Icon name={rightSidebarPanelIcon} class="text-[1.45rem]" />
+              </span>
+            </button>
+            <div class="mobile-edge-drawer-layer">
+              <button
+                type="button"
+                class="mobile-edge-drawer-backdrop"
+                data-mobile-edge-drawer-backdrop
+                aria-label="关闭页面工具"
+              />
+              <aside
+                id="mobile-post-tools-panel"
+                class="mobile-edge-drawer-panel"
+                data-mobile-edge-drawer-panel
+                aria-hidden="true"
+              >
+                <div class="mobile-edge-drawer-head">
+                  <div class="space-y-1">
+                    <p class="text-xs font-semibold uppercase tracking-[0.16em] text-50">
+                      Tools
+                    </p>
+                    <p class="text-base font-semibold text-90">页面工具</p>
+                  </div>
+                  <button
+                    type="button"
+                    class="btn-plain scale-animation flex h-10 w-10 items-center justify-center rounded-lg active:scale-90"
+                    data-mobile-edge-drawer-close
+                    aria-label="关闭页面工具"
+                  >
+                    <Icon
+                      name="material-symbols:close-rounded"
+                      class="text-[1.3rem]"
+                    />
+                  </button>
+                </div>
+                <div class="mobile-edge-drawer-body">
+                  {shouldRelocateRightSidebarContent ? (
+                    <div
+                      class="w-full min-w-0"
+                      data-responsive-right-sidebar-mobile-anchor
+                    />
+                  ) : hasCustomRightSidebarContent ? (
+                    <slot name="sidebar-right" />
+                  ) : (
+                    hasRightSidebarComponents && (
+                      <RightSideBar
+                        headings={headings}
+                        topComponents={rightSidebarBuckets.topComponents}
+                        stickyComponents={rightSidebarBuckets.stickyComponents}
+                      />
+                    )
+                  )}
+                </div>
+              </aside>
+            </div>
+          </div>
+        )
+      }
       <BackToTop />
-      {siteConfig.toc.enable && isFloatTOC && <FloatingTOC />}
+      {
+        siteConfig.toc.enable && isFloatTOC && (
+          <div class="hidden lg:block">
+            <FloatingTOC />
+          </div>
+        )
+      }
     </div>
   </div>
 
@@ -509,4 +824,9 @@ const {
   }
 
   <slot name="modal" />
+  <script>
+    import "@/scripts/mobile-edge-drawer";
+    import "@/scripts/mobile-post-toc-drawer";
+    import "@/scripts/responsive-sidebar-placement";
+  </script>
 </Layout>

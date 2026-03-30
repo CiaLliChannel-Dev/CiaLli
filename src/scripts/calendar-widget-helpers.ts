@@ -1,4 +1,3 @@
-/* eslint-disable max-lines -- 文件行数较长，按页面驱动与模块边界保留当前结构 */
 /**
  * Calendar widget helpers - 从 calendar-widget.ts 中分离出来的辅助函数。
  * 这些函数通过 CalendarContext 对象访问共享状态，避免了大型闭包。

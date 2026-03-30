@@ -1,0 +1,147 @@
+---
+import { Icon } from "astro-icon/components";
+
+interface Props {
+  title: string;
+  icon?: string;
+  class?: string;
+  bodyClass?: string;
+  defaultOpen?: boolean;
+}
+
+const {
+  title,
+  icon = "material-symbols:widgets-outline-rounded",
+  class: className = "",
+  bodyClass = "",
+  defaultOpen = false,
+} = Astro.props;
+const panelId = `sidebar-panel-${Math.random().toString(36).slice(2, 10)}`;
+---
+
+<section
+  class:list={[
+    "responsive-sidebar-panel min-w-0 overflow-hidden rounded-(--radius-large) border border-(--line-divider) bg-(--card-bg) lg:border-none lg:bg-transparent lg:rounded-none",
+    className,
+  ]}
+  data-mobile-collapsible-root
+  data-open={defaultOpen ? "true" : "false"}
+>
+  <button
+    type="button"
+    class="responsive-sidebar-toggle flex w-full items-center justify-between gap-3 px-4 py-3 text-left text-sm font-semibold text-90 lg:hidden"
+    aria-controls={panelId}
+    aria-expanded={defaultOpen ? "true" : "false"}
+    data-mobile-collapsible-toggle
+  >
+    <span class="flex min-w-0 items-center gap-2">
+      <Icon name={icon} class="text-[1.2rem] shrink-0 text-(--primary)" />
+      <span class="truncate">{title}</span>
+    </span>
+    <Icon
+      name="material-symbols:keyboard-arrow-down-rounded"
+      class="responsive-sidebar-toggle-icon shrink-0 text-[1.35rem] text-60 transition-transform duration-200"
+    />
+  </button>
+  <div
+    id={panelId}
+    class:list={[
+      "responsive-sidebar-panel-body min-w-0 lg:block",
+      !defaultOpen && "hidden",
+      bodyClass,
+    ]}
+    data-mobile-collapsible-body
+  >
+    <slot />
+  </div>
+</section>
+
+<style>
+  @reference "../../styles/main.css";
+
+  .responsive-sidebar-toggle {
+    color: rgb(0 0 0 / 0.9);
+  }
+
+  .responsive-sidebar-toggle-icon {
+    color: rgb(0 0 0 / 0.6);
+  }
+
+  :global(:root.dark) .responsive-sidebar-toggle {
+    color: rgb(255 255 255 / 0.9);
+  }
+
+  :global(:root.dark) .responsive-sidebar-toggle-icon {
+    color: rgb(255 255 255 / 0.6);
+  }
+
+  .responsive-sidebar-panel[data-open="true"] .responsive-sidebar-toggle-icon {
+    @apply rotate-180 text-(--primary);
+  }
+</style>
+
+<script is:inline>
+  (() => {
+    const ROOT_SELECTOR = "[data-mobile-collapsible-root]";
+    const BOUND_ATTR = "data-mobile-collapsible-bound";
+    const BOOTSTRAP_ATTR = "data-mobile-collapsible-bootstrap";
+
+    const syncPanelState = (root) => {
+      const button = root.querySelector("[data-mobile-collapsible-toggle]");
+      const body = root.querySelector("[data-mobile-collapsible-body]");
+      if (
+        !(button instanceof HTMLButtonElement) ||
+        !(body instanceof HTMLElement)
+      ) {
+        return;
+      }
+
+      const isDesktop = window.matchMedia("(min-width: 1280px)").matches;
+      const isOpen = isDesktop || !body.classList.contains("hidden");
+      button.setAttribute("aria-expanded", isOpen ? "true" : "false");
+      root.dataset.open = isOpen ? "true" : "false";
+    };
+
+    const bindPanel = (root) => {
+      if (
+        !(root instanceof HTMLElement) ||
+        root.getAttribute(BOUND_ATTR) === "1"
+      ) {
+        return;
+      }
+
+      const button = root.querySelector("[data-mobile-collapsible-toggle]");
+      const body = root.querySelector("[data-mobile-collapsible-body]");
+      if (
+        !(button instanceof HTMLButtonElement) ||
+        !(body instanceof HTMLElement)
+      ) {
+        return;
+      }
+
+      root.setAttribute(BOUND_ATTR, "1");
+      button.addEventListener("click", () => {
+        if (window.matchMedia("(min-width: 1280px)").matches) {
+          return;
+        }
+        body.classList.toggle("hidden");
+        syncPanelState(root);
+      });
+      syncPanelState(root);
+    };
+
+    const initPanels = () => {
+      document.querySelectorAll(ROOT_SELECTOR).forEach((root) => {
+        bindPanel(root);
+        syncPanelState(root);
+      });
+    };
+
+    initPanels();
+    if (!document.documentElement.hasAttribute(BOOTSTRAP_ATTR)) {
+      document.documentElement.setAttribute(BOOTSTRAP_ATTR, "1");
+      window.addEventListener("resize", initPanels, { passive: true });
+      document.addEventListener("astro:after-swap", initPanels);
+    }
+  })();
+</script>

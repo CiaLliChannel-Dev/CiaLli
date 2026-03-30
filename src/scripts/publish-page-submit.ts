@@ -1,4 +1,4 @@
-/* eslint-disable complexity, max-lines -- 发布页提交链路需要保持上传、加密与提交状态在同一文件内收敛。 */
+/* eslint-disable complexity -- 发布页提交链路需要保持上传、加密与提交状态在同一文件内收敛。 */
 /**
  * 发布页面提交逻辑
  *

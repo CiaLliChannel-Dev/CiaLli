@@ -1,5 +1,9 @@
 import type { MarkdownHeading } from "astro";
-import type { SiteConfig } from "@/types/config";
+import type {
+    SiteConfig,
+    WidgetComponentConfig,
+    WidgetComponentType,
+} from "@/types/config";
 import { widgetManager } from "@utils/widget-manager";
 import { BANNER_HEIGHT_HOME } from "../constants/constants";
 
@@ -10,6 +14,24 @@ export type MainGridLayoutProps = {
     lang?: string;
     setOGTypeArticle?: boolean;
     headings?: MarkdownHeading[];
+    leftSidebarMobilePreset?: LeftSidebarMobilePreset;
+    rightSidebarMobilePreset?: RightSidebarMobilePreset;
+    hasCustomRightSidebarContent?: boolean;
+};
+
+export type LeftSidebarMobilePreset =
+    | "footer"
+    | "hidden"
+    | "profile-only"
+    | "supplementary"
+    | "without-announcement"
+    | "supplementary-without-announcement";
+
+export type RightSidebarMobilePreset = "panel" | "hidden" | "drawer";
+
+export type SidebarComponentBuckets = {
+    topComponents: WidgetComponentConfig[];
+    stickyComponents: WidgetComponentConfig[];
 };
 
 export type MainGridLayoutState = {
@@ -40,7 +62,119 @@ export type MainGridLayoutState = {
     mainContentClass: string;
     hasCarousel: boolean;
     hasCustomRightSidebar: boolean;
+    leftSidebarBuckets: SidebarComponentBuckets;
+    rightSidebarBuckets: SidebarComponentBuckets;
 };
+
+type SidebarPosition = "left" | "right";
+
+type SidebarFilterOptions = {
+    includeTypes?: readonly WidgetComponentType[];
+    excludeTypes?: readonly WidgetComponentType[];
+};
+
+function isHomePagePath(pathname: string): boolean {
+    return pathname === "/" || pathname === "";
+}
+
+function filterSidebarComponents(
+    components: WidgetComponentConfig[],
+    options?: SidebarFilterOptions,
+): WidgetComponentConfig[] {
+    const includeTypes = options?.includeTypes
+        ? new Set<WidgetComponentType>(options.includeTypes)
+        : null;
+    const excludeTypes = options?.excludeTypes
+        ? new Set<WidgetComponentType>(options.excludeTypes)
+        : null;
+
+    return components.filter((component) => {
+        if (includeTypes && !includeTypes.has(component.type)) {
+            return false;
+        }
+        if (excludeTypes && excludeTypes.has(component.type)) {
+            return false;
+        }
+        return true;
+    });
+}
+
+function applySidebarFilter(
+    buckets: SidebarComponentBuckets,
+    options?: SidebarFilterOptions,
+): SidebarComponentBuckets {
+    return {
+        topComponents: filterSidebarComponents(buckets.topComponents, options),
+        stickyComponents: filterSidebarComponents(
+            buckets.stickyComponents,
+            options,
+        ),
+    };
+}
+
+export function hasSidebarComponents(
+    buckets: SidebarComponentBuckets,
+): boolean {
+    return (
+        buckets.topComponents.length > 0 || buckets.stickyComponents.length > 0
+    );
+}
+
+export function getSidebarBuckets(
+    pathname: string,
+    sidebar: SidebarPosition,
+): SidebarComponentBuckets {
+    const shouldFilterCalendar = !isHomePagePath(pathname);
+    const baseFilterOptions: SidebarFilterOptions | undefined =
+        shouldFilterCalendar
+            ? {
+                  excludeTypes: ["calendar"],
+              }
+            : undefined;
+
+    return {
+        topComponents: filterSidebarComponents(
+            widgetManager.getComponentsByPosition("top", sidebar),
+            baseFilterOptions,
+        ),
+        stickyComponents: filterSidebarComponents(
+            widgetManager.getComponentsByPosition("sticky", sidebar),
+            baseFilterOptions,
+        ),
+    };
+}
+
+export function resolveLeftSidebarMobileBuckets(
+    sourceBuckets: SidebarComponentBuckets,
+    preset: LeftSidebarMobilePreset,
+): SidebarComponentBuckets {
+    switch (preset) {
+        case "profile-only":
+            return applySidebarFilter(sourceBuckets, {
+                includeTypes: ["profile"],
+            });
+        case "supplementary":
+            return applySidebarFilter(sourceBuckets, {
+                excludeTypes: ["profile", "calendar"],
+            });
+        case "without-announcement":
+            return applySidebarFilter(sourceBuckets, {
+                excludeTypes: ["announcement"],
+            });
+        case "supplementary-without-announcement":
+            return applySidebarFilter(sourceBuckets, {
+                excludeTypes: ["profile", "calendar", "announcement"],
+            });
+        case "hidden":
+            return {
+                topComponents: [],
+                stickyComponents: [],
+            };
+        case "footer":
+        default:
+            return sourceBuckets;
+    }
+}
 
 export function normalizeBannerList(value: string | string[]): string[] {
     if (typeof value === "string") {
@@ -86,13 +220,13 @@ export function resolveGridCols(
     effectiveShowRightSidebar: boolean,
 ): string {
     if (desktopShowLeftSidebar && effectiveShowRightSidebar) {
-        return "grid-cols-[17.5rem_minmax(0,1fr)_17.5rem]";
+        return "grid-cols-1 lg:grid-cols-[17.5rem_minmax(0,1fr)_17.5rem]";
     }
     if (desktopShowLeftSidebar) {
-        return "grid-cols-[17.5rem_minmax(0,1fr)]";
+        return "grid-cols-1 lg:grid-cols-[17.5rem_minmax(0,1fr)]";
     }
     if (effectiveShowRightSidebar) {
-        return "grid-cols-[minmax(0,1fr)_17.5rem]";
+        return "grid-cols-1 lg:grid-cols-[minmax(0,1fr)_17.5rem]";
     }
     return "grid-cols-1";
 }
@@ -104,14 +238,17 @@ export function resolveRightSidebarClass(
     desktopShowLeftSidebar: boolean,
 ): string {
     const colClass = desktopShowLeftSidebar
-        ? "col-start-3 col-end-4"
-        : "col-start-2 col-end-3";
+        ? "lg:col-start-3 lg:col-end-4"
+        : "lg:col-start-2 lg:col-end-3";
+
+    const baseClass =
+        "onload-animation block w-full min-w-0 order-2 lg:order-none lg:row-start-1 lg:row-end-2 lg:max-w-[17.5rem]";
 
     if (hasCustomRightSidebar) {
-        return `onload-animation block mb-4 max-w-[17.5rem] row-start-1 row-end-2 ${colClass}`;
+        return `${baseClass} mb-4 ${colClass}`;
     }
     if (hasRightSidebarComponents || shouldRenderDedicatedPostToc) {
-        return `onload-animation block overflow-x-hidden mb-4 max-w-[17.5rem] row-start-1 row-end-2 ${colClass}`;
+        return `${baseClass} overflow-x-hidden mb-4 ${colClass}`;
     }
     return "hidden";
 }
@@ -121,9 +258,9 @@ export function resolveMainGridPositionClass(
     effectiveShowRightSidebar: boolean,
 ): string {
     if (desktopShowLeftSidebar || effectiveShowRightSidebar) {
-        return "col-start-2 col-end-3";
+        return "lg:col-start-2 lg:col-end-3";
     }
-    return "col-span-1";
+    return "lg:col-span-1";
 }
 
 type TocState = {
@@ -161,7 +298,7 @@ function resolvePageKindState(
     siteConfig: SiteConfig,
     pathname: string,
 ): PageKindState {
-    const isHomePage = pathname === "/" || pathname === "";
+    const isHomePage = isHomePagePath(pathname);
     const normalizedPath = pathname.replace(/\/+$/, "");
     const isPostEditorPage =
         normalizedPath === "/posts/new" ||
@@ -198,29 +335,6 @@ function resolveWallpaperPanelState(
     return { initialWallpaperMode, mainPanelTop, finalMainPanelTop };
 }
 
-type RightSidebarState = {
-    hasRightSidebarComponents: boolean;
-    hasRightSidebarTocWidget: boolean;
-};
-
-function resolveRightSidebarState(): RightSidebarState {
-    const rightTopComponents = widgetManager.getComponentsByPosition(
-        "top",
-        "right",
-    );
-    const rightStickyComponents = widgetManager.getComponentsByPosition(
-        "sticky",
-        "right",
-    );
-    const hasRightSidebarComponents =
-        rightTopComponents.length > 0 || rightStickyComponents.length > 0;
-    const hasRightSidebarTocWidget = [
-        ...rightTopComponents,
-        ...rightStickyComponents,
-    ].some((component) => component.type === "toc");
-    return { hasRightSidebarComponents, hasRightSidebarTocWidget };
-}
-
 function resolveMainContentClass(
     desktopShowSidebar: boolean,
     desktopShowLeftSidebar: boolean,
@@ -231,9 +345,10 @@ function resolveMainContentClass(
         effectiveShowRightSidebar,
     );
     return `
-  transition-fade overflow-clip w-full
-  col-span-1 row-start-1 row-end-2
-  ${desktopShowSidebar ? mainGridPositionClass : "col-span-1"}
+  transition-fade overflow-clip w-full min-w-0
+  order-1 col-span-1 row-start-auto
+  lg:order-none lg:row-start-1 lg:row-end-2
+  ${desktopShowSidebar ? mainGridPositionClass : "lg:col-span-1"}
 `
         .trim()
         .replace(/\s+/g, " ");
@@ -259,12 +374,14 @@ export function buildMainGridLayoutState(
     const { initialWallpaperMode, mainPanelTop, finalMainPanelTop } =
         resolveWallpaperPanelState(siteConfig, isHomePage);
 
-    const hasLeftSidebarComponents =
-        widgetManager.getComponentsByPosition("top", "left").length > 0 ||
-        widgetManager.getComponentsByPosition("sticky", "left").length > 0;
-
-    const { hasRightSidebarComponents, hasRightSidebarTocWidget } =
-        resolveRightSidebarState();
+    const leftSidebarBuckets = getSidebarBuckets(pathname, "left");
+    const rightSidebarBuckets = getSidebarBuckets(pathname, "right");
+    const hasLeftSidebarComponents = hasSidebarComponents(leftSidebarBuckets);
+    const hasRightSidebarComponents = hasSidebarComponents(rightSidebarBuckets);
+    const hasRightSidebarTocWidget = [
+        ...rightSidebarBuckets.topComponents,
+        ...rightSidebarBuckets.stickyComponents,
+    ].some((component) => component.type === "toc");
 
     const shouldRenderDedicatedPostToc =
         shouldShowPostTocSidebar && !hasRightSidebarTocWidget;
@@ -284,7 +401,7 @@ export function buildMainGridLayoutState(
         effectiveShowRightSidebar,
     );
     const sidebarClass = desktopShowLeftSidebar
-        ? "onload-animation mb-4 max-w-[17.5rem] col-start-1 col-end-2 row-start-1 row-end-2"
+        ? "onload-animation mb-4 w-full min-w-0 order-3 lg:order-none lg:max-w-[17.5rem] lg:col-start-1 lg:col-end-2 lg:row-start-1 lg:row-end-2"
         : "hidden";
     const rightSidebarClass = resolveRightSidebarClass(
         hasCustomRightSidebar,
@@ -332,5 +449,7 @@ export function buildMainGridLayoutState(
         mainContentClass,
         hasCarousel,
         hasCustomRightSidebar,
+        leftSidebarBuckets,
+        rightSidebarBuckets,
     };
 }

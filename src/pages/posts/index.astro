@@ -10,6 +10,7 @@ import {
   DIRECTUS_ACCESS_COOKIE_NAME,
   DIRECTUS_REFRESH_COOKIE_NAME,
 } from "@/server/directus-auth";
+import type { HomeFeedPageItem } from "@/server/recommendation/home-feed.types";
 import {
   getSortedPosts,
   getTagList,
@@ -29,6 +30,19 @@ const allPosts = await getSortedPosts(viewerId);
 const tags = await getTagList(viewerId);
 const categories = await getCategoryList(viewerId);
 const uncategorizedLabel = i18n(I18nKey.contentUncategorized);
+const archiveFeedItems: HomeFeedPageItem[] = allPosts.map((entry) => ({
+  type: "article",
+  id: entry.data.article_id,
+  authorId: entry.data.author_id,
+  publishedAt: entry.data.published,
+  entry,
+  viewerState: {
+    hasLiked: false,
+    canDeleteOwn: false,
+    canDeleteAdmin: false,
+    canBlock: false,
+  },
+}));
 
 if (hasSessionCookie || viewerId) {
   Astro.response.headers.set("Cache-Control", "private, no-store");
@@ -40,10 +54,14 @@ if (hasSessionCookie || viewerId) {
 }
 ---
 
-<MainGridLayout title={i18n(I18nKey.coreArchive)}>
+<MainGridLayout
+  title={i18n(I18nKey.coreArchive)}
+  leftSidebarMobilePreset="supplementary"
+  rightSidebarMobilePreset="drawer"
+>
   <!-- 默认 slot: 文章列表 -->
   <div
-    class="archive-posts min-w-0"
+    class="archive-posts min-w-0 mb-4 lg:mb-0"
     data-uncategorized-label={uncategorizedLabel}
   >
     {
@@ -52,7 +70,7 @@ if (hasSessionCookie || viewerId) {
           暂无公开文章。
         </div>
       ) : (
-        <PostPage page={{ data: allPosts }} maxAnimationIndex={15} />
+        <PostPage items={archiveFeedItems} maxAnimationIndex={15} />
       )
     }
 
@@ -96,7 +114,7 @@ if (hasSessionCookie || viewerId) {
   <!-- 右侧栏 slot: 筛选面板 -->
   <div
     slot="sidebar-right"
-    class="archive-filter-panel max-h-[calc(100vh-6.5rem)] overflow-y-auto flex flex-col gap-4 self-start"
+    class="archive-filter-panel w-full max-h-none overflow-visible flex flex-col gap-4 self-start lg:max-h-[calc(100dvh-6.5rem)] lg:overflow-y-auto"
   >
     <!-- 日历 -->
     <Calendar defaultExpanded={false} />

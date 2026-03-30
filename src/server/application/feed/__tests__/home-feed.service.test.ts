@@ -113,20 +113,6 @@ function createArticleItem(params: {
         authorId: params.authorId,
         publishedAt: BASE_NOW,
         entry: createArticleEntry(params),
-        likes72h: 0,
-        comments72h: 0,
-        qualityScore: 0.5,
-        personalizationScore: 0,
-        score: 0.5,
-        signals: {
-            recency: 0.8,
-            engagement: 0.1,
-            quality: 0.5,
-            personalization: 0,
-            engagementRaw: 0,
-            likes72h: 0,
-            comments72h: 0,
-        },
     };
 }
 
@@ -140,20 +126,6 @@ function createDiaryItem(params: {
         authorId: params.authorId,
         publishedAt: BASE_NOW,
         entry: createDiaryEntry(params),
-        likes72h: 0,
-        comments72h: 0,
-        qualityScore: 0.5,
-        personalizationScore: 0,
-        score: 0.5,
-        signals: {
-            recency: 0.8,
-            engagement: 0.1,
-            quality: 0.5,
-            personalization: 0,
-            engagementRaw: 0,
-            likes72h: 0,
-            comments72h: 0,
-        },
     };
 }
 
@@ -161,21 +133,6 @@ function createBuildResult(items: HomeFeedItem[]): HomeFeedBuildResult {
     return {
         items,
         generatedAt: BASE_NOW.toISOString(),
-        meta: {
-            viewerId: null,
-            limit: 20,
-            outputLimit: 20,
-            articleCandidateLimit: 80,
-            diaryCandidateLimit: 60,
-            articleCandidateCount: items.filter(
-                (item) => item.type === "article",
-            ).length,
-            diaryCandidateCount: items.filter((item) => item.type === "diary")
-                .length,
-            engagementWindowHours: 72,
-            personalizationLookbackDays: 30,
-            algoVersion: "home-feed-v2",
-        },
     };
 }
 
@@ -200,8 +157,6 @@ describe("buildHomeFeedPage", () => {
             offset: 0,
             pageLimit: 20,
             totalLimit: 20,
-            articleCandidateLimit: 80,
-            diaryCandidateLimit: 60,
         });
 
         expect(readManyMock).not.toHaveBeenCalled();
@@ -212,6 +167,44 @@ describe("buildHomeFeedPage", () => {
             canDeleteAdmin: false,
             canBlock: false,
         });
+    });
+
+    it("分页切片会按 10 条返回首页首屏结果", async () => {
+        buildHomeFeedMock.mockResolvedValue(
+            createBuildResult(
+                Array.from({ length: 12 }, (_, index) =>
+                    createArticleItem({
+                        id: `article-${index + 1}`,
+                        authorId: `author-${index + 1}`,
+                    }),
+                ),
+            ),
+        );
+
+        const result = await buildHomeFeedPage({
+            viewerId: null,
+            offset: 0,
+            pageLimit: 10,
+            totalLimit: 12,
+        });
+
+        expect(readManyMock).not.toHaveBeenCalled();
+        expect(result.items).toHaveLength(10);
+        expect(result.items.map((item) => item.id)).toEqual([
+            "article-1",
+            "article-2",
+            "article-3",
+            "article-4",
+            "article-5",
+            "article-6",
+            "article-7",
+            "article-8",
+            "article-9",
+            "article-10",
+        ]);
+        expect(result.next_offset).toBe(10);
+        expect(result.has_more).toBe(true);
+        expect(result.total).toBe(12);
     });
 
     it("登录用户在服务端过滤已屏蔽作者并附带 viewerState", async () => {
@@ -255,8 +248,6 @@ describe("buildHomeFeedPage", () => {
             offset: 0,
             pageLimit: 20,
             totalLimit: 20,
-            articleCandidateLimit: 80,
-            diaryCandidateLimit: 60,
         });
 
         expect(readManyMock).toHaveBeenCalledTimes(3);
@@ -277,5 +268,30 @@ describe("buildHomeFeedPage", () => {
             canDeleteAdmin: true,
             canBlock: true,
         });
+    });
+
+    it("首页返回项不再暴露推荐算法字段", async () => {
+        buildHomeFeedMock.mockResolvedValue(
+            createBuildResult([
+                createArticleItem({
+                    id: "article-public",
+                    authorId: "author-public",
+                }),
+            ]),
+        );
+
+        const result = await buildHomeFeedPage({
+            viewerId: null,
+            offset: 0,
+            pageLimit: 20,
+            totalLimit: 20,
+        });
+
+        expect(result.items[0]).not.toHaveProperty("score");
+        expect(result.items[0]).not.toHaveProperty("signals");
+        expect(result.items[0]).not.toHaveProperty("qualityScore");
+        expect(result.items[0]).not.toHaveProperty("personalizationScore");
+        expect(result.items[0]).not.toHaveProperty("likes72h");
+        expect(result.items[0]).not.toHaveProperty("comments72h");
     });
 });

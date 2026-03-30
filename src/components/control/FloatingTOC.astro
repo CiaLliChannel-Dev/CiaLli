@@ -41,11 +41,14 @@ const useJapaneseBadge = resolvedSiteSettings.settings.toc.useJapaneseBadge;
 <style>
   .floating-toc-wrapper {
     position: fixed;
-    right: 6rem;
-    bottom: 20rem;
-    z-index: 50;
+    right: var(--right-float-right, 1rem);
+    bottom: calc(
+      var(--back-to-top-bottom, 1rem) + var(--right-float-size, 3.75rem) +
+        4.75rem
+    );
+    z-index: var(--z-float-rail, 70);
     pointer-events: auto;
-    transform: translateX(5rem);
+    transform: translateX(var(--right-float-shift-x, 0));
     display: none;
     transition:
       opacity 0.3s ease,
@@ -99,7 +102,18 @@ const useJapaneseBadge = resolvedSiteSettings.settings.toc.useJapaneseBadge;
     position: absolute;
     bottom: 4.5rem;
     right: 0;
-    width: 18rem;
+    z-index: var(--z-float-panel, 75);
+    width: min(
+      18rem,
+      calc(
+        100vw -
+          max(
+            2rem,
+            env(safe-area-inset-left, 0px) + env(safe-area-inset-right, 0px) +
+              2rem
+          )
+      )
+    );
     max-height: 60vh;
     background: var(--card-bg);
     border: 1px solid var(--line-color);
@@ -207,6 +221,21 @@ const useJapaneseBadge = resolvedSiteSettings.settings.toc.useJapaneseBadge;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+
+  @media (max-width: 1279px) {
+    .floating-toc-wrapper {
+      bottom: calc(
+        var(--back-to-top-bottom, 1rem) + var(--right-float-size, 3.75rem) +
+          1rem
+      );
+    }
+
+    .floating-toc-panel {
+      bottom: calc(100% + 0.75rem);
+      right: 0;
+      max-height: min(60vh, 24rem);
+    }
   }
 </style>
 

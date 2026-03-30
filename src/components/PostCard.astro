@@ -14,10 +14,12 @@ interface Props {
   entry: DirectusPostEntry;
   style?: string;
   viewerState?: HomeFeedViewerState;
+  titleSerif?: boolean;
 }
 
 const { entry, style } = Astro.props;
 const className = Astro.props.class;
+const titleSerif = Astro.props.titleSerif === true;
 const viewerState: HomeFeedViewerState = Astro.props.viewerState ?? {
   hasLiked: false,
   canDeleteOwn: false,
@@ -43,6 +45,12 @@ const {
 const url = getPostUrl(entry);
 const hasCover = typeof image === "string" && image.trim().length > 0;
 const coverWidth = "28%";
+const desktopBodyWidthClass = hasCover
+  ? "lg:w-[calc(100%-var(--coverWidth)-0.75rem)]"
+  : "lg:w-[calc(100%-3.25rem-0.75rem)]";
+const desktopEnterLinkClass = hasCover
+  ? "lg:w-[var(--coverWidth)]"
+  : "lg:w-[3.25rem]";
 const bodyText = entry.data.encrypted
   ? ""
   : String(entry.body || "")
@@ -79,81 +87,127 @@ const adminDeleteLabel = i18n(I18nKey.interactionCommonDeleteAdmin);
   data-author-handle={authorHandle}
   data-enter-skeleton-target="post-card"
 >
-  <div
-    data-enter-skeleton-content
-    class:list={[
-      "pl-9 pr-2 pt-7 pb-6 relative",
-      {
-        "w-[calc(100%-3.25rem-0.75rem)]": !hasCover,
-        "w-[calc(100%-var(--coverWidth)-0.75rem)]": hasCover,
-      },
-    ]}
-  >
+  <div data-enter-skeleton-content class="relative flex flex-col lg:block">
     <a
       href={url}
-      class="transition group w-full block font-bold mb-3 text-3xl text-90
-        hover:text-(--primary) dark:hover:text-(--primary)
-        active:text-(--title-active) dark:active:text-(--title-active)
-        before:w-1 before:h-5 before:rounded-md before:bg-(--primary)
-        before:absolute
-        before:top-[2.1875rem] before:left-[1.125rem] before:block"
+      aria-label={title}
+      tabindex="-1"
+      class="absolute inset-0 z-10 rounded-(--radius-large) lg:hidden"
     >
-      {
-        pinned && (
-          <Icon
-            name="mdi:pin"
-            class="inline text-(--primary) text-2xl mr-2 -translate-y-0.5"
-          />
-        )
-      }
-      {title}
-      <Icon
-        class="hidden text-[2rem] text-(--primary) translate-y-0.5 absolute"
-        name="material-symbols:chevron-right-rounded"
-      />
-      <Icon
-        class="text-(--primary) text-[2rem] transition inline absolute translate-y-0.5 opacity-0 group-hover:opacity-100 -translate-x-1 group-hover:translate-x-0"
-        name="material-symbols:chevron-right-rounded"
-      />
     </a>
+    <div
+      class:list={[
+        "post-card-body relative flex flex-col gap-4 px-5 pt-5 pb-5 lg:pl-9 lg:pr-2 lg:pt-7 lg:pb-0",
+        desktopBodyWidthClass,
+      ]}
+    >
+      <a
+        href={url}
+        class:list={[
+          "post-card-title post-card-primary-text relative z-20 transition w-full block font-bold text-2xl lg:text-3xl hover:text-(--primary) dark:hover:text-(--primary) active:text-(--title-active) dark:active:text-(--title-active) before:content-[''] before:absolute before:-left-4 before:top-[0.18em] before:bottom-[0.18em] before:w-1 before:rounded-md before:bg-(--primary) lg:before:-left-[1.125rem]",
+          {
+            "font-content-serif": titleSerif,
+          },
+        ]}
+      >
+        {
+          pinned && (
+            <Icon
+              name="mdi:pin"
+              class="inline text-(--primary) text-2xl mr-2 -translate-y-0.5"
+            />
+          )
+        }
+        {title}
+      </a>
 
-    <div class="mb-4 h-5" aria-hidden="true"></div>
+      <div class="hidden lg:block h-5" aria-hidden="true"></div>
 
-    <div class="transition text-75 -mt-3 mb-3.5 pr-4 line-clamp-1">
-      {excerpt}
+      <div
+        class="post-card-excerpt transition text-75 mb-0 lg:-mt-3 lg:mb-3.5 lg:pr-4 line-clamp-2 lg:line-clamp-1"
+      >
+        {excerpt}
+      </div>
     </div>
 
-    <div class="flex items-center justify-between gap-3 mt-2">
+    {
+      hasCover ? (
+        <a
+          href={url}
+          aria-label={title}
+          class:list={[
+            "post-card-cover group relative mx-5 mb-5 block h-52 rounded-xl overflow-hidden active:scale-95 lg:absolute lg:top-3 lg:right-3 lg:bottom-3 lg:mx-0 lg:mb-0 lg:h-auto",
+            desktopEnterLinkClass,
+          ]}
+        >
+          <div class="absolute pointer-events-none z-10 w-full h-full group-hover:bg-black/30 group-active:bg-black/50 transition" />
+          <div class="absolute pointer-events-none z-20 w-full h-full flex items-center justify-center">
+            <Icon
+              name="material-symbols:chevron-right-rounded"
+              class="transition opacity-0 group-hover:opacity-100 scale-50 group-hover:scale-100 text-white text-5xl"
+            />
+          </div>
+          <ExternalImage
+            src={image || ""}
+            alt={`Cover image of ${title}`}
+            class="w-full h-full object-cover"
+            loading="lazy"
+          />
+        </a>
+      ) : (
+        <a
+          href={url}
+          aria-label={title}
+          class="hidden mx-5 mb-5 h-12 rounded-xl btn-regular bg-(--enter-btn-bg) hover:bg-(--enter-btn-bg-hover) active:bg-(--enter-btn-bg-active) active:scale-95 lg:absolute lg:right-3 lg:top-3 lg:bottom-3 lg:mx-0 lg:mb-0 lg:flex lg:h-auto lg:w-[3.25rem]"
+        >
+          <Icon
+            name="material-symbols:chevron-right-rounded"
+            class="transition text-(--primary) text-4xl mx-auto"
+          />
+        </a>
+      )
+    }
+
+    {
+      /* 移动端把作者信息与按钮统一放到配图后，桌面端仍维持左文右图的既有结构。 */
+    }
+    <div
+      class:list={[
+        "post-card-footer flex flex-col items-start gap-3 px-5 pb-5 lg:-mt-2 lg:pl-9 lg:pr-2 lg:pb-6 lg:flex-row lg:items-center lg:justify-between",
+        desktopBodyWidthClass,
+      ]}
+    >
       <div
-        class="flex min-w-0 items-center gap-1.5 text-50 text-sm font-medium leading-none"
+        class="post-card-meta flex min-w-0 flex-wrap items-center gap-1.5 text-50 text-sm font-medium leading-none"
       >
         <div class="max-w-[14rem] min-w-0 inline-flex items-baseline gap-1">
           <a
             href={`/${authorHandle}`}
-            class="truncate text-90 border-b border-transparent hover:border-current"
+            class="post-card-primary-text relative z-20 truncate border-b border-transparent hover:border-current"
           >
             {authorDisplayName}
           </a>
           <a
             href={`/${authorHandle}`}
-            class="shrink-0 text-60 hover:text-(--primary) transition-colors"
+            class="post-card-secondary-text relative z-20 shrink-0 hover:text-(--primary) transition-colors"
           >
-            @{authorHandle}
+            {"@"}
+            {authorHandle}
           </a>
         </div>
         <span class="text-(--meta-divider)" aria-hidden="true">·</span>
         <span>{publishedDate}</span>
       </div>
       <div
-        class="flex items-center gap-4 ml-3 mr-2 shrink-0 post-card-actions leading-none"
+        class="post-card-actions flex w-full items-center justify-between gap-4 shrink-0 leading-none lg:ml-3 lg:mr-2 lg:w-auto lg:justify-start"
       >
         <button
           type="button"
           class:list={[
-            "inline-flex h-6 items-center gap-1.5 text-base font-medium hover:text-(--primary) transition-colors post-card-action-btn",
+            "post-card-action-control relative z-20 inline-flex h-6 items-center gap-1.5 text-base font-medium hover:text-(--primary) transition-colors post-card-action-btn",
             {
               "text-(--primary)": viewerState.hasLiked,
-              "text-50": !viewerState.hasLiked,
+              "post-card-muted-text": !viewerState.hasLiked,
             },
           ]}
           data-action="toggle-like"
@@ -161,22 +215,31 @@ const adminDeleteLabel = i18n(I18nKey.interactionCommonDeleteAdmin);
           data-like-count={like_count}
           aria-label="切换点赞"
         >
-          <Icon name="material-symbols:thumb-up-rounded" class="text-xl" />
+          <Icon
+            name="material-symbols:thumb-up-rounded"
+            class="post-card-action-icon text-xl"
+          />
           <span data-like-count>{like_count}</span>
         </button>
         <a
           href={`${url}#comment-root`}
-          class="inline-flex h-6 items-center gap-1.5 text-50 text-base font-medium hover:text-(--primary) transition-colors"
+          class="post-card-action-control post-card-muted-text relative z-20 inline-flex h-6 items-center gap-1.5 text-base font-medium hover:text-(--primary) transition-colors"
         >
-          <Icon name="material-symbols:comment-rounded" class="text-xl" />
+          <Icon
+            name="material-symbols:comment-rounded"
+            class="post-card-action-icon text-xl"
+          />
           <span>{comment_count}</span>
         </a>
-        <details class="relative post-card-menu">
+        <details class="relative z-20 post-card-menu">
           <summary
-            class="list-none cursor-pointer inline-flex items-center justify-center w-8 h-8 rounded-lg text-50 hover:text-(--primary) hover:bg-(--btn-plain-bg-hover) active:bg-(--btn-plain-bg-active) transition-colors"
+            class="post-card-action-menu post-card-muted-text list-none cursor-pointer inline-flex items-center justify-center w-8 h-8 rounded-lg hover:text-(--primary) hover:bg-(--btn-plain-bg-hover) active:bg-(--btn-plain-bg-active) transition-colors"
             aria-label="更多操作"
           >
-            <Icon name="material-symbols:more-horiz" class="text-xl" />
+            <Icon
+              name="material-symbols:more-horiz"
+              class="post-card-action-icon text-xl"
+            />
           </summary>
           <div
             class="absolute right-0 bottom-full mb-2 z-30 min-w-[12rem] rounded-xl border border-black/5 dark:border-white/10 bg-(--float-panel-bg) p-1.5 shadow-xl dark:shadow-none"
@@ -208,7 +271,7 @@ const adminDeleteLabel = i18n(I18nKey.interactionCommonDeleteAdmin);
             <button
               type="button"
               class:list={[
-                "w-full text-left px-3 py-2 text-sm rounded-lg text-black/75 dark:text-white/75 hover:text-(--primary) hover:bg-(--btn-plain-bg-hover) post-card-action-btn transition-colors",
+                "post-card-panel-text w-full text-left px-3 py-2 text-sm rounded-lg hover:text-(--primary) hover:bg-(--btn-plain-bg-hover) post-card-action-btn transition-colors",
                 {
                   hidden: !viewerState.canBlock,
                 },
@@ -222,82 +285,69 @@ const adminDeleteLabel = i18n(I18nKey.interactionCommonDeleteAdmin);
       </div>
     </div>
   </div>
-
-  {
-    hasCover && (
-      <a
-        data-enter-skeleton-content
-        href={url}
-        aria-label={title}
-        class="group absolute top-3 bottom-3 right-3 rounded-xl overflow-hidden active:scale-95"
-        style="width: var(--coverWidth);"
-      >
-        <div class="absolute pointer-events-none z-10 w-full h-full group-hover:bg-black/30 group-active:bg-black/50 transition" />
-        <div class="absolute pointer-events-none z-20 w-full h-full flex items-center justify-center">
-          <Icon
-            name="material-symbols:chevron-right-rounded"
-            class="transition opacity-0 group-hover:opacity-100 scale-50 group-hover:scale-100 text-white text-5xl"
-          />
-        </div>
-        <ExternalImage
-          src={image || ""}
-          alt={`Cover image of ${title}`}
-          class="w-full h-full object-cover"
-          loading="lazy"
-        />
-      </a>
-    )
-  }
-
-  {
-    !hasCover && (
-      <a
-        data-enter-skeleton-content
-        href={url}
-        aria-label={title}
-        class="flex btn-regular w-[3.25rem]
-         absolute right-3 top-3 bottom-3 rounded-xl bg-(--enter-btn-bg)
-         hover:bg-(--enter-btn-bg-hover) active:bg-(--enter-btn-bg-active) active:scale-95"
-      >
-        <Icon
-          name="material-symbols:chevron-right-rounded"
-          class="transition text-(--primary) text-4xl mx-auto"
-        />
-      </a>
-    )
-  }
   <div
     data-enter-skeleton-placeholder
     aria-hidden="true"
     class="absolute inset-0 z-20 pointer-events-none"
   >
-    <div
-      class:list={[
-        "pl-9 pr-2 pt-7 pb-6 h-full flex flex-col",
-        {
-          "w-[calc(100%-3.25rem-0.75rem)]": !hasCover,
-          "w-[calc(100%-var(--coverWidth)-0.75rem)]": hasCover,
-        },
-      ]}
-    >
-      <div class="space-y-4">
-        <div class="flex items-center gap-2.5">
-          <div class="block md3-skeleton-block h-8 w-1 rounded-md"></div>
+    <div class="relative flex h-full flex-col lg:block">
+      <div
+        class:list={[
+          "post-card-skeleton-body px-5 pt-5 pb-5 flex flex-col gap-4 lg:h-full lg:pl-9 lg:pr-2 lg:pt-7 lg:pb-0",
+          desktopBodyWidthClass,
+        ]}
+      >
+        <div class="relative block">
+          <div
+            class="absolute top-1 bottom-1 -left-4 md3-skeleton-block w-1 rounded-md lg:-left-[1.125rem]"
+          >
+          </div>
           <div
             class="md3-skeleton-text"
-            style="--skeleton-width: 42%; --skeleton-height: 2.2rem;"
+            style="--skeleton-width: 42%; --skeleton-height: 2rem;"
           >
           </div>
         </div>
 
-        <div class="h-5" aria-hidden="true"></div>
+        <div class="hidden h-5 lg:block" aria-hidden="true"></div>
 
-        <div class="-mt-3">
+        <div class="lg:-mt-3">
           <div class="md3-skeleton-text" style="--skeleton-width: 48%;"></div>
         </div>
       </div>
-      <div class="mt-auto flex items-center justify-between gap-4 pt-2.5">
-        <div class="flex min-w-0 items-center gap-2">
+
+      {
+        hasCover ? (
+          <div
+            class:list={[
+              "post-card-skeleton-cover relative mx-5 mb-5 block h-52 rounded-xl overflow-hidden lg:absolute lg:top-3 lg:right-3 lg:bottom-3 lg:mx-0 lg:mb-0 lg:h-auto",
+              desktopEnterLinkClass,
+            ]}
+          >
+            <div class="md3-skeleton-block h-full w-full rounded-xl" />
+            <div class="absolute inset-0 flex items-center justify-center">
+              <div class="md3-skeleton-circle h-10 w-10" />
+            </div>
+          </div>
+        ) : (
+          <div
+            class:list={[
+              "hidden mx-5 mb-5 h-12 rounded-xl overflow-hidden lg:absolute lg:right-3 lg:top-3 lg:bottom-3 lg:mx-0 lg:mb-0 lg:flex lg:h-auto",
+              desktopEnterLinkClass,
+            ]}
+          >
+            <div class="md3-skeleton-block h-full w-full rounded-xl" />
+          </div>
+        )
+      }
+
+      <div
+        class:list={[
+          "post-card-skeleton-footer flex flex-col items-start gap-3 px-5 pb-5 lg:-mt-2 lg:pl-9 lg:pr-2 lg:pb-6 lg:flex-row lg:items-center lg:justify-between lg:gap-4",
+          desktopBodyWidthClass,
+        ]}
+      >
+        <div class="flex min-w-0 flex-wrap items-center gap-2">
           <div
             class="md3-skeleton-text"
             style="--skeleton-width: 9.5rem; --skeleton-height: 1.45rem;"
@@ -310,30 +360,15 @@ const adminDeleteLabel = i18n(I18nKey.interactionCommonDeleteAdmin);
           >
           </div>
         </div>
-        <div class="ml-3 mr-2 flex shrink-0 items-center gap-4">
+        <div
+          class="flex w-full shrink-0 items-center justify-between gap-4 lg:ml-3 lg:mr-2 lg:w-auto lg:justify-start"
+        >
           <div class="md3-skeleton-block h-6 w-8 rounded-lg"></div>
           <div class="md3-skeleton-block h-6 w-8 rounded-lg"></div>
           <div class="md3-skeleton-circle h-6 w-6"></div>
         </div>
       </div>
     </div>
-    {
-      hasCover ? (
-        <div
-          class="absolute top-3 bottom-3 right-3 rounded-xl overflow-hidden"
-          style="width: var(--coverWidth);"
-        >
-          <div class="md3-skeleton-block h-full w-full rounded-xl" />
-          <div class="absolute inset-0 flex items-center justify-center">
-            <div class="md3-skeleton-circle h-10 w-10" />
-          </div>
-        </div>
-      ) : (
-        <div class="flex absolute right-3 top-3 bottom-3 w-[3.25rem] rounded-xl overflow-hidden">
-          <div class="md3-skeleton-block h-full w-full rounded-xl" />
-        </div>
-      )
-    }
   </div>
 </div>
 <div
@@ -345,5 +380,148 @@ const adminDeleteLabel = i18n(I18nKey.interactionCommonDeleteAdmin);
 <style>
   .post-card-menu summary::-webkit-details-marker {
     display: none;
+  }
+
+  @media (max-width: 639px) {
+    .post-card-action-control {
+      gap: 0.375rem;
+      height: 1.25rem;
+      font-size: 0.875rem;
+    }
+
+    .post-card-action-icon {
+      font-size: 1rem;
+    }
+
+    .post-card-action-menu {
+      width: 1.75rem;
+      height: 1.75rem;
+    }
+  }
+
+  .post-card-primary-text {
+    color: rgb(0 0 0 / 0.9);
+  }
+
+  .post-card-secondary-text {
+    color: rgb(0 0 0 / 0.6);
+  }
+
+  .post-card-muted-text {
+    color: rgb(0 0 0 / 0.5);
+  }
+
+  .post-card-panel-text {
+    color: rgb(0 0 0 / 0.75);
+  }
+
+  :global(:root.dark) .post-card-primary-text {
+    color: rgb(255 255 255 / 0.9);
+  }
+
+  :global(:root.dark) .post-card-secondary-text {
+    color: rgb(255 255 255 / 0.6);
+  }
+
+  :global(:root.dark) .post-card-muted-text {
+    color: rgb(255 255 255 / 0.5);
+  }
+
+  :global(:root.dark) .post-card-panel-text {
+    color: rgb(255 255 255 / 0.75);
+  }
+
+  /* 移动端改用媒体查询收敛尺寸，避免较小断点的 padding 规则在桌面宽度下反向覆盖。 */
+  @media (max-width: 1279px) {
+    .post-card-body,
+    .post-card-skeleton-body {
+      gap: 0.875rem;
+      padding: 1rem;
+    }
+
+    .post-card-title {
+      font-size: 1.25rem;
+      line-height: 1.25;
+    }
+
+    .post-card-excerpt {
+      font-size: 0.875rem;
+      line-height: 1.5rem;
+    }
+
+    .post-card-meta {
+      font-size: 0.75rem;
+      line-height: 1.25rem;
+    }
+
+    .post-card-actions,
+    .post-card-footer,
+    .post-card-skeleton-footer {
+      gap: 0.75rem;
+    }
+
+    .post-card-skeleton-footer {
+      padding-top: 0.5rem;
+    }
+
+    .post-card-cover,
+    .post-card-skeleton-cover {
+      margin-inline: 1rem;
+      margin-bottom: 1rem;
+      height: 11rem;
+    }
+
+    .post-card-footer,
+    .post-card-skeleton-footer {
+      padding: 0 1rem 1rem;
+    }
+  }
+
+  @media (min-width: 640px) and (max-width: 1279px) {
+    .post-card-body,
+    .post-card-skeleton-body {
+      padding: 1.25rem;
+    }
+
+    .post-card-title {
+      font-size: 1.5rem;
+    }
+
+    .post-card-meta {
+      font-size: 0.875rem;
+      line-height: 1;
+    }
+
+    .post-card-actions {
+      gap: 1rem;
+    }
+
+    .post-card-cover,
+    .post-card-skeleton-cover {
+      margin-inline: 1.25rem;
+      margin-bottom: 1.25rem;
+      height: 12rem;
+    }
+
+    .post-card-footer,
+    .post-card-skeleton-footer {
+      padding: 0 1.25rem 1.25rem;
+    }
+  }
+
+  @media (min-width: 768px) and (max-width: 1279px) {
+    .post-card-excerpt {
+      -webkit-line-clamp: 3;
+    }
+
+    .post-card-footer,
+    .post-card-skeleton-footer {
+      gap: 0.875rem;
+    }
+
+    .post-card-cover,
+    .post-card-skeleton-cover {
+      height: 13rem;
+    }
   }
 </style>

@@ -4,9 +4,7 @@ import Analytics from "@vercel/analytics/astro";
 import SpeedInsights from "@vercel/speed-insights/astro";
 import ConfigCarrier from "@components/ConfigCarrier.astro";
 import MusicPlayer from "@components/widget/MusicPlayer/MusicPlayer.svelte";
-import DesktopOnlyNotice from "@components/misc/DesktopOnlyNotice.astro";
 import { buildLegacySiteConfig } from "@/config";
-import { generatedFontManifest } from "@/generated/font-manifest";
 import { getResolvedSiteSettings } from "@/server/site-settings/service";
 import { readCsrfToken } from "@/server/security/csrf";
 import type { ResolvedSiteSettings } from "@/types/site-settings";
@@ -14,7 +12,7 @@ import type { ResolvedSiteSettings } from "@/types/site-settings";
 const BANNER_HEIGHT = 35;
 const BANNER_HEIGHT_EXTEND = 30;
 const BANNER_HEIGHT_HOME = BANNER_HEIGHT + BANNER_HEIGHT_EXTEND;
-const DESKTOP_MIN_WIDTH = 1280;
+const PAGE_SCALE_MIN_WIDTH = 1280;
 
 import {
   DARK_MODE,
@@ -141,14 +139,12 @@ const clarityId = analyticsConfig.clarityId;
 const analyticsEnabled = Boolean(gtmId || clarityId);
 const htmlClassName = [
   "bg-(--page-bg)",
-  "text-[16px]",
   isPostEditorRoute ? "route-post-editor" : "",
 ]
   .filter(Boolean)
   .join(" ");
 const bodyClassName = [
   "min-h-screen",
-  isHomePage ? "lg:is-home" : "",
   isArchivePage ? "page-archive" : "",
   isPostEditorRoute ? "route-post-editor" : "",
   initialLayoutMode === "banner" ? "enable-banner" : "no-banner-mode",
@@ -156,42 +152,6 @@ const bodyClassName = [
 ]
   .filter(Boolean)
   .join(" ");
-
-// 构建字体配置的 CSS 变量
-// ASCII 字体优先级最高（用于英文字母、数字等），CJK 字体作为回退
-let bodyFontFamily = "";
-if (siteConfig.font) {
-  const fonts: string[] = [];
-  // 先添加 ASCII 字体（优先级最高）
-  if (siteConfig.font.asciiFont?.fontFamily) {
-    const asciiFont = siteConfig.font.asciiFont.fontFamily;
-    // 字体名包含空格时需加引号
-    fonts.push(asciiFont.includes(" ") ? `"${asciiFont}"` : asciiFont);
-  }
-  // 再添加 CJK 字体（作为回退）
-  if (siteConfig.font.cjkFont?.fontFamily) {
-    const cjkFont = siteConfig.font.cjkFont.fontFamily;
-    // 字体名包含空格时需加引号
-    fonts.push(cjkFont.includes(" ") ? `"${cjkFont}"` : cjkFont);
-  }
-  // 添加系统字体作为最终兜底
-  fonts.push(
-    "system-ui",
-    "-apple-system",
-    "BlinkMacSystemFont",
-    "'Segoe UI'",
-    "Roboto",
-    "Oxygen",
-    "Ubuntu",
-    "Cantarell",
-    "'Open Sans'",
-    "'Helvetica Neue'",
-    "sans-serif",
-  );
-  // 组合为完整的 font-family 字符串
-  bodyFontFamily = fonts.join(", ");
-}
-const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
 ---
 
 <!doctype html>
@@ -203,122 +163,16 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
 >
   <head>
     <ClientRouter fallback="swap" />
-    <link rel="stylesheet" href={generatedFontManifest.cssHref} />
-    {
-      generatedFontManifest.preloadFonts.map((font) => (
-        <link
-          rel="preload"
-          href={font.href}
-          as="font"
-          type={font.type}
-          crossorigin={font.crossorigin}
-          fetchpriority={font.fetchpriority}
-        />
-      ))
-    }
-    <script
-      is:inline
-      define:vars={{
-        deferredFonts: generatedFontManifest.deferredFonts,
-        deferredWarmup: generatedFontManifest.deferredWarmup,
-      }}
-    >
-      (() => {
-        if (
-          typeof window === "undefined" ||
-          !deferredWarmup?.enabled ||
-          !Array.isArray(deferredFonts) ||
-          deferredFonts.length === 0
-        ) {
-          return;
-        }
-
-        const sessionKey = String(deferredWarmup.sessionKey || "").trim();
-        const hasWarmupFinished = () => {
-          if (!sessionKey) {
-            return false;
-          }
-          try {
-            return sessionStorage.getItem(sessionKey) === "1";
-          } catch (error) {
-            console.warn("[layout] 读取字体预热状态失败:", error);
-            return false;
-          }
-        };
-        const markWarmupFinished = () => {
-          if (!sessionKey) {
-            return;
-          }
-          try {
-            sessionStorage.setItem(sessionKey, "1");
-          } catch (error) {
-            console.warn("[layout] 写入字体预热状态失败:", error);
-          }
-        };
-
-        if (hasWarmupFinished()) {
-          return;
-        }
-
-        const warmupDeferredFonts = () => {
-          for (const font of deferredFonts) {
-            if (!font?.href) {
-              continue;
-            }
-
-            const link = document.createElement("link");
-            link.rel = "preload";
-            link.as = "font";
-            link.href = String(font.href);
-            link.type = String(font.type || "font/woff2");
-            link.crossOrigin = String(font.crossorigin || "anonymous");
-            link.setAttribute(
-              "fetchpriority",
-              String(
-                font.fetchpriority || deferredWarmup.fetchpriority || "low",
-              ),
-            );
-            link.dataset.fontDeferredWarmup = "true";
-            document.head.appendChild(link);
-          }
-
-          markWarmupFinished();
-        };
-
-        const scheduleWarmup = () => {
-          if (typeof window.requestIdleCallback === "function") {
-            window.requestIdleCallback(
-              () => {
-                warmupDeferredFonts();
-              },
-              { timeout: 4000 },
-            );
-            return;
-          }
-
-          window.setTimeout(() => {
-            warmupDeferredFonts();
-          }, 0);
-        };
-
-        if (deferredWarmup.trigger === "window-load-idle") {
-          if (document.readyState === "complete") {
-            scheduleWarmup();
-            return;
-          }
-          window.addEventListener(
-            "load",
-            () => {
-              scheduleWarmup();
-            },
-            { once: true },
-          );
-          return;
-        }
-
-        scheduleWarmup();
-      })();
-    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link
+      rel="preconnect"
+      href="https://fonts.gstatic.com"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&family=Long+Cang&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+Mono:wght@400;500;700&family=Noto+Sans+SC:wght@400;500;700&family=Noto+Serif+SC:wght@400;500;600;700&family=Noto+Serif+TC:wght@400;500;600;700&display=swap"
+    />
 
     <script is:inline>
       (() => {
@@ -376,52 +230,6 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
           }
           return siblings.item(currentIndex + 1) || null;
         });
-      })();
-    </script>
-    <script is:inline define:vars={{ DESKTOP_MIN_WIDTH }}>
-      (function () {
-        const runtimeWindow = window;
-        const DESKTOP_FORCE_BROWSE_KEY = "cialli.desktop.force-browse";
-
-        const readForceBrowseFlag = () => {
-          try {
-            return sessionStorage.getItem(DESKTOP_FORCE_BROWSE_KEY) === "true";
-          } catch (error) {
-            console.warn("[layout] 读取强制浏览状态失败:", error);
-            return false;
-          }
-        };
-
-        const applyDesktopSupportState = () => {
-          const forceBrowse = readForceBrowseFlag();
-          const unsupported =
-            window.innerWidth < DESKTOP_MIN_WIDTH && !forceBrowse;
-          const unsupportedValue = unsupported ? "true" : "false";
-          const forceBrowseValue = forceBrowse ? "true" : "false";
-          document.documentElement.dataset.desktopUnsupported =
-            unsupportedValue;
-          document.documentElement.dataset.desktopForceBrowse =
-            forceBrowseValue;
-          if (document.body) {
-            document.body.dataset.desktopUnsupported = unsupportedValue;
-            document.body.dataset.desktopForceBrowse = forceBrowseValue;
-          }
-        };
-
-        applyDesktopSupportState();
-        if (!runtimeWindow.__desktopOnlyGuardBound) {
-          runtimeWindow.__desktopOnlyGuardBound = true;
-          window.addEventListener("resize", applyDesktopSupportState, {
-            passive: true,
-          });
-          document.addEventListener(
-            "astro:page-load",
-            applyDesktopSupportState,
-          );
-          window.addEventListener("desktop-force-browse-change", () => {
-            applyDesktopSupportState();
-          });
-        }
       })();
     </script>
     <script is:inline define:vars={{ gtmId, clarityId, analyticsEnabled }}>
@@ -546,8 +354,8 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
         DARK_MODE,
         BANNER_HEIGHT_EXTEND,
         PAGE_WIDTH,
+        PAGE_SCALE_MIN_WIDTH,
         configHue,
-        DESKTOP_MIN_WIDTH,
         pageScaling: siteConfig.pageScaling,
       }}
     >
@@ -588,17 +396,18 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
 
       // 自动缩放逻辑（从 MainGridLayout 前移，尽早执行）
       (function () {
-        if (!pageScaling) {
+        const targetWidth = Number(pageScaling?.targetWidth || 0);
+        if (!Number.isFinite(targetWidth) || targetWidth <= 0) {
           return;
         }
 
         function adjustPageScale() {
           const currentWidth = document.documentElement.clientWidth;
-          if (currentWidth < DESKTOP_MIN_WIDTH) {
+          // 仅在宽屏下启用整体缩放，避免影响移动端与平板端的原生响应式布局。
+          if (currentWidth < PAGE_SCALE_MIN_WIDTH) {
             document.documentElement.style.fontSize = "";
             return;
           }
-          const targetWidth = pageScaling.targetWidth || 2000;
           let scale = currentWidth / targetWidth;
           if (scale > 1) scale = 1;
           if (scale < 0.85) scale = 0.85;
@@ -630,45 +439,41 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
   </head>
   <body
     class={bodyClassName}
-    style={bodyStyle}
     data-layout-mode={initialLayoutMode}
     data-route-home={String(isHomePage)}
     data-route-archive={String(isArchivePage)}
     data-route-post-editor={String(isPostEditorRoute)}
     data-overlayscrollbars-initialize
   >
-    <div data-desktop-app>
-      <ConfigCarrier resolvedSiteSettings={resolvedSiteSettings} />
-      {
-        gtmId && (
-          <noscript>
-            <iframe
-              src={`https://www.googletagmanager.com/ns.html?id=${encodeURIComponent(gtmId)}`}
-              height="0"
-              width="0"
-              style="display:none;visibility:hidden"
-            />
-          </noscript>
-        )
-      }
-      <slot />
+    <ConfigCarrier resolvedSiteSettings={resolvedSiteSettings} />
+    {
+      gtmId && (
+        <noscript>
+          <iframe
+            src={`https://www.googletagmanager.com/ns.html?id=${encodeURIComponent(gtmId)}`}
+            height="0"
+            width="0"
+            style="display:none;visibility:hidden"
+          />
+        </noscript>
+      )
+    }
+    <slot />
 
-      <!-- Music Player - 仅在启用时加载 -->
-      {
-        musicPlayerSettings.enable && (
-          <div id="music-player-shell" transition:persist>
-            <MusicPlayer musicPlayer={musicPlayerSettings} client:idle />
-          </div>
-        )
-      }
+    <!-- Music Player - 仅在启用时加载 -->
+    {
+      musicPlayerSettings.enable && (
+        <div id="music-player-shell" transition:persist>
+          <MusicPlayer musicPlayer={musicPlayerSettings} client:idle />
+        </div>
+      )
+    }
 
-      <!-- 切页时临时增加页面高度，避免滚动动画跳变 -->
-      <div id="page-height-extend" class="hidden h-[300vh]"></div>
-    </div>
+    <!-- 切页时临时增加页面高度，避免滚动动画跳变 -->
+    <div id="page-height-extend" class="hidden h-[300vh]"></div>
     <!-- Vercel 可观测性 -->
     <Analytics />
     <SpeedInsights />
-    <DesktopOnlyNotice />
   </body>
 </html>
 
@@ -683,26 +488,6 @@ const bodyStyle = bodyFontFamily ? `font-family: ${bodyFontFamily};` : "";
   @reference "../styles/main.css";
 
   @layer components {
-    #desktop-only-notice {
-      display: none;
-    }
-
-    html[data-desktop-unsupported="true"],
-    html[data-desktop-unsupported="true"] body {
-      overflow: hidden !important;
-      overscroll-behavior: none;
-    }
-
-    html[data-desktop-unsupported="true"] [data-desktop-app] {
-      visibility: hidden;
-      pointer-events: none !important;
-      user-select: none;
-    }
-
-    html[data-desktop-unsupported="true"] #desktop-only-notice {
-      display: flex;
-    }
-
     body[data-layout-mode="banner"][data-route-home="true"] #banner-wrapper {
       @apply h-(--banner-height-home) translate-y-(--banner-height-extend);
     }

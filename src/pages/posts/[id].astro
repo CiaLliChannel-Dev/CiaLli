@@ -2,6 +2,7 @@
 import Comment from "@components/comment/index.astro";
 import ContentNotVisible from "@components/misc/ContentNotVisible.astro";
 import ArticleShareDialog from "@components/misc/ArticleShareDialog.astro";
+import Profile from "@components/widget/Profile.astro";
 import I18nKey from "@i18n/i18nKey";
 import { i18n } from "@i18n/translation";
 import ExternalImage from "@components/misc/ExternalImage.astro";
@@ -301,6 +302,8 @@ const articleSharePayload: SharePosterPayload | undefined =
     ? article.title || i18n(I18nKey.contentUntitled)
     : i18n(I18nKey.contentArticleNotFoundTitle)}
   description={article?.summary || ""}
+  leftSidebarMobilePreset="hidden"
+  rightSidebarMobilePreset="drawer"
 >
   {
     coverPreloadUrl && (
@@ -331,7 +334,7 @@ const articleSharePayload: SharePosterPayload | undefined =
         >
           <div data-enter-skeleton-content>
             <header class="mb-6 space-y-3">
-              <h1 class="text-3xl font-bold text-90">
+              <h1 class="text-3xl font-bold text-90 font-content-serif">
                 {article.title || i18n(I18nKey.contentUntitled)}
               </h1>
               {ownerOnlyNotice && (
@@ -409,7 +412,7 @@ const articleSharePayload: SharePosterPayload | undefined =
                 ownerPasswordStorageKeys={ownerPasswordStorageKeys}
               />
             ) : (
-              <Markdown class="markdown-content">
+              <Markdown class="markdown-content content-serif">
                 <Fragment set:html={articleHtml} />
               </Markdown>
             )}
@@ -461,7 +464,9 @@ const articleSharePayload: SharePosterPayload | undefined =
           likedByViewer={articleLikedByViewer}
           dockToBackTop={true}
           showLikeAction={articleSupportsPublicInteraction}
-          showCommentAction={articleSupportsPublicInteraction}
+          showCommentAction={
+            articleSupportsPublicInteraction && article.allow_comments
+          }
           sharePayload={articleSharePayload}
           editHref={`/posts/${encodeURIComponent(article.short_id || rawId)}/edit`}
           deleteEndpoint={`/api/v1/me/articles/${encodeURIComponent(article.id)}`}
@@ -472,6 +477,10 @@ const articleSharePayload: SharePosterPayload | undefined =
           )}
           deleteSuccessHref="/"
         />
+
+        <section class="mb-4 lg:hidden">
+          <Profile />
+        </section>
 
         <Comment
           module="articles"

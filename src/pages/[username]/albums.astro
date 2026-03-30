@@ -144,6 +144,9 @@ const hasSidebarContent = tagList.length > 0 || categoryList.length > 0;
 <MainGridLayout
   title={i18n(I18nKey.contentAlbums)}
   description={i18n(I18nKey.contentAlbumsPublicSubtitle)}
+  leftSidebarMobilePreset="without-announcement"
+  rightSidebarMobilePreset="drawer"
+  hasCustomRightSidebarContent={result.status === "ok" && hasSidebarContent}
 >
   {
     result.status === "not_found" || result.status === "permission_denied" ? (
@@ -204,7 +207,7 @@ const hasSidebarContent = tagList.length > 0 || categoryList.length > 0;
               {i18n(I18nKey.contentAlbumsNoPublic)}
             </div>
           ) : (
-            <div class="grid grid-cols-2 xl:grid-cols-2 2xl:grid-cols-3 gap-5">
+            <div class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-5">
               {enrichedItems.map((item) => (
                 <article
                   class="album-list-item card-base rounded-(--radius-large) overflow-hidden border border-(--line-divider) text-90"
@@ -253,7 +256,8 @@ const hasSidebarContent = tagList.length > 0 || categoryList.length > 0;
                         {item.author.displayName}
                       </span>
                       <span class="shrink-0 hover:text-(--primary) transition-colors">
-                        @{item.author.username}
+                        {"@"}
+                        {item.author.username}
                       </span>
                       {item.formattedDate && (
                         <>
@@ -351,7 +355,7 @@ const hasSidebarContent = tagList.length > 0 || categoryList.length > 0;
             </div>
             <div class="md3-skeleton-block h-10 w-28 rounded-lg" />
           </section>
-          <div class="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-3 gap-5">
+          <div class="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-5">
             {Array.from({ length: 6 }).map(() => (
               <article class="album-list-item card-base rounded-(--radius-large) overflow-hidden border border-(--line-divider)">
                 <div class="md3-skeleton-block h-56 w-full rounded-none" />
@@ -391,7 +395,7 @@ const hasSidebarContent = tagList.length > 0 || categoryList.length > 0;
     result.status === "ok" && hasSidebarContent && (
       <div
         slot="sidebar-right"
-        class="album-filter-panel max-h-[calc(100vh-6.5rem)] overflow-y-auto flex flex-col gap-4 self-start"
+        class="album-filter-panel w-full max-h-none overflow-visible flex flex-col gap-4 self-start lg:max-h-[calc(100dvh-6.5rem)] lg:overflow-y-auto"
       >
         {/* Categories */}
         {categoryList.length > 0 && (

@@ -1,10 +1,14 @@
 <script lang="ts">
-  /* eslint-disable max-lines -- 文件行数较长，按页面驱动与模块边界保留当前结构 */
   import "../../../styles/music-player.css";
   import Icon from "@iconify/svelte";
   import { onDestroy, onMount, tick } from "svelte";
   import Key from "../../../i18n/i18nKey";
   import { i18n } from "../../../i18n/translation";
+  import {
+    closeAllMobileEdgeDrawers,
+    MOBILE_EDGE_DRAWER_OPEN_EVENT,
+  } from "../../../scripts/mobile-edge-drawer";
+  import { syncMobileFloatStack } from "../../../scripts/mobile-float-stack";
   import type { MusicPlayerConfig } from "../../../types/config";
   import {
     fetchPlaylistFromMeting,
@@ -86,6 +90,26 @@
   let isPointerDown = false,
     volumeBarRect: DOMRect | null = null,
     rafId: number | null = null;
+  let isDesktopViewport = true;
+  let viewportMediaQuery: MediaQueryList | null = null;
+  let removeViewportListener: (() => void) | null = null;
+  let removeExternalDrawerListener: (() => void) | null = null;
+
+  function scheduleFloatSync(): void {
+    if (typeof window === "undefined") {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      syncMobileFloatStack();
+    });
+  }
+
+  function closeMobileDrawer(): void {
+    isExpanded = false;
+    isHidden = true;
+    showPlaylist = false;
+    scheduleFloatSync();
+  }
 
   async function fetchMetingPlaylist() {
     const api =
@@ -119,11 +143,38 @@
     }
   }
   function toggleExpanded() {
+    if (!isDesktopViewport) {
+      closeAllMobileEdgeDrawers();
+      if (isExpanded && !isHidden) {
+        closeMobileDrawer();
+        return;
+      }
+      isExpanded = true;
+      isHidden = false;
+      showPlaylist = false;
+      scheduleFloatSync();
+      return;
+    }
     isExpanded = !isExpanded;
     showPlaylist = false;
-    if (isExpanded) isHidden = false;
+    if (isExpanded) {
+      isHidden = false;
+    }
   }
   function toggleHidden() {
+    if (!isDesktopViewport) {
+      if (isHidden) {
+        closeAllMobileEdgeDrawers();
+        isHidden = false;
+        isExpanded = true;
+        showPlaylist = false;
+      } else {
+        closeMobileDrawer();
+        return;
+      }
+      scheduleFloatSync();
+      return;
+    }
     isHidden = !isHidden;
     if (isHidden) {
       isExpanded = false;
@@ -196,6 +247,12 @@
   }
 
   function applyDisplayMode(mode: PlayerDisplayMode): void {
+    if (!isDesktopViewport) {
+      isExpanded = false;
+      isHidden = true;
+      showPlaylist = false;
+      return;
+    }
     if (mode === "expanded") {
       isExpanded = true;
       isHidden = false;
@@ -380,7 +437,9 @@
     void currentSong.title;
     void isExpanded;
     void isHidden;
+    void isDesktopViewport;
     void scheduleTitleMarqueeUpdate();
+    scheduleFloatSync();
   }
   $: if (!isPlaying) {
     clearMarqueeDelay("mini");
@@ -390,6 +449,19 @@
   $: if (!expandedTitleMarquee) clearMarqueeDelay("expanded");
 
   onMount(() => {
+    const applyViewportMode = (): void => {
+      isDesktopViewport = window.matchMedia("(min-width: 1280px)").matches;
+      if (!isDesktopViewport) {
+        isExpanded = false;
+        isHidden = true;
+        showPlaylist = false;
+      } else if (isHidden) {
+        isExpanded = false;
+        isHidden = false;
+      }
+      scheduleFloatSync();
+    };
+
     const saved = readVolumeSettings();
     if (saved !== null) volume = saved;
     const evts = ["click", "keydown", "touchstart"] as const;
@@ -397,6 +469,31 @@
       document.addEventListener(e, handleUserInteraction, { capture: true });
     });
     if (!musicPlayerConfig.enable) return;
+    viewportMediaQuery = window.matchMedia("(min-width: 1280px)");
+    const handleViewportChange = () => {
+      applyViewportMode();
+    };
+    const handleExternalDrawerOpen = () => {
+      if (!isDesktopViewport && isExpanded && !isHidden) {
+        closeMobileDrawer();
+      }
+    };
+    applyViewportMode();
+    viewportMediaQuery.addEventListener("change", handleViewportChange);
+    document.addEventListener(
+      MOBILE_EDGE_DRAWER_OPEN_EVENT,
+      handleExternalDrawerOpen,
+    );
+    removeViewportListener = () => {
+      viewportMediaQuery?.removeEventListener("change", handleViewportChange);
+      viewportMediaQuery = null;
+    };
+    removeExternalDrawerListener = () => {
+      document.removeEventListener(
+        MOBILE_EDGE_DRAWER_OPEN_EVENT,
+        handleExternalDrawerOpen,
+      );
+    };
     const storedMode = readDisplayMode();
     if (storedMode) applyDisplayMode(storedMode);
     fetchMetingPlaylist();
@@ -416,6 +513,11 @@
     }
     clearMarqueeDelay("mini");
     clearMarqueeDelay("expanded");
+    removeViewportListener?.();
+    removeViewportListener = null;
+    removeExternalDrawerListener?.();
+    removeExternalDrawerListener = null;
+    syncMobileFloatStack();
   });
 </script>
 
@@ -448,7 +550,7 @@
 
 {#if musicPlayerConfig.enable}
   {#if showError}
-    <div class="fixed bottom-20 right-4 z-60 max-w-sm">
+    <div class="music-player-error-toast fixed z-60">
       <div
         class="bg-red-500 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 animate-slide-up"
       >
@@ -466,17 +568,30 @@
   {/if}
 
   <div
-    class="music-player fixed bottom-4 right-4 z-50 transition-all duration-300 ease-in-out"
+    class="music-player music-player-shell fixed z-50 transition-all duration-300 ease-in-out"
     class:expanded={isExpanded}
     class:hidden-mode={isHidden}
+    class:mobile-drawer-mode={!isDesktopViewport}
   >
+    <button
+      type="button"
+      class="music-player-mobile-backdrop"
+      class:mobile-backdrop-active={!isDesktopViewport &&
+        isExpanded &&
+        !isHidden}
+      on:click={closeMobileDrawer}
+      aria-label="关闭音乐播放器"
+      aria-hidden={!isDesktopViewport && isExpanded && !isHidden
+        ? "false"
+        : "true"}
+    ></button>
+
     <!-- 隐藏状态的小圆球 -->
     <div
       class="orb-player w-12 h-12 bg-(--primary) rounded-full shadow-2xl cursor-pointer transition-all duration-500 ease-in-out flex items-center justify-center hover:scale-110 active:scale-95"
-      hidden={!isHidden}
-      class:opacity-0={!isHidden}
-      class:scale-0={!isHidden}
-      class:pointer-events-none={!isHidden}
+      class:orb-player-active={isHidden}
+      data-mobile-float-launcher
+      data-mobile-float-order="1"
       on:click={toggleHidden}
       on:keydown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -510,10 +625,10 @@
     <!-- 收缩状态的迷你播放器 -->
     <div
       class="mini-player card-base bg-(--float-panel-bg) shadow-2xl rounded-2xl p-3 transition-all duration-500 ease-in-out"
-      hidden={isExpanded || isHidden}
-      class:opacity-0={isExpanded || isHidden}
-      class:scale-95={isExpanded || isHidden}
-      class:pointer-events-none={isExpanded || isHidden}
+      class:mini-player-active={!isExpanded && !isHidden && isDesktopViewport}
+      aria-hidden={!isExpanded && !isHidden && isDesktopViewport
+        ? "false"
+        : "true"}
     >
       <div class="flex items-center gap-3">
         <div
@@ -601,10 +716,9 @@
     <!-- 展开状态的完整播放器 -->
     <div
       class="expanded-player transition-all duration-500 ease-in-out"
-      hidden={!isExpanded || isHidden}
-      class:opacity-0={!isExpanded}
-      class:scale-95={!isExpanded}
-      class:pointer-events-none={!isExpanded}
+      class:expanded-player-active={isExpanded && !isHidden}
+      class:music-player-mobile-panel={!isDesktopViewport}
+      aria-hidden={isExpanded && !isHidden ? "false" : "true"}
     >
       {#if showPlaylist}
         <MusicPlayerPlaylist

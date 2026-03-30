@@ -28,14 +28,14 @@ export function createSocialLinkRow(
 
     const dragHandle = document.createElement("span");
     dragHandle.className =
-        "cursor-grab active:cursor-grabbing text-30 hover:text-60 transition-colors select-none text-base leading-none";
+        "settings-console-drag-handle cursor-grab active:cursor-grabbing text-30 hover:text-60 transition-colors select-none text-base leading-none";
     dragHandle.textContent = "≡";
     dragHandle.title = t(I18nKey.meSettingsDragSort);
     row.appendChild(dragHandle);
 
     const toggleWrap = document.createElement("label");
     toggleWrap.className =
-        "flex items-center gap-1.5 text-sm text-60 cursor-pointer select-none";
+        "settings-console-toggle-label flex items-center gap-1.5 text-sm text-60 cursor-pointer select-none";
     const checkInput = document.createElement("input");
     checkInput.type = "checkbox";
     checkInput.checked = enabled;
@@ -52,7 +52,7 @@ export function createSocialLinkRow(
 
     const select = document.createElement("select");
     select.className =
-        "rounded-lg border border-(--line-divider) px-3 py-2 text-sm text-75 bg-transparent";
+        "settings-console-inline-select rounded-lg border border-(--line-divider) px-3 py-2 text-sm text-75 bg-transparent";
     select.dataset.socialField = "platform";
     const defaultOption = document.createElement("option");
     defaultOption.value = "";

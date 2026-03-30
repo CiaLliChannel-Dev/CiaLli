@@ -179,7 +179,7 @@ const hasSidebarContent = categoryList.length > 0 || tagList.length > 0;
             </div>
           ) : (
             <>
-              <div class="grid grid-cols-2 gap-4">
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {items.map((item) => (
                   <article
                     class="bangumi-list-item card-base p-4 rounded-(--radius-large) border border-(--line-divider) h-full text-90"
@@ -268,7 +268,7 @@ const hasSidebarContent = categoryList.length > 0 || tagList.length > 0;
               />
             </div>
           </section>
-          <div class="grid grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
             {Array.from({ length: 6 }).map(() => (
               <article class="card-base p-4 rounded-(--radius-large) border border-(--line-divider) h-full">
                 <div class="flex gap-4 h-full">
@@ -311,7 +311,7 @@ const hasSidebarContent = categoryList.length > 0 || tagList.length > 0;
     result.status === "ok" && hasSidebarContent && (
       <div
         slot="sidebar-right"
-        class="bangumi-filter-panel max-h-[calc(100vh-6.5rem)] overflow-y-auto flex flex-col gap-4 self-start"
+        class="bangumi-filter-panel w-full max-h-none overflow-visible flex flex-col gap-4 self-start lg:max-h-[calc(100dvh-6.5rem)] lg:overflow-y-auto"
       >
         {categoryList.length > 0 && (
           <div class="card-base rounded-(--radius-large) pb-4">

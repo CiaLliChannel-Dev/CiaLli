@@ -127,11 +127,8 @@ export function setupScrollIntentSource(
                 return;
             }
 
-            if (
-                currentState.mode === "banner" &&
-                currentState.isHome &&
-                viewportWidth >= 1280
-            ) {
+            // 所有视口都沿用同一套 banner 收起阈值，避免移动端长期占满首屏。
+            if (currentState.mode === "banner" && currentState.isHome) {
                 const threshold = getCollapseScrollThreshold(
                     scrollTop,
                     options.bannerHeightHome,

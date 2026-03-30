@@ -34,9 +34,9 @@ const linkProps = bangumi.link
 
 <Tag
   {...linkProps}
-  class="shrink-0 w-[160px] rounded-xl overflow-hidden bg-black/5 dark:bg-white/5 hover:bg-black/8 dark:hover:bg-white/8 transition-colors snap-start block group"
+  class="block shrink-0 w-[43vw] min-w-[9.5rem] max-w-[10.25rem] snap-start overflow-hidden rounded-xl bg-black/5 transition-colors group hover:bg-black/8 dark:bg-white/5 dark:hover:bg-white/8 sm:w-[160px] sm:min-w-0 sm:max-w-[160px]"
 >
-  <div class="h-48 overflow-hidden relative">
+  <div class="relative h-44 overflow-hidden sm:h-48">
     {
       hasCover ? (
         <ExternalImage
@@ -59,7 +59,7 @@ const linkProps = bangumi.link
     }
     <span
       class:list={[
-        "absolute bottom-2 right-2 px-2 py-0.5 rounded-full text-[10px] font-medium text-white shadow-sm",
+        "absolute bottom-2 right-2 px-2 py-0.5 rounded-full text-[0.625rem] font-medium text-white shadow-sm whitespace-nowrap",
         statusInfo.color,
       ]}
     >
@@ -67,13 +67,13 @@ const linkProps = bangumi.link
     </span>
   </div>
 
-  <div class="p-2.5">
+  <div class="p-2.5 sm:p-3">
     <h3
       class="text-sm font-medium text-90 line-clamp-2 leading-snug mb-1 group-hover:text-(--primary) transition-colors"
     >
       {bangumi.title}
     </h3>
-    <p class="text-xs text-50 flex items-center gap-1">
+    <p class="flex flex-wrap items-center gap-x-1 gap-y-1 text-xs text-50">
       {
         ratingStr && (
           <>
