@@ -18,7 +18,7 @@ import { CommentControllerBase } from "@/scripts/comments/controller-base";
 
 export class CommentControllerLoad extends CommentControllerBase {
     // 评论列表状态
-    readonly pendingLikeCommentIds = new Set<string>();
+    readonly pendingLikeCommentIds: Set<string> = new Set<string>();
     comments: CommentItem[] = [];
     isCommentsLoading = false;
     isLoadingMoreComments = false;

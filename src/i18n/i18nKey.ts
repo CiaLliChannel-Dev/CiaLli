@@ -7,8 +7,17 @@ import { ArticleEditorKey } from "./keys/article-editor";
 import { DiaryEditorKey } from "./keys/diary-editor";
 import { InteractionKey } from "./keys/interaction";
 
+type I18nKeyMap = typeof CoreKey &
+    typeof ContentKey &
+    typeof AuthKey &
+    typeof MeKey &
+    typeof AdminKey &
+    typeof ArticleEditorKey &
+    typeof DiaryEditorKey &
+    typeof InteractionKey;
+
 // 将所有子枚举合并为统一命名空间对象，保持向后兼容访问方式（I18nKey.xxx）
-const I18nKey = {
+const I18nKey: I18nKeyMap = {
     ...CoreKey,
     ...ContentKey,
     ...AuthKey,

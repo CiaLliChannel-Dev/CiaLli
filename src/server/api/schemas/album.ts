@@ -4,6 +4,11 @@
 import * as z from "zod";
 
 import {
+    type AlbumLayout,
+    type AppStatus,
+    type OptionalInt,
+    type OptionalString,
+    type Tags,
     AlbumLayoutSchema,
     AppStatusSchema,
     OptionalIntSchema,
@@ -12,11 +17,68 @@ import {
     TagsSchema,
 } from "./common";
 
+export type CreateAlbumInput = {
+    title: string;
+    slug?: OptionalString;
+    description?: OptionalString;
+    cover_file?: OptionalString;
+    cover_url?: OptionalString;
+    date?: OptionalString;
+    location?: OptionalString;
+    tags: Tags;
+    category?: OptionalString;
+    layout: AlbumLayout;
+    columns: number;
+    is_public: boolean;
+};
+
+export type UpdateAlbumInput = {
+    title?: string;
+    slug?: OptionalString;
+    description?: OptionalString;
+    cover_file?: OptionalString;
+    cover_url?: OptionalString;
+    date?: OptionalString;
+    location?: OptionalString;
+    tags?: Tags;
+    category?: OptionalString;
+    layout?: AlbumLayout;
+    columns?: number;
+    is_public?: boolean;
+};
+
+export type CreateAlbumPhotoInput = {
+    file_id?: OptionalString;
+    image_url?: OptionalString;
+    title?: OptionalString;
+    description?: OptionalString;
+    tags: Tags;
+    taken_at?: OptionalString;
+    location?: OptionalString;
+    sort?: OptionalInt;
+    is_public: boolean;
+    show_on_profile: boolean;
+};
+
+export type UpdateAlbumPhotoInput = {
+    file_id?: OptionalString;
+    image_url?: OptionalString;
+    title?: OptionalString;
+    description?: OptionalString;
+    tags?: Tags;
+    taken_at?: OptionalString;
+    location?: OptionalString;
+    sort?: OptionalInt;
+    is_public?: boolean;
+    show_on_profile?: boolean;
+    status?: AppStatus;
+};
+
 // ── 相册状态（仅 draft / published） ──
 
 // ── 创建相册 ──
 
-export const CreateAlbumSchema = z.object({
+export const CreateAlbumSchema: z.ZodType<CreateAlbumInput> = z.object({
     title: z.string().min(1, "相册标题必填"),
     slug: OptionalStringSchema,
     description: OptionalStringSchema,
@@ -31,11 +93,9 @@ export const CreateAlbumSchema = z.object({
     is_public: z.boolean().default(false),
 });
 
-export type CreateAlbumInput = z.infer<typeof CreateAlbumSchema>;
-
 // ── 更新相册 ──
 
-export const UpdateAlbumSchema = z
+export const UpdateAlbumSchema: z.ZodType<UpdateAlbumInput> = z
     .object({
         title: z.string().min(1),
         slug: OptionalStringSchema,
@@ -52,28 +112,25 @@ export const UpdateAlbumSchema = z
     })
     .partial();
 
-export type UpdateAlbumInput = z.infer<typeof UpdateAlbumSchema>;
-
 // ── 创建相册照片 ──
 
-export const CreateAlbumPhotoSchema = z.object({
-    file_id: OptionalStringSchema,
-    image_url: OptionalStringSchema,
-    title: OptionalStringSchema,
-    description: OptionalStringSchema,
-    tags: TagsDefaultSchema,
-    taken_at: OptionalStringSchema,
-    location: OptionalStringSchema,
-    sort: OptionalIntSchema,
-    is_public: z.boolean().default(true),
-    show_on_profile: z.boolean().default(true),
-});
-
-export type CreateAlbumPhotoInput = z.infer<typeof CreateAlbumPhotoSchema>;
+export const CreateAlbumPhotoSchema: z.ZodType<CreateAlbumPhotoInput> =
+    z.object({
+        file_id: OptionalStringSchema,
+        image_url: OptionalStringSchema,
+        title: OptionalStringSchema,
+        description: OptionalStringSchema,
+        tags: TagsDefaultSchema,
+        taken_at: OptionalStringSchema,
+        location: OptionalStringSchema,
+        sort: OptionalIntSchema,
+        is_public: z.boolean().default(true),
+        show_on_profile: z.boolean().default(true),
+    });
 
 // ── 更新相册照片 ──
 
-export const UpdateAlbumPhotoSchema = z
+export const UpdateAlbumPhotoSchema: z.ZodType<UpdateAlbumPhotoInput> = z
     .object({
         file_id: OptionalStringSchema,
         image_url: OptionalStringSchema,
@@ -88,5 +145,3 @@ export const UpdateAlbumPhotoSchema = z
         status: AppStatusSchema,
     })
     .partial();
-
-export type UpdateAlbumPhotoInput = z.infer<typeof UpdateAlbumPhotoSchema>;

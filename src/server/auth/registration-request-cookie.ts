@@ -3,9 +3,10 @@ import type { APIContext } from "astro";
 import { getCookieOptions } from "@/server/directus-auth";
 
 export const REGISTRATION_REQUEST_COOKIE_NAME = "dc_registration_request";
-export const REGISTRATION_REQUEST_COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30;
+export const REGISTRATION_REQUEST_COOKIE_MAX_AGE_SECONDS: number =
+    60 * 60 * 24 * 30;
 
-const UUID_PATTERN =
+const UUID_PATTERN: RegExp =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function normalizeRegistrationRequestId(value: unknown): string | null {

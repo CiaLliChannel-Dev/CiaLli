@@ -4,12 +4,19 @@ import { en } from "./languages/en";
 import { ja } from "./languages/ja";
 import { zh_CN } from "./languages/zh_CN";
 import { zh_TW } from "./languages/zh_TW";
+import type { ResolvedSiteSettings } from "@/types/site-settings";
 
 export type Translation = {
     [K in I18nKey]: string;
 };
 
 export type Translator = (key: I18nKey) => string;
+
+type RuntimeWindow = Window &
+    typeof globalThis & {
+        __CIALLI_RUNTIME_SETTINGS__?: ResolvedSiteSettings;
+        __CIALLI_I18N__?: Partial<Record<I18nKey, string>>;
+    };
 
 const defaultTranslation = en;
 
@@ -42,21 +49,24 @@ export function setServerLanguageResolver(
 }
 
 export function getCurrentLanguage(): string {
+    const runtimeWindow =
+        typeof window === "undefined" ? null : (window as RuntimeWindow);
+
     if (typeof window === "undefined" && serverLanguageResolver) {
         return serverLanguageResolver();
     }
-    if (
-        typeof window !== "undefined" &&
-        window.__CIALLI_RUNTIME_SETTINGS__?.system.lang
-    ) {
-        return window.__CIALLI_RUNTIME_SETTINGS__.system.lang;
+    if (runtimeWindow?.__CIALLI_RUNTIME_SETTINGS__?.system.lang) {
+        return runtimeWindow.__CIALLI_RUNTIME_SETTINGS__.system.lang;
     }
     return systemSiteConfig.lang || "en";
 }
 
 export function i18n(key: I18nKey): string {
-    if (typeof window !== "undefined" && window.__CIALLI_I18N__) {
-        const runtimeValue = window.__CIALLI_I18N__[key];
+    const runtimeWindow =
+        typeof window === "undefined" ? null : (window as RuntimeWindow);
+
+    if (runtimeWindow?.__CIALLI_I18N__) {
+        const runtimeValue = runtimeWindow.__CIALLI_I18N__[key];
         if (
             typeof runtimeValue === "string" &&
             runtimeValue.trim().length > 0

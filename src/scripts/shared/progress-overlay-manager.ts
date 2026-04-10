@@ -339,5 +339,10 @@ export const ensureProgressOverlayBridge = (): void => {
     if (typeof window === "undefined") {
         return;
     }
-    window.__CIALLI_PROGRESS_OVERLAY__ = getProgressOverlayApi();
+
+    const runtimeWindow = window as Window &
+        typeof globalThis & {
+            __CIALLI_PROGRESS_OVERLAY__?: ProgressOverlayApi;
+        };
+    runtimeWindow.__CIALLI_PROGRESS_OVERLAY__ = getProgressOverlayApi();
 };

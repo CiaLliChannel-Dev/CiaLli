@@ -22,7 +22,7 @@ export const HEADER_CROP_OUTPUT_HEIGHT = 400;
 export const CROP_ZOOM_MIN = 100;
 export const CROP_ZOOM_MAX = 300;
 export const DATA_BOUND = "data-homepage-bound";
-export const BANGUMI_ID_PATTERN = /^[0-9]+$/;
+export const BANGUMI_ID_PATTERN: RegExp = /^[0-9]+$/;
 
 export const toSafeFileLabel = (value: string): string =>
     String(value || "")
@@ -30,7 +30,7 @@ export const toSafeFileLabel = (value: string): string =>
         .replace(/[\\/:*?"<>|]/g, "-")
         .replace(/\s+/g, " ");
 
-export const DEFAULT_SECTION_ORDER = [
+export const DEFAULT_SECTION_ORDER: string[] = [
     "articles",
     "diaries",
     "bangumi",

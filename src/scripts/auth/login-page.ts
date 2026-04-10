@@ -244,10 +244,7 @@ function initLoginForm(): void {
     const i18n = readI18n(form);
 
     bindPasswordToggle(pwdEl, passwordToggleEl, i18n);
-    form.addEventListener(
-        "submit",
-        createSubmitHandler(form, i18n) as EventListener,
-    );
+    form.addEventListener("submit", createSubmitHandler(form, i18n));
 }
 
 export function init(): void {

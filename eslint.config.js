@@ -7,9 +7,12 @@ import globals from "globals";
 import tseslint from "typescript-eslint";
 
 const tsconfigRootDir = fileURLToPath(new URL(".", import.meta.url));
-const projectServiceParserOptions = {
-    // typescript-eslint v8 官方推荐在 Flat Config 下使用 projectService 提供 typed lint。
-    projectService: true,
+const typeAwareParserOptions = {
+    project: "./tsconfig.json",
+    tsconfigRootDir,
+};
+const testParserOptions = {
+    project: "./tsconfig.test.json",
     tsconfigRootDir,
 };
 const astroParserOptions = {
@@ -50,7 +53,13 @@ export default tseslint.config(
     {
         files: ["**/*.{ts,tsx,cts,mts}"],
         languageOptions: {
-            parserOptions: projectServiceParserOptions,
+            parserOptions: typeAwareParserOptions,
+        },
+    },
+    {
+        files: ["**/__tests__/**/*.ts", "**/*.test.ts"],
+        languageOptions: {
+            parserOptions: testParserOptions,
         },
     },
     js.configs.recommended,

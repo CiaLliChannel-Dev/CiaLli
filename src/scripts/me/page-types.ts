@@ -26,7 +26,7 @@ export const SOCIAL_PLATFORMS = [
     "website",
     "gitee",
     "codeberg",
-];
+] as const;
 
 export const SOCIAL_PLATFORM_LABELS: Record<string, string> = {
     github: "GitHub",

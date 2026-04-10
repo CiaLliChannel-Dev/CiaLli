@@ -1,3 +1,4 @@
+import type { MiddlewareHandler } from "astro";
 import { defineMiddleware } from "astro:middleware";
 
 import I18nKey from "@/i18n/i18nKey";
@@ -39,9 +40,52 @@ function buildEnvErrorResponse(pathname: string): Response {
     });
 }
 
-export const onRequest = defineMiddleware(async (context, next) => {
-    // 预渲染页面构建时，request.headers 不可用，跳过运行时逻辑
-    if (context.isPrerendered) {
+export const onRequest: MiddlewareHandler = defineMiddleware(
+    async (context, next) => {
+        // 预渲染页面构建时，request.headers 不可用，跳过运行时逻辑
+        if (context.isPrerendered) {
+            let siteSettings = context.locals.siteSettings;
+            try {
+                siteSettings = await getResolvedSiteSettings();
+                context.locals.siteSettings = siteSettings;
+            } catch (error) {
+                console.error(
+                    "[middleware] failed to load site settings:",
+                    error,
+                );
+            }
+
+            return await runWithRequestContext(
+                {
+                    requestId: "prerender",
+                    language: siteSettings?.system.lang ?? "en",
+                    siteSettings,
+                    isPrerendered: true,
+                },
+                async () => await next(),
+            );
+        }
+
+        // 1. 生成/复用请求 ID
+        const upstreamId = context.request.headers.get("x-request-id");
+        const requestId =
+            upstreamId && upstreamId.length <= 128
+                ? upstreamId
+                : crypto.randomUUID();
+        context.locals.requestId = requestId;
+
+        // 2. 环境变量校验
+        try {
+            assertRequiredEnv();
+        } catch (error) {
+            console.error(
+                "[middleware] required env validation failed:",
+                error,
+            );
+            return buildEnvErrorResponse(context.url.pathname);
+        }
+
+        // 3. 加载站点设置
         let siteSettings = context.locals.siteSettings;
         try {
             siteSettings = await getResolvedSiteSettings();
@@ -50,56 +94,21 @@ export const onRequest = defineMiddleware(async (context, next) => {
             console.error("[middleware] failed to load site settings:", error);
         }
 
-        return await runWithRequestContext(
+        // 4. 确保 CSRF cookie 存在，服务端注入到 <meta> 供客户端使用
+        context.locals.csrfToken = ensureCsrfCookie(context);
+
+        // 5. 执行后续处理
+        const response = await runWithRequestContext(
             {
-                requestId: "prerender",
+                requestId,
                 language: siteSettings?.system.lang ?? "en",
                 siteSettings,
-                isPrerendered: true,
             },
             async () => await next(),
         );
-    }
 
-    // 1. 生成/复用请求 ID
-    const upstreamId = context.request.headers.get("x-request-id");
-    const requestId =
-        upstreamId && upstreamId.length <= 128
-            ? upstreamId
-            : crypto.randomUUID();
-    context.locals.requestId = requestId;
-
-    // 2. 环境变量校验
-    try {
-        assertRequiredEnv();
-    } catch (error) {
-        console.error("[middleware] required env validation failed:", error);
-        return buildEnvErrorResponse(context.url.pathname);
-    }
-
-    // 3. 加载站点设置
-    let siteSettings = context.locals.siteSettings;
-    try {
-        siteSettings = await getResolvedSiteSettings();
-        context.locals.siteSettings = siteSettings;
-    } catch (error) {
-        console.error("[middleware] failed to load site settings:", error);
-    }
-
-    // 4. 确保 CSRF cookie 存在，服务端注入到 <meta> 供客户端使用
-    context.locals.csrfToken = ensureCsrfCookie(context);
-
-    // 5. 执行后续处理
-    const response = await runWithRequestContext(
-        {
-            requestId,
-            language: siteSettings?.system.lang ?? "en",
-            siteSettings,
-        },
-        async () => await next(),
-    );
-
-    // 6. 响应头附加 requestId
-    response.headers.set("X-Request-ID", requestId);
-    return response;
-});
+        // 6. 响应头附加 requestId
+        response.headers.set("X-Request-ID", requestId);
+        return response;
+    },
+);

@@ -3,9 +3,37 @@
  */
 import * as z from "zod";
 
+import type { OptionalString, SocialLinks } from "./common";
 import { OptionalStringSchema, SocialLinksSchema } from "./common";
 
-const OptionalBangumiIdSchema = z
+type OptionalBangumiId = string | null | undefined;
+
+export type UpdateProfileInput = {
+    username?: string;
+    display_name?: string;
+    bio?: string | null;
+    bio_typewriter_enable?: boolean;
+    bio_typewriter_speed?: number;
+    avatar_file?: OptionalString;
+    header_file?: OptionalString;
+    social_links?: SocialLinks;
+    home_section_order?: string[] | null;
+    profile_public?: boolean;
+    show_bangumi_on_profile?: boolean;
+    bangumi_username?: OptionalBangumiId;
+    bangumi_include_private?: boolean;
+    bangumi_access_token?: OptionalString;
+};
+
+export type UpdatePrivacyInput = {
+    profile_public?: boolean;
+    show_articles_on_profile?: boolean;
+    show_diaries_on_profile?: boolean;
+    show_albums_on_profile?: boolean;
+    show_comments_on_profile?: boolean;
+};
+
+const OptionalBangumiIdSchema: z.ZodType<OptionalBangumiId> = z
     .string()
     .trim()
     .regex(/^[0-9]+$/, "Bangumi ID 仅支持数字")
@@ -14,7 +42,7 @@ const OptionalBangumiIdSchema = z
 
 // ── 更新档案 ──
 
-export const UpdateProfileSchema = z
+export const UpdateProfileSchema: z.ZodType<UpdateProfileInput> = z
     .object({
         username: z.string().min(1),
         display_name: z.string().min(1),
@@ -33,11 +61,9 @@ export const UpdateProfileSchema = z
     })
     .partial();
 
-export type UpdateProfileInput = z.infer<typeof UpdateProfileSchema>;
-
 // ── 更新隐私设置 ──
 
-export const UpdatePrivacySchema = z
+export const UpdatePrivacySchema: z.ZodType<UpdatePrivacyInput> = z
     .object({
         profile_public: z.boolean(),
         show_articles_on_profile: z.boolean(),
@@ -46,5 +72,3 @@ export const UpdatePrivacySchema = z
         show_comments_on_profile: z.boolean(),
     })
     .partial();
-
-export type UpdatePrivacyInput = z.infer<typeof UpdatePrivacySchema>;

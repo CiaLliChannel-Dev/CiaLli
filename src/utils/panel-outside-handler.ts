@@ -1,10 +1,10 @@
 type PanelOutsideConfig = {
-    panelId: string;
+    panelId: "display-setting";
     ignores: string[];
 };
 
 type PanelManager = {
-    closePanel: (panelId: string) => Promise<void>;
+    closePanel: (panelId: PanelOutsideConfig["panelId"]) => Promise<void>;
 };
 
 export const setupPanelOutsideHandler = (panelManager: PanelManager): void => {

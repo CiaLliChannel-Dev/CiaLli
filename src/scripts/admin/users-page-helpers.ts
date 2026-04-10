@@ -211,7 +211,10 @@ function buildDetailFields(item: UnknownRecord): DetailContentItem[] {
     ];
 }
 
-export const buildRegistrationDetailContent = (item: UnknownRecord) => {
+export const buildRegistrationDetailContent: (item: UnknownRecord) => {
+    status: string;
+    content: ReturnType<typeof buildDetailFields>;
+} = (item: UnknownRecord) => {
     const status = getStr(item.request_status);
     return {
         status,

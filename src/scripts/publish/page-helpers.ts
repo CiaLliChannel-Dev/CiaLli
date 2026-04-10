@@ -49,7 +49,7 @@ export type ProtectedArticlePlaintext = {
 
 // ── 常量 ──
 
-export const TOOLBAR_ACTIONS = new Set<ToolbarAction>([
+export const TOOLBAR_ACTIONS: ReadonlySet<ToolbarAction> = new Set([
     "bold",
     "italic",
     "underline",

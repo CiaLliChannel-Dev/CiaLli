@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "types": ["astro/client", "node", "vitest/globals"]
+  },
+  "include": [
+    "src/**/__tests__/**/*.ts",
+    "src/__tests__/setup.ts",
+    "src/env.d.ts"
+  ]
+}

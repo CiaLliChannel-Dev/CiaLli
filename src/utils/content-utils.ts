@@ -555,7 +555,10 @@ function buildCategoryListFromPosts(posts: DirectusPostEntry[]): Category[] {
     }));
 }
 
-const loadDerivedBlogDataSingleFlight = createSingleFlightRunner(
+const loadDerivedBlogDataSingleFlight = createSingleFlightRunner<
+    [cacheKey: string, viewerId?: string | null],
+    DerivedBlogData
+>(
     async (
         cacheKey: string,
         viewerId?: string | null,

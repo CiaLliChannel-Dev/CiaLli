@@ -15,7 +15,7 @@ import { t } from "@/scripts/shared/i18n-runtime";
 
 export const DATA_BOUND = "data-ss-bound";
 
-export const DIRECTUS_FILE_ID_PATTERN =
+export const DIRECTUS_FILE_ID_PATTERN: RegExp =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export const isLikelyDirectusFileId = (value: string): boolean =>
@@ -60,7 +60,7 @@ export const PREVIEW_ICON_CLS =
     "h-15 w-15 rounded-lg border border-(--line-divider) object-contain bg-black/5";
 export const CROP_ZOOM_MIN = 100;
 export const CROP_ZOOM_MAX = 300;
-export const CROP_OUTPUT_MAX_BYTES = 1.5 * 1024 * 1024;
+export const CROP_OUTPUT_MAX_BYTES: number = 1.5 * 1024 * 1024;
 
 // ---------------------------------------------------------------------------
 // 通用拖拽工具
@@ -187,7 +187,7 @@ export type PendingCropEntry = {
     targetFormat?: "ico";
     purpose?: UploadPurpose;
 };
-export const pendingCropBlobs = new Map<HTMLElement, PendingCropEntry>();
+export const pendingCropBlobs: Map<HTMLElement, PendingCropEntry> = new Map();
 
 export const cleanupPendingBlob = (row: HTMLElement): void => {
     const entry = pendingCropBlobs.get(row);

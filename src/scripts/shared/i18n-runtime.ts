@@ -4,11 +4,15 @@ type RuntimeTranslationMap = Partial<Record<keyof Translation, string>>;
 
 type TemplateVariables = Record<string, string | number>;
 
-function getWindowObject(): Window | null {
+type RuntimeWindow = Window & {
+    __CIALLI_I18N__?: RuntimeTranslationMap;
+};
+
+function getWindowObject(): RuntimeWindow | null {
     if (typeof window === "undefined") {
         return null;
     }
-    return window;
+    return window as RuntimeWindow;
 }
 
 function getRuntimeMap(): RuntimeTranslationMap {

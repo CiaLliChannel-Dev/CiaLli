@@ -45,7 +45,7 @@ export const JAPANESE_KATAKANA = [
     "ワ",
     "ヲ",
     "ン",
-];
+] as const;
 
 export type TocHeading = {
     id: string;

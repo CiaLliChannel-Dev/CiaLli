@@ -6,11 +6,59 @@ import * as z from "zod";
 import { ARTICLE_TITLE_MAX, weightedCharLength } from "@/constants/text-limits";
 
 import {
+    type AppStatus,
+    type OptionalString,
+    type Tags,
     AppStatusSchema,
     OptionalStringSchema,
     TagsDefaultSchema,
     TagsSchema,
 } from "./common";
+
+export type CreateArticleInput = {
+    title: string;
+    body_markdown: string;
+    status: "published";
+    slug?: OptionalString;
+    summary?: OptionalString;
+    cover_file?: OptionalString;
+    cover_url?: OptionalString;
+    tags: Tags;
+    category?: OptionalString;
+    allow_comments: boolean;
+    is_public: boolean;
+};
+
+export type UpdateArticleInput = {
+    title?: string;
+    slug?: OptionalString;
+    summary?: OptionalString;
+    body_markdown?: string;
+    cover_file?: OptionalString;
+    cover_url?: OptionalString;
+    tags?: Tags;
+    category?: OptionalString;
+    allow_comments?: boolean;
+    status?: AppStatus;
+    is_public?: boolean;
+};
+
+export type UpsertWorkingDraftInput = {
+    title?: string;
+    summary?: OptionalString;
+    body_markdown?: string;
+    cover_file?: OptionalString;
+    cover_url?: OptionalString;
+    tags?: Tags;
+    category?: OptionalString;
+    allow_comments?: boolean;
+    is_public?: boolean;
+};
+
+export type ArticlePreviewInput = {
+    body_markdown: string;
+    render_mode: "fast" | "full";
+};
 
 const ArticleTitleLengthSchema = z
     .string()
@@ -28,7 +76,7 @@ const DraftTagsSchema = z.array(z.string().max(100)).max(20).optional();
 
 // ── 创建文章 ──
 
-export const CreateArticleSchema = z.object({
+export const CreateArticleSchema: z.ZodType<CreateArticleInput> = z.object({
     title: ArticleTitleSchema,
     body_markdown: z.string().min(1, "正文必填"),
     status: z.literal("published").default("published"),
@@ -42,11 +90,9 @@ export const CreateArticleSchema = z.object({
     is_public: z.boolean().default(true),
 });
 
-export type CreateArticleInput = z.infer<typeof CreateArticleSchema>;
-
 // ── 更新文章（PATCH，全部字段可选） ──
 
-export const UpdateArticleSchema = z
+export const UpdateArticleSchema: z.ZodType<UpdateArticleInput> = z
     .object({
         title: ArticleTitleLengthSchema,
         slug: OptionalStringSchema,
@@ -62,27 +108,24 @@ export const UpdateArticleSchema = z
     })
     .partial();
 
-export type UpdateArticleInput = z.infer<typeof UpdateArticleSchema>;
-
 // ── 工作草稿（允许未完成字段） ──
 
-export const UpsertWorkingDraftSchema = z.object({
-    title: ArticleTitleLengthSchema.optional(),
-    summary: OptionalStringSchema,
-    body_markdown: z.string().optional(),
-    cover_file: OptionalStringSchema,
-    cover_url: OptionalStringSchema,
-    tags: DraftTagsSchema,
-    category: OptionalStringSchema,
-    allow_comments: z.boolean().optional(),
-    is_public: z.boolean().optional(),
-});
-
-export type UpsertWorkingDraftInput = z.infer<typeof UpsertWorkingDraftSchema>;
+export const UpsertWorkingDraftSchema: z.ZodType<UpsertWorkingDraftInput> =
+    z.object({
+        title: ArticleTitleLengthSchema.optional(),
+        summary: OptionalStringSchema,
+        body_markdown: z.string().optional(),
+        cover_file: OptionalStringSchema,
+        cover_url: OptionalStringSchema,
+        tags: DraftTagsSchema,
+        category: OptionalStringSchema,
+        allow_comments: z.boolean().optional(),
+        is_public: z.boolean().optional(),
+    });
 
 // ── 预览 ──
 
-export const ArticlePreviewSchema = z.object({
+export const ArticlePreviewSchema: z.ZodType<ArticlePreviewInput> = z.object({
     body_markdown: z.string(),
     render_mode: z.enum(["fast", "full"]).default("full"),
 });

@@ -52,7 +52,7 @@ export const ENTER_SKELETON_AWAITING_REPLACE_CLASS =
 export const BANNER_TO_SPEC_TRANSITION_DURATION_MS = 980;
 export const BANNER_TO_SPEC_PROXY_ENTER_DURATION_MS = 180;
 export const BANNER_TO_SPEC_PROXY_REVEAL_DURATION_MS = 280;
-export const ROOT_RUNTIME_CLASSES_TO_PRESERVE = [
+export const ROOT_RUNTIME_CLASSES_TO_PRESERVE: readonly string[] = [
     "dark",
     "is-theme-transitioning",
     "use-view-transition",
@@ -69,7 +69,7 @@ export const ROOT_RUNTIME_CLASSES_TO_PRESERVE = [
     BANNER_TO_SPEC_PROXY_ENTERING_CLASS,
     BANNER_TO_SPEC_PROXY_REVEALING_CLASS,
 ] as const;
-export const ROOT_RUNTIME_STYLE_PROPERTIES_TO_PRESERVE = [
+export const ROOT_RUNTIME_STYLE_PROPERTIES_TO_PRESERVE: readonly string[] = [
     "font-size",
     "--hue",
     "--banner-height-extend",
@@ -77,7 +77,7 @@ export const ROOT_RUNTIME_STYLE_PROPERTIES_TO_PRESERVE = [
     BANNER_TO_SPEC_BG_OVERSHOOT_VAR,
     BANNER_TO_SPEC_TRANSITION_DURATION_VAR,
 ] as const;
-export const ROOT_RUNTIME_DATA_ATTRIBUTES_TO_PRESERVE = [
+export const ROOT_RUNTIME_DATA_ATTRIBUTES_TO_PRESERVE: readonly string[] = [
     "data-enter-skeleton-mode",
     "data-nav-phase",
     BANNER_TO_SPEC_PROXY_MODE_ATTR,

@@ -114,4 +114,5 @@ async function handleV1Inner(context: APIContext): Promise<Response> {
     return dispatchRoute(context, segments);
 }
 
-export const handleV1 = withErrorHandler(handleV1Inner);
+export const handleV1: (context: APIContext) => Promise<Response> =
+    withErrorHandler(handleV1Inner);

@@ -31,7 +31,7 @@ export type CommentToolbarAction =
     | "inline-code"
     | "code-block";
 
-export const TOOLBAR_ACTIONS = new Set<CommentToolbarAction>([
+export const TOOLBAR_ACTIONS: ReadonlySet<CommentToolbarAction> = new Set([
     "bold",
     "italic",
     "underline",
