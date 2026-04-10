@@ -51,13 +51,7 @@ const desktopBodyWidthClass = hasCover
 const desktopEnterLinkClass = hasCover
   ? "lg:w-[var(--coverWidth)]"
   : "lg:w-[3.25rem]";
-const bodyText = entry.data.encrypted
-  ? ""
-  : String(entry.body || "")
-      .replace(/<[^>]+>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-const excerpt = description || bodyText.slice(0, 30) || "";
+const excerpt = description || "";
 const { displayName: authorDisplayName, username: authorHandle } =
   resolveAuthorIdentity(
     {
