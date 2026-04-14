@@ -104,9 +104,6 @@ export const enAdmin: Record<string, string> = {
     [Key.adminSiteSettingsAddItem]: "Add item",
     [Key.adminSiteSettingsAddNavLink]: "Add navigation link",
     [Key.adminSiteSettingsAddSubmenu]: "Add submenu",
-    [Key.adminSiteSettingsAnalyticsHint]:
-        "Configure analytics scripts and traffic information.",
-    [Key.adminSiteSettingsAnalyticsTitle]: "Analytics settings",
     [Key.adminSiteSettingsBannerAlignment]: "Banner alignment",
     [Key.adminSiteSettingsBannerApiUrl]: "Banner API URL",
     [Key.adminSiteSettingsBannerRemovedPendingSave]:

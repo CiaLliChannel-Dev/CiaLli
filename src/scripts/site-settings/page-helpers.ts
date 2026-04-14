@@ -58,17 +58,10 @@ function bindSiteBasicFields(site: SettingsObj): void {
     setVal("ss-start-date", String(site.siteStartDate ?? ""));
 }
 
-function bindSiteAnalyticsFields(analytics: SettingsObj): void {
-    setVal("ss-gtm-id", String(analytics.gtmId ?? ""));
-    setVal("ss-clarity-id", String(analytics.clarityId ?? ""));
-}
-
 function bindSiteSection(s: SettingsObj): void {
     const site = (s.site ?? {}) as SettingsObj;
-    const analytics = (s.analytics ?? {}) as SettingsObj;
 
     bindSiteBasicFields(site);
-    bindSiteAnalyticsFields(analytics);
 
     if (faviconListContainer) {
         fillFaviconList(
@@ -237,11 +230,6 @@ export function collectSitePayload(current: SettingsObj): SettingsObj {
             favicon: faviconListContainer
                 ? collectFaviconList(faviconListContainer)
                 : ((current.site as SettingsObj | undefined)?.favicon ?? []),
-        },
-        analytics: {
-            ...((current.analytics ?? {}) as SettingsObj),
-            gtmId: inputVal("ss-gtm-id"),
-            clarityId: inputVal("ss-clarity-id"),
         },
     };
 }

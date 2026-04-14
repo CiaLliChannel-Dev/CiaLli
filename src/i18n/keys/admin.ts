@@ -96,8 +96,6 @@ export enum AdminKey {
     adminSiteSettingsAddItem = "adminSiteSettingsAddItem",
     adminSiteSettingsAddNavLink = "adminSiteSettingsAddNavLink",
     adminSiteSettingsAddSubmenu = "adminSiteSettingsAddSubmenu",
-    adminSiteSettingsAnalyticsHint = "adminSiteSettingsAnalyticsHint",
-    adminSiteSettingsAnalyticsTitle = "adminSiteSettingsAnalyticsTitle",
     adminSiteSettingsArticleLicenseInfo = "adminSiteSettingsArticleLicenseInfo",
     adminSiteSettingsBannerAlignment = "adminSiteSettingsBannerAlignment",
     adminSiteSettingsBannerApiUrl = "adminSiteSettingsBannerApiUrl",

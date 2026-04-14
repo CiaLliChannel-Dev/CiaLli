@@ -13,11 +13,6 @@ export type ProfileRuntimeSettings = {
     avatar: string;
 };
 
-export type AnalyticsRuntimeSettings = {
-    gtmId: string;
-    clarityId: string;
-};
-
 export type EditableSiteSettings = {
     site: {
         title: string;
@@ -40,8 +35,6 @@ export type EditableSiteSettings = {
     announcement: AnnouncementConfig;
     musicPlayer: MusicPlayerConfig;
     sakura: SakuraConfig;
-
-    analytics: AnalyticsRuntimeSettings;
 };
 
 export type SiteSettingsPayload = EditableSiteSettings;

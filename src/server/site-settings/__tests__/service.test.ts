@@ -75,6 +75,22 @@ describe("resolveSiteSettingsPayload", () => {
 
         expect(result.site.timeZone).toBeNull();
     });
+
+    it("会在归一化阶段剔除历史 analytics 字段", () => {
+        const result = resolveSiteSettingsPayload({
+            analytics: {
+                gtmId: "GTM-XXXXXXX",
+                clarityId: "abcd1234",
+            },
+        });
+
+        expect(
+            Object.prototype.hasOwnProperty.call(
+                result as Record<string, unknown>,
+                "analytics",
+            ),
+        ).toBe(false);
+    });
 });
 
 describe("site-settings/service", () => {

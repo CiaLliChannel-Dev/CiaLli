@@ -13,7 +13,6 @@ import {
     isRecord,
     isSiteLanguageOption,
     normalizeAnnouncement,
-    normalizeAnalytics,
     normalizeBannerBasic,
     normalizeBannerHomeText,
     normalizeBannerImageApi,
@@ -136,7 +135,11 @@ function normalizeSettings(
     normalizeAnnouncement(merged);
     normalizeMusicPlayer(merged);
     merged.sakura.enable = Boolean(merged.sakura.enable);
-    normalizeAnalytics(merged, base);
+    const mergedRecord = merged as Record<string, unknown>;
+    if (Object.prototype.hasOwnProperty.call(mergedRecord, "analytics")) {
+        // 历史统计设置字段已废弃：读取与保存时都主动收敛，防止脏数据继续透传。
+        delete mergedRecord.analytics;
+    }
 
     return merged;
 }

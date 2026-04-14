@@ -98,8 +98,6 @@ export const zhTWAdmin: Record<string, string> = {
     [Key.adminSiteSettingsAddItem]: "新增項目",
     [Key.adminSiteSettingsAddNavLink]: "新增導覽連結",
     [Key.adminSiteSettingsAddSubmenu]: "新增子選單",
-    [Key.adminSiteSettingsAnalyticsHint]: "設定統計腳本與流量資訊。",
-    [Key.adminSiteSettingsAnalyticsTitle]: "統計設定",
     [Key.adminSiteSettingsBannerAlignment]: "橫幅對齊方式",
     [Key.adminSiteSettingsBannerApiUrl]: "橫幅 API 位址",
     [Key.adminSiteSettingsBannerRemovedPendingSave]: "橫幅已移除，儲存後生效",

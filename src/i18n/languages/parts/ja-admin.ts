@@ -103,9 +103,6 @@ export const jaAdmin: Record<string, string> = {
     [Key.adminSiteSettingsAddItem]: "項目を追加",
     [Key.adminSiteSettingsAddNavLink]: "ナビリンクを追加",
     [Key.adminSiteSettingsAddSubmenu]: "サブメニューを追加",
-    [Key.adminSiteSettingsAnalyticsHint]:
-        "分析スクリプトとアクセス情報を設定します。",
-    [Key.adminSiteSettingsAnalyticsTitle]: "分析設定",
     [Key.adminSiteSettingsBannerAlignment]: "バナー配置",
     [Key.adminSiteSettingsBannerApiUrl]: "バナー API URL",
     [Key.adminSiteSettingsBannerRemovedPendingSave]:

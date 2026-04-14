@@ -167,11 +167,6 @@ export const defaultSiteSettings: SiteSettingsPayload = {
     sakura: {
         enable: false,
     },
-
-    analytics: {
-        gtmId: "GTM-KRX3XGVH",
-        clarityId: "tjr3vkhj8i",
-    },
 };
 
 export function buildLegacySiteConfig(

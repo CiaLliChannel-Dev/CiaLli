@@ -98,8 +98,6 @@ export const zhCNAdmin: Record<string, string> = {
     [Key.adminSiteSettingsAddItem]: "新增条目",
     [Key.adminSiteSettingsAddNavLink]: "添加导航链接",
     [Key.adminSiteSettingsAddSubmenu]: "添加子菜单",
-    [Key.adminSiteSettingsAnalyticsHint]: "配置统计脚本与访问信息。",
-    [Key.adminSiteSettingsAnalyticsTitle]: "统计设置",
     [Key.adminSiteSettingsBannerAlignment]: "横幅对齐方式",
     [Key.adminSiteSettingsBannerApiUrl]: "横幅 API 地址",
     [Key.adminSiteSettingsBannerRemovedPendingSave]: "横幅已移除，保存后生效",
