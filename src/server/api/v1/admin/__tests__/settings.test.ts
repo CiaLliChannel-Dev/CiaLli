@@ -104,20 +104,13 @@ describe("handleAdminSettings /bulletin", () => {
     });
 
     it("GET /admin/settings/bulletin 返回公告配置", async () => {
-        mockedGetResolvedSiteSettings.mockResolvedValue({
-            system: {} as never,
-            settings: {
-                announcement: {
-                    title: "公告标题",
-                    summary: "摘要",
-                    body_markdown: "# 正文",
-                    closable: true,
-                },
-            },
-        } as never);
         mockedReadMany.mockResolvedValue([
             {
                 id: "row-1",
+                title: "公告标题",
+                summary: "摘要",
+                body_markdown: "# 正文",
+                closable: true,
                 date_updated: "2026-02-15T12:00:00.000Z",
                 date_created: "2026-02-10T12:00:00.000Z",
             },
@@ -178,14 +171,6 @@ describe("handleAdminSettings /bulletin", () => {
                 },
             },
         } as never);
-        mockedResolveSiteSettingsPayload.mockReturnValue({
-            announcement: {
-                title: "新标题",
-                summary: "新摘要",
-                body_markdown: "# 新正文",
-                closable: false,
-            },
-        } as never);
         mockedReadMany.mockResolvedValue([
             {
                 id: "row-1",
@@ -209,8 +194,20 @@ describe("handleAdminSettings /bulletin", () => {
             ["settings", "bulletin"],
         );
         expect(response.status).toBe(200);
-        expect(mockedResolveSiteSettingsPayload).toHaveBeenCalledTimes(1);
+        expect(mockedResolveSiteSettingsPayload).not.toHaveBeenCalled();
         expect(mockedUpdateOne).toHaveBeenCalledTimes(1);
+        expect(mockedUpdateOne).toHaveBeenCalledWith(
+            "app_site_announcements",
+            "row-1",
+            {
+                key: "default",
+                status: "published",
+                title: "新标题",
+                summary: "新摘要",
+                body_markdown: "# 新正文",
+                closable: false,
+            },
+        );
         expect(mockedInvalidateSiteSettingsCache).toHaveBeenCalledTimes(1);
 
         const body = await parseResponseJson<{
@@ -313,6 +310,12 @@ describe("handleAdminSettings /site", () => {
                 title: "旧标题",
                 timeZone: "UTC",
             },
+            announcement: {
+                title: "不应写入",
+                summary: "不应写入",
+                body_markdown: "不应写入",
+                closable: false,
+            },
         } as never);
         mockedReadMany.mockResolvedValue([
             {
@@ -330,6 +333,9 @@ describe("handleAdminSettings /site", () => {
             site: {
                 timeZone: "UTC",
             },
+            announcement: {
+                title: "前端误传公告",
+            },
         });
         const response = await handleAdminSettings(
             ctx as unknown as APIContext,
@@ -343,6 +349,17 @@ describe("handleAdminSettings /site", () => {
                 },
             },
             expect.anything(),
+        );
+        expect(mockedUpdateOne).toHaveBeenCalledWith(
+            "app_site_settings",
+            "row-1",
+            {
+                key: "default",
+                status: "published",
+                settings: expect.not.objectContaining({
+                    announcement: expect.anything(),
+                }),
+            },
         );
 
         const body = await parseResponseJson<{

@@ -4,6 +4,8 @@ import { performance } from "node:perf_hooks";
 import type {
     EditableSiteSettings,
     SiteSettingsPayload,
+    SiteAnnouncementPayload,
+    StoredSiteSettingsPayload,
 } from "@/types/site-settings";
 import type { JsonObject } from "@/types/json";
 import { canonicalizeSiteTimeZone } from "@/utils/date-utils";
@@ -90,15 +92,86 @@ async function readSiteSettingsRowMeta(): Promise<{
     };
 }
 
+async function readSiteAnnouncementRowMeta(): Promise<{
+    id: string;
+    updatedAt: string | null;
+} | null> {
+    const rows = await readMany("app_site_announcements", {
+        filter: { key: { _eq: "default" } } as JsonObject,
+        limit: 1,
+        sort: ["-date_updated", "-date_created"],
+        fields: ["id", "date_updated", "date_created"],
+    });
+    const row = rows[0];
+    if (!row) {
+        return null;
+    }
+    return {
+        id: row.id,
+        updatedAt: row.date_updated || row.date_created || null,
+    };
+}
+
+function stripAnnouncementFromSiteSettings(
+    settings: SiteSettingsPayload,
+): StoredSiteSettingsPayload {
+    const { announcement: _announcement, ...storedSettings } = settings;
+    return storedSettings;
+}
+
+type NormalizedAnnouncementContent = {
+    title: string;
+    summary: string;
+    body_markdown: string;
+    closable: boolean;
+};
+
+function normalizeAnnouncementContent(
+    input: Partial<EditableSiteSettings["announcement"]>,
+): NormalizedAnnouncementContent {
+    return {
+        title: String(input.title ?? "").trim(),
+        summary: String(input.summary ?? "").trim(),
+        body_markdown: String(input.body_markdown ?? "").trim(),
+        closable: Boolean(input.closable),
+    };
+}
+
+function normalizeBulletinPayload(
+    input: Partial<EditableSiteSettings["announcement"]>,
+): SiteAnnouncementPayload {
+    const normalized = normalizeAnnouncementContent(input);
+    return {
+        key: "default",
+        title: normalized.title,
+        summary: normalized.summary,
+        body_markdown: normalized.body_markdown,
+        closable: normalized.closable,
+    };
+}
+
+function readAnnouncementFromRow(
+    row: Partial<SiteAnnouncementPayload> | null,
+): EditableSiteSettings["announcement"] {
+    const normalized = normalizeAnnouncementContent(row || {});
+    return {
+        title: normalized.title,
+        summary: normalized.summary,
+        body_markdown: normalized.body_markdown,
+        closable: normalized.closable,
+    };
+}
+
 async function upsertSiteSettings(
     settings: SiteSettingsPayload,
 ): Promise<{ updatedAt: string | null }> {
+    const storedSettings = stripAnnouncementFromSiteSettings(settings);
     const existing = await readSiteSettingsRowMeta();
     if (!existing) {
         const created = await createOne("app_site_settings", {
             key: "default",
             status: "published",
-            settings,
+            settings: storedSettings,
         });
         return {
             updatedAt: created.date_updated || created.date_created || null,
@@ -108,10 +181,76 @@ async function upsertSiteSettings(
     const updated = await updateOne("app_site_settings", existing.id, {
         key: "default",
         status: "published",
-        settings,
+        settings: storedSettings,
     });
     return {
         updatedAt: updated.date_updated || updated.date_created || null,
+    };
+}
+
+async function upsertSiteAnnouncement(
+    announcement: EditableSiteSettings["announcement"],
+): Promise<{ updatedAt: string | null }> {
+    const payload = normalizeBulletinPayload(announcement);
+    const existing = await readSiteAnnouncementRowMeta();
+    if (!existing) {
+        const created = await createOne("app_site_announcements", {
+            key: payload.key,
+            status: "published",
+            title: payload.title,
+            summary: payload.summary,
+            body_markdown: payload.body_markdown,
+            closable: payload.closable,
+        });
+        return {
+            updatedAt: created.date_updated || created.date_created || null,
+        };
+    }
+
+    const updated = await updateOne("app_site_announcements", existing.id, {
+        key: payload.key,
+        status: "published",
+        title: payload.title,
+        summary: payload.summary,
+        body_markdown: payload.body_markdown,
+        closable: payload.closable,
+    });
+    return {
+        updatedAt: updated.date_updated || updated.date_created || null,
+    };
+}
+
+async function readSiteAnnouncement(): Promise<{
+    announcement: EditableSiteSettings["announcement"];
+    updatedAt: string | null;
+} | null> {
+    const rows = await readMany("app_site_announcements", {
+        filter: { key: { _eq: "default" } } as JsonObject,
+        limit: 1,
+        sort: ["-date_updated", "-date_created"],
+        fields: [
+            "id",
+            "title",
+            "summary",
+            "body_markdown",
+            "closable",
+            "date_updated",
+            "date_created",
+        ],
+    });
+    const row = rows[0];
+    if (!row) {
+        return null;
+    }
+
+    return {
+        announcement: readAnnouncementFromRow({
+            title: row.title,
+            summary: row.summary,
+            body_markdown: row.body_markdown,
+            closable: row.closable,
+        }),
+        updatedAt: row.date_updated || row.date_created || null,
     };
 }
 
@@ -366,6 +505,15 @@ async function handleAdminSitePatch(
             "INVALID_TIME_ZONE",
         );
     }
+
+    if (
+        isObjectRecord(body) &&
+        Object.prototype.hasOwnProperty.call(body, "announcement")
+    ) {
+        // 站点设置 PATCH 支持整包提交，必须主动剔除 announcement 避免回写到 app_site_settings。
+        delete body.announcement;
+    }
+
     const patch = body as Partial<EditableSiteSettings>;
     const current = await getResolvedSiteSettings();
     const settings = resolveSiteSettingsPayload(patch, current.settings);
@@ -433,13 +581,12 @@ async function handleAdminBulletinPreview(
 // ── 路由处理：/admin/settings/bulletin ──
 
 async function handleAdminBulletinGet(): Promise<Response> {
-    const [resolved, rowMeta] = await Promise.all([
-        getResolvedSiteSettings(),
-        readSiteSettingsRowMeta(),
-    ]);
+    const announcementRow = await readSiteAnnouncement();
+    const resolved = announcementRow ? null : await getResolvedSiteSettings();
     return ok({
-        announcement: resolved.settings.announcement,
-        updated_at: rowMeta?.updatedAt || null,
+        announcement:
+            announcementRow?.announcement || resolved?.settings.announcement,
+        updated_at: announcementRow?.updatedAt || null,
     });
 }
 
@@ -449,7 +596,7 @@ async function handleAdminBulletinPatch(
     const body = await parseJsonBody(context.request);
     const input = validateBody(AdminBulletinUpdateSchema, body);
     const current = await getResolvedSiteSettings();
-    const announcementPatch: EditableSiteSettings["announcement"] = {
+    const announcementPatch = readAnnouncementFromRow({
         ...current.settings.announcement,
         ...(input.title !== undefined
             ? { title: String(input.title ?? "") }
@@ -461,15 +608,11 @@ async function handleAdminBulletinPatch(
             ? { body_markdown: input.body_markdown }
             : {}),
         ...(input.closable !== undefined ? { closable: input.closable } : {}),
-    };
-    const settings = resolveSiteSettingsPayload(
-        { announcement: announcementPatch },
-        current.settings,
-    );
-    const { updatedAt } = await upsertSiteSettings(settings);
+    });
+    const { updatedAt } = await upsertSiteAnnouncement(announcementPatch);
     invalidateSiteSettingsCache();
     return ok({
-        announcement: settings.announcement,
+        announcement: announcementPatch,
         updated_at: updatedAt,
     });
 }

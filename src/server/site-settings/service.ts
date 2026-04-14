@@ -38,6 +38,17 @@ type SiteSettingsFailureFallback = {
 };
 
 const SITE_SETTINGS_FAILURE_BACKOFF_MS = 5_000;
+const ANNOUNCEMENT_QUERY_FIELDS = [
+    "id",
+    "key",
+    "title",
+    "summary",
+    "body_markdown",
+    "closable",
+    "status",
+    "date_updated",
+    "date_created",
+] as const;
 
 let recentFailureFallback: SiteSettingsFailureFallback | null = null;
 let lastKnownGood: ResolvedSiteSettings | null = null;
@@ -82,6 +93,54 @@ function mergeWithDefaults<T>(defaults: T, patch: unknown): T {
         default:
             return defaults;
     }
+}
+
+function stripAnnouncementFromSiteSettingsRaw(raw: unknown): unknown {
+    if (!isRecord(raw)) {
+        return raw;
+    }
+    const sanitized: Record<string, unknown> = { ...raw };
+    if (Object.prototype.hasOwnProperty.call(sanitized, "announcement")) {
+        // 公告已拆分到独立集合，读取站点设置时必须丢弃历史 announcement 脏字段。
+        delete sanitized.announcement;
+    }
+    return sanitized;
+}
+
+function normalizeAnnouncementPayload(
+    raw: unknown,
+    fallback: SiteSettingsPayload["announcement"],
+): SiteSettingsPayload["announcement"] {
+    const source = isRecord(raw) ? raw : {};
+    return {
+        title: String(source.title ?? fallback.title ?? "").trim(),
+        summary: String(source.summary ?? fallback.summary ?? "").trim(),
+        body_markdown: String(
+            source.body_markdown ?? fallback.body_markdown ?? "",
+        ).trim(),
+        closable: Boolean(source.closable ?? fallback.closable),
+    };
+}
+
+function pickLatestUpdatedAt(
+    left: string | null,
+    right: string | null,
+): string | null {
+    if (!left) {
+        return right;
+    }
+    if (!right) {
+        return left;
+    }
+    const leftEpoch = Date.parse(left);
+    const rightEpoch = Date.parse(right);
+    if (!Number.isFinite(leftEpoch)) {
+        return right;
+    }
+    if (!Number.isFinite(rightEpoch)) {
+        return left;
+    }
+    return leftEpoch >= rightEpoch ? left : right;
 }
 
 function readExplicitSiteTimeZonePatch(raw: unknown): {
@@ -210,6 +269,98 @@ async function readSiteSettingsRow(): Promise<{
     };
 }
 
+async function readSiteAnnouncementRow(): Promise<{
+    announcement: SiteSettingsPayload["announcement"];
+    updatedAt: string | null;
+} | null> {
+    // 迁移期间可能出现 key/status 不一致的数据，先批量读取非归档公告，再按优先级选择最可信的记录。
+    const rows = await withServiceRepositoryContext(
+        async () =>
+            await readMany("app_site_announcements", {
+                filter: { status: { _neq: "archived" } },
+                limit: 20,
+                sort: ["-date_updated", "-date_created"],
+                fields: [...ANNOUNCEMENT_QUERY_FIELDS],
+            }),
+    );
+
+    const candidates = rows.map((row) => ({
+        payload: {
+            key: String(row.key ?? ""),
+            title: String(row.title ?? ""),
+            summary: String(row.summary ?? ""),
+            body_markdown: String(row.body_markdown ?? ""),
+            closable: Boolean(row.closable),
+        },
+        status: String(row.status ?? ""),
+        updatedAt: row.date_updated || row.date_created || null,
+    }));
+
+    const pick = (
+        predicate: (candidate: (typeof candidates)[number]) => boolean,
+    ): (typeof candidates)[number] | null => candidates.find(predicate) || null;
+
+    // 选择顺序：严格命中 -> 兼容 key -> 兼容 status -> 最新非归档。
+    const strict = pick(
+        (candidate) =>
+            candidate.payload.key === "default" &&
+            candidate.status === "published",
+    );
+    if (strict) {
+        return {
+            announcement: normalizeAnnouncementPayload(
+                strict.payload,
+                defaultSiteSettings.announcement,
+            ),
+            updatedAt: strict.updatedAt,
+        };
+    }
+
+    const keyDefault = pick((candidate) => candidate.payload.key === "default");
+    if (keyDefault) {
+        console.warn(
+            "[site-settings] 公告读取未命中 published 状态，已回退到 key=default 的非归档公告。请检查迁移数据的 status。",
+        );
+        return {
+            announcement: normalizeAnnouncementPayload(
+                keyDefault.payload,
+                defaultSiteSettings.announcement,
+            ),
+            updatedAt: keyDefault.updatedAt,
+        };
+    }
+
+    const published = pick((candidate) => candidate.status === "published");
+    if (published) {
+        console.warn(
+            "[site-settings] 公告读取未命中 key=default，已回退到最新 published 公告。请检查迁移数据的 key。",
+        );
+        return {
+            announcement: normalizeAnnouncementPayload(
+                published.payload,
+                defaultSiteSettings.announcement,
+            ),
+            updatedAt: published.updatedAt,
+        };
+    }
+
+    const latest = candidates[0];
+    if (latest) {
+        console.warn(
+            "[site-settings] 公告读取未命中 key/status 约束，已回退到最新非归档公告。请尽快修正 app_site_announcements 数据。",
+        );
+        return {
+            announcement: normalizeAnnouncementPayload(
+                latest.payload,
+                defaultSiteSettings.announcement,
+            ),
+            updatedAt: latest.updatedAt,
+        };
+    }
+
+    return null;
+}
+
 export function resolveSiteSettingsPayload(
     raw: unknown,
     base: SiteSettingsPayload = defaultSiteSettings,
@@ -221,8 +372,11 @@ const loadResolvedSiteSettingsSingleFlight = createSingleFlightRunner(
     async (): Promise<ResolvedSiteSettings> => {
         const defaultResolved = buildDefaultResolvedSettings();
         try {
-            const row = await readSiteSettingsRow();
-            if (!row) {
+            const [siteRow, announcementRow] = await Promise.all([
+                readSiteSettingsRow(),
+                readSiteAnnouncementRow(),
+            ]);
+            if (!siteRow && !announcementRow) {
                 const value: SiteSettingsCacheValue = {
                     resolved: defaultResolved,
                     updatedAt: null,
@@ -233,17 +387,28 @@ const loadResolvedSiteSettingsSingleFlight = createSingleFlightRunner(
                 return defaultResolved;
             }
 
-            const settings = normalizeSettings(
-                row.settings,
-                defaultSiteSettings,
-            );
+            const settings = siteRow
+                ? normalizeSettings(
+                      stripAnnouncementFromSiteSettingsRaw(siteRow.settings),
+                      defaultSiteSettings,
+                  )
+                : cloneSettings(defaultSiteSettings);
+            settings.announcement =
+                announcementRow?.announcement ||
+                normalizeAnnouncementPayload(
+                    null,
+                    defaultSiteSettings.announcement,
+                );
             const resolved: ResolvedSiteSettings = {
                 system: buildSystemSiteConfig(settings),
                 settings,
             };
             const value: SiteSettingsCacheValue = {
                 resolved,
-                updatedAt: row.updatedAt,
+                updatedAt: pickLatestUpdatedAt(
+                    siteRow?.updatedAt || null,
+                    announcementRow?.updatedAt || null,
+                ),
             };
             lastKnownGood = resolved;
             recentFailureFallback = null;
