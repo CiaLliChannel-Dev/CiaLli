@@ -249,6 +249,10 @@ const coverUrl = article?.cover_url
         },
       )
     : null;
+const ogImageUrl =
+  articleVisibleToPublic && coverUrl
+    ? new URL(coverUrl, Astro.url).toString()
+    : null;
 
 const ownerOnlyNotice = viewerIsOwner
   ? article?.status === "draft"
@@ -282,7 +286,7 @@ const articleSharePayload: SharePosterPayload | undefined =
         author:
           article.author?.display_name ||
           article.author?.name ||
-          defaultSiteSettings.profile.name,
+          defaultSiteSettings.site.title,
         description: article.summary || "",
         pubDate: article.date_created || article.date_updated || "",
         coverImage: coverUrl,
@@ -314,6 +318,14 @@ const articleSharePayload: SharePosterPayload | undefined =
         type="image/webp"
         href={coverPreloadUrl}
       />
+    )
+  }
+  {
+    ogImageUrl && (
+      <>
+        <meta slot="head" property="og:image" content={ogImageUrl} />
+        <meta slot="head" name="twitter:image" content={ogImageUrl} />
+      </>
     )
   }
   {

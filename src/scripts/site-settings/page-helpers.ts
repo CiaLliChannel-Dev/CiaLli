@@ -39,7 +39,7 @@ export type SettingsObj = Record<string, unknown>;
 // bindSettings — 按分区拆分为独立函数
 // ---------------------------------------------------------------------------
 
-function bindSiteBasicFields(site: SettingsObj, profile: SettingsObj): void {
+function bindSiteBasicFields(site: SettingsObj): void {
     setVal("ss-title", String(site.title ?? ""));
     setVal("ss-subtitle", String(site.subtitle ?? ""));
     setSelect("ss-language", String(site.lang ?? "zh_CN"));
@@ -56,21 +56,12 @@ function bindSiteBasicFields(site: SettingsObj, profile: SettingsObj): void {
             : "",
     );
     setVal("ss-start-date", String(site.siteStartDate ?? ""));
-    setVal("ss-profile-name", String(profile.name ?? ""));
-}
-
-function bindSiteAnalyticsFields(analytics: SettingsObj): void {
-    setVal("ss-gtm-id", String(analytics.gtmId ?? ""));
-    setVal("ss-clarity-id", String(analytics.clarityId ?? ""));
 }
 
 function bindSiteSection(s: SettingsObj): void {
     const site = (s.site ?? {}) as SettingsObj;
-    const profile = (s.profile ?? {}) as SettingsObj;
-    const analytics = (s.analytics ?? {}) as SettingsObj;
 
-    bindSiteBasicFields(site, profile);
-    bindSiteAnalyticsFields(analytics);
+    bindSiteBasicFields(site);
 
     if (faviconListContainer) {
         fillFaviconList(
@@ -188,7 +179,6 @@ function bindHomeSection(s: SettingsObj): void {
 
 function bindOtherSection(s: SettingsObj): void {
     const musicPlayer = (s.musicPlayer ?? {}) as SettingsObj;
-    const sakura = (s.sakura ?? {}) as SettingsObj;
 
     setChecked("ss-music-enable", Boolean(musicPlayer.enable));
     setVal("ss-music-api", String(musicPlayer.meting_api ?? ""));
@@ -196,7 +186,6 @@ function bindOtherSection(s: SettingsObj): void {
     setVal("ss-music-server", String(musicPlayer.server ?? ""));
     setVal("ss-music-type", String(musicPlayer.type ?? ""));
     setVal("ss-music-marquee", String(musicPlayer.marqueeSpeed ?? ""));
-    setChecked("ss-sakura-enable", Boolean(sakura.enable));
 }
 
 function bindFeatureSection(s: SettingsObj): void {
@@ -239,15 +228,6 @@ export function collectSitePayload(current: SettingsObj): SettingsObj {
             favicon: faviconListContainer
                 ? collectFaviconList(faviconListContainer)
                 : ((current.site as SettingsObj | undefined)?.favicon ?? []),
-        },
-        profile: {
-            ...((current.profile ?? {}) as SettingsObj),
-            name: inputVal("ss-profile-name"),
-        },
-        analytics: {
-            ...((current.analytics ?? {}) as SettingsObj),
-            gtmId: inputVal("ss-gtm-id"),
-            clarityId: inputVal("ss-clarity-id"),
         },
     };
 }
@@ -370,9 +350,6 @@ export function collectOtherPayload(current: SettingsObj): SettingsObj {
             server: inputVal("ss-music-server"),
             type: inputVal("ss-music-type"),
             marqueeSpeed: numberOrFallback(inputVal("ss-music-marquee"), 10),
-        },
-        sakura: {
-            enable: checked("ss-sakura-enable"),
         },
     };
 }

@@ -45,14 +45,7 @@ const siteConfig = buildLegacySiteConfig(
   resolvedSiteSettings.system,
   resolvedSiteSettings.settings,
 );
-const profileName = resolvedSiteSettings.settings.profile.name;
 const musicPlayerSettings = resolvedSiteSettings.settings.musicPlayer;
-const analyticsConfig = {
-  gtmId: String(resolvedSiteSettings.settings.analytics.gtmId || "").trim(),
-  clarityId: String(
-    resolvedSiteSettings.settings.analytics.clarityId || "",
-  ).trim(),
-};
 const csrfTokenFromLocals =
   typeof Astro.locals.csrfToken === "string" ? Astro.locals.csrfToken : "";
 const csrfToken = csrfTokenFromLocals || readCsrfToken(Astro);
@@ -125,10 +118,6 @@ const bannerOffset =
 const pageWidthRem = `${PAGE_WIDTH}rem`;
 const bannerHeightHomeVh = `${BANNER_HEIGHT_HOME}vh`;
 const bannerHeightVh = `${BANNER_HEIGHT}vh`;
-
-const gtmId = analyticsConfig.gtmId;
-const clarityId = analyticsConfig.clarityId;
-const analyticsEnabled = Boolean(gtmId || clarityId);
 const htmlClassName = [
   "bg-(--page-bg)",
   isPostEditorRoute ? "route-post-editor" : "",
@@ -224,53 +213,6 @@ const bodyClassName = [
         });
       })();
     </script>
-    <script is:inline define:vars={{ gtmId, clarityId, analyticsEnabled }}>
-      if (analyticsEnabled) {
-        // 使用 requestIdleCallback 延迟加载第三方脚本
-        const loadAnalytics = () => {
-          // Google Tag Manager 脚本
-          if (gtmId) {
-            (function (w, d, s, l, i) {
-              w[l] = w[l] || [];
-              w[l].push({
-                "gtm.start": new Date().getTime(),
-                event: "gtm.js",
-              });
-              const f = d.getElementsByTagName(s)[0];
-              const j = d.createElement(s);
-              const dl = l !== "dataLayer" ? "&l=" + l : "";
-              j.async = true;
-              j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
-              f.parentNode.insertBefore(j, f);
-            })(window, document, "script", "dataLayer", gtmId);
-          }
-
-          // Clarity 脚本
-          if (clarityId) {
-            (function (c, l, a, r, i, t, y) {
-              c[a] =
-                c[a] ||
-                function () {
-                  (c[a].q = c[a].q || []).push(arguments);
-                };
-              t = l.createElement(r);
-              t.async = true;
-              t.src = "https://www.clarity.ms/tag/" + i;
-              y = l.getElementsByTagName(r)[0];
-              y.parentNode.insertBefore(t, y);
-            })(window, document, "clarity", "script", clarityId);
-          }
-        };
-
-        // 浏览器空闲时加载；若长期不空闲则 3 秒后兜底加载
-        if ("requestIdleCallback" in window) {
-          requestIdleCallback(loadAnalytics, { timeout: 3000 });
-        } else {
-          setTimeout(loadAnalytics, 3000);
-        }
-      }
-    </script>
-
     <title>{pageTitle}</title>
     <meta charset="UTF-8" />
     <meta name="description" content={description || pageTitle} />
@@ -279,7 +221,6 @@ const bodyClassName = [
         <meta name="keywords" content={siteConfig.keywords.join(", ")} />
       )
     }
-    <meta name="author" content={profileName} />
     <meta property="og:site_name" content={siteConfig.title} />
     <meta property="og:url" content={Astro.url} />
     <meta property="og:title" content={pageTitle} />
@@ -422,7 +363,7 @@ const bodyClassName = [
     <link
       rel="alternate"
       type="application/rss+xml"
-      title={profileName}
+      title={siteConfig.title}
       href={`${Astro.site}rss.xml`}
     />
   </head>
@@ -435,18 +376,6 @@ const bodyClassName = [
     data-overlayscrollbars-initialize
   >
     <ConfigCarrier resolvedSiteSettings={resolvedSiteSettings} />
-    {
-      gtmId && (
-        <noscript>
-          <iframe
-            src={`https://www.googletagmanager.com/ns.html?id=${encodeURIComponent(gtmId)}`}
-            height="0"
-            width="0"
-            style="display:none;visibility:hidden"
-          />
-        </noscript>
-      )
-    }
     <slot />
 
     <!-- Music Player - 仅在启用时加载 -->

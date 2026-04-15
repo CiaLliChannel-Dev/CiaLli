@@ -5,18 +5,11 @@ import type {
     Favicon,
     MusicPlayerConfig,
     NavBarConfig,
-    SakuraConfig,
     SiteConfig,
 } from "./config";
 
 export type ProfileRuntimeSettings = {
     avatar: string;
-    name: string;
-};
-
-export type AnalyticsRuntimeSettings = {
-    gtmId: string;
-    clarityId: string;
 };
 
 export type EditableSiteSettings = {
@@ -40,12 +33,22 @@ export type EditableSiteSettings = {
     profile: ProfileRuntimeSettings;
     announcement: AnnouncementConfig;
     musicPlayer: MusicPlayerConfig;
-    sakura: SakuraConfig;
-
-    analytics: AnalyticsRuntimeSettings;
 };
 
 export type SiteSettingsPayload = EditableSiteSettings;
+
+export type StoredSiteSettingsPayload = Omit<
+    SiteSettingsPayload,
+    "announcement"
+>;
+
+export type SiteAnnouncementPayload = {
+    key: string;
+    title: string;
+    summary: string;
+    body_markdown: string;
+    closable: boolean;
+};
 
 export type PublicSiteSettings = EditableSiteSettings;
 
@@ -66,7 +69,22 @@ export type ResolvedSiteSettings = {
 export type AppSiteSettings = {
     id: string;
     key: string;
-    settings: SiteSettingsPayload | null;
+    settings: StoredSiteSettingsPayload | null;
+    status: AppStatus;
+    sort: number | null;
+    user_created: string | null;
+    date_created: string | null;
+    user_updated: string | null;
+    date_updated: string | null;
+};
+
+export type AppSiteAnnouncement = {
+    id: string;
+    key: string;
+    title: string;
+    summary: string;
+    body_markdown: string;
+    closable: boolean;
     status: AppStatus;
     sort: number | null;
     user_created: string | null;

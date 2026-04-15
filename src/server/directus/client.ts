@@ -66,6 +66,7 @@ type DirectusRoleRecord = {
     id: string;
     name: string;
     description?: string | null;
+    users?: string[] | null;
 };
 
 type DirectusUserPolicyAssignment = {
@@ -594,7 +595,7 @@ export async function listDirectusRoles(): Promise<DirectusRoleRecord[]> {
             method: "GET",
             params: {
                 limit: 100,
-                fields: ["id", "name", "description"],
+                fields: ["id", "name", "description", "users"],
                 sort: ["name"],
             },
         }),

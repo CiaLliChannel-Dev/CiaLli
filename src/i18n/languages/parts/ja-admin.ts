@@ -80,8 +80,10 @@ export const jaAdmin: Record<string, string> = {
     [Key.adminUsersRegistrationNotFound]: "登録申請が見つかりません",
     [Key.adminUsersRegistrationReason]: "申請理由",
     [Key.adminUsersRegistrationStatus]: "申請状態",
+    [Key.adminUsersRegistrationStatusAll]: "すべて",
     [Key.adminUsersRegistrationStatusConflict]: "申請状態の競合",
     [Key.adminUsersRegistrationStatusFilter]: "状態フィルター",
+    [Key.adminUsersRegistrationStatusUnknown]: "不明",
     [Key.adminUsersRegistrationsTitle]: "登録申請",
     [Key.adminUsersReject]: "却下",
     [Key.adminUsersRejectReason]: "却下理由",
@@ -90,6 +92,9 @@ export const jaAdmin: Record<string, string> = {
     [Key.adminUsersReviewedAt]: "審査日時",
     [Key.adminUsersReviewedBy]: "審査者",
     [Key.adminUsersRole]: "ロール",
+    [Key.adminUsersRoleMember]: "メンバー",
+    [Key.adminUsersRolePlatformAdmin]: "プラットフォーム管理者",
+    [Key.adminUsersRoleSiteAdmin]: "サイト管理者",
     [Key.adminUsersSortAsc]: "昇順",
     [Key.adminUsersSortDesc]: "降順",
     [Key.adminUsersSavingRegisterSwitchTitle]: "登録スイッチを保存中",
@@ -103,11 +108,11 @@ export const jaAdmin: Record<string, string> = {
     [Key.adminSiteSettingsAddItem]: "項目を追加",
     [Key.adminSiteSettingsAddNavLink]: "ナビリンクを追加",
     [Key.adminSiteSettingsAddSubmenu]: "サブメニューを追加",
-    [Key.adminSiteSettingsAnalyticsHint]:
-        "分析スクリプトとアクセス情報を設定します。",
-    [Key.adminSiteSettingsAnalyticsTitle]: "分析設定",
     [Key.adminSiteSettingsBannerAlignment]: "バナー配置",
+    [Key.adminSiteSettingsBannerAlignmentBottom]: "下寄せ",
+    [Key.adminSiteSettingsBannerAlignmentCenter]: "中央",
     [Key.adminSiteSettingsBannerApiUrl]: "バナー API URL",
+    [Key.adminSiteSettingsBannerAlignmentTop]: "上寄せ",
     [Key.adminSiteSettingsBannerRemovedPendingSave]:
         "バナーを削除しました。保存後に反映されます",
     [Key.adminSiteSettingsCarouselIntervalSeconds]: "カルーセル間隔（秒）",
@@ -128,7 +133,6 @@ export const jaAdmin: Record<string, string> = {
     [Key.adminSiteSettingsEnableArticleToc]: "記事目次を有効化",
     [Key.adminSiteSettingsEnableBannerApi]: "バナー API を有効化",
     [Key.adminSiteSettingsEnableMusicPlayer]: "音楽プレーヤーを有効化",
-    [Key.adminSiteSettingsEnableSakura]: "桜エフェクトを有効化",
     [Key.adminSiteSettingsEnableTypewriter]: "タイプライター効果を有効化",
     [Key.adminSiteSettingsEnableWallpaperCarousel]: "壁紙カルーセルを有効化",
     [Key.adminSiteSettingsEnableWaveEffect]: "波エフェクトを有効化",
@@ -169,13 +173,11 @@ export const jaAdmin: Record<string, string> = {
     [Key.adminSiteSettingsPageIntro]:
         "ここでサイト表示情報と機能スイッチを設定できます。",
     [Key.adminSiteSettingsPauseTimeMs]: "停止時間（ms）",
+    [Key.adminSiteSettingsPauseTimeMsHint]:
+        "各タイピングサイクル完了後の待機時間です。",
     [Key.adminSiteSettingsPlaylistId]: "プレイリスト ID",
     [Key.adminSiteSettingsPresetLink]: "プリセットリンク {index}",
     [Key.adminSiteSettingsProfileAvatarLabel]: "プロフィールアバター",
-    [Key.adminSiteSettingsProfileNameLabel]: "プロフィール名",
-    [Key.adminSiteSettingsProfileNamePlaceholder]:
-        "プロフィール名を入力してください",
-    [Key.adminSiteSettingsSakuraEffect]: "桜エフェクト",
     [Key.adminSiteSettingsSaveArticle]: "記事設定を保存",
     [Key.adminSiteSettingsSaveHome]: "ホーム設定を保存",
     [Key.adminSiteSettingsSaveNav]: "ナビ設定を保存",
@@ -191,8 +193,18 @@ export const jaAdmin: Record<string, string> = {
     [Key.adminSiteSettingsSelectImageFile]: "画像ファイルを選択してください",
     [Key.adminSiteSettingsShowBannerCopy]: "バナー著作権を表示",
     [Key.adminSiteSettingsSiteKeywords]: "サイトキーワード",
+    [Key.adminSiteSettingsSiteKeywordsHint]:
+        "複数キーワードはカンマ区切りで入力し、SEO メタ情報に使用します。",
     [Key.adminSiteSettingsSiteLanguage]: "サイト言語",
+    [Key.adminSiteSettingsSiteLanguageHint]:
+        "既定のインターフェース言語を設定します。",
+    [Key.adminSiteSettingsSiteStartDateHint]:
+        "サイト稼働日数などの表示計算に使用します。",
     [Key.adminSiteSettingsSiteTimeZone]: "サイトタイムゾーン",
+    [Key.adminSiteSettingsSiteSubtitleHint]:
+        "ホームやナビなどに表示する補足コピーです。",
+    [Key.adminSiteSettingsSiteTitleHint]:
+        "ブラウザタイトルとサイト見出しに表示されます。",
     [Key.adminSiteSettingsTimeZoneFollowEnvironment]: "環境設定に従う",
     [Key.adminSiteSettingsTimeZoneHint]:
         "記事、日記、コメントなどのシステム時刻表示に使用します。",
@@ -206,9 +218,27 @@ export const jaAdmin: Record<string, string> = {
     [Key.adminSiteSettingsTocDepth]: "目次の深さ",
     [Key.adminSiteSettingsTocMode]: "目次モード",
     [Key.adminSiteSettingsTypeSpeedMs]: "入力速度（ms）",
+    [Key.adminSiteSettingsTypeSpeedMsHint]:
+        "値が小さいほどタイピング速度が速くなります。",
+    [Key.adminSiteSettingsDeleteSpeedMsHint]:
+        "値が小さいほど削除速度が速くなります。",
+    [Key.adminSiteSettingsHomeTitleHint]:
+        "ホームバナーに表示するメイン見出しです。",
+    [Key.adminSiteSettingsHomeSubtitleLinesHint]:
+        "1 行に 1 つ入力し、タイプライター表示で順番に使用します。",
+    [Key.adminSiteSettingsWallpaperModeHint]:
+        "ホームページで使用する既定の壁紙モードを指定します。",
+    [Key.adminSiteSettingsBannerAlignmentHint]:
+        "バナー画像のコンテナ内での配置を制御します。",
+    [Key.adminSiteSettingsCarouselIntervalSecondsHint]:
+        "デスクトップ壁紙カルーセルの間隔（秒）です。",
+    [Key.adminSiteSettingsBannerApiUrlHint]:
+        "バナー API 有効時、この URL から画像を取得します。",
     [Key.adminSiteSettingsUploadFailedCanceled]:
         "アップロードに失敗したか、キャンセルされました",
     [Key.adminSiteSettingsUrlOrFileId]: "URL またはファイル ID を入力",
     [Key.adminSiteSettingsUseJapaneseTocBadge]: "日本語目次バッジを使用",
     [Key.adminSiteSettingsWallpaperMode]: "壁紙モード",
+    [Key.adminSiteSettingsWallpaperModeBanner]: "バナー",
+    [Key.adminSiteSettingsWallpaperModeNone]: "なし",
 };

@@ -126,21 +126,6 @@ export function isSafeExternalUrl(url: string): boolean {
     return true;
 }
 
-const GTM_ID_PATTERN = /^GTM-[A-Z0-9]+$/i;
-const CLARITY_ID_PATTERN = /^[a-z0-9]{4,64}$/i;
-
-function normalizeAnalyticsId(
-    value: unknown,
-    fallback: string,
-    pattern: RegExp,
-): string {
-    const raw = String(value ?? "").trim();
-    if (!raw) {
-        return "";
-    }
-    return pattern.test(raw) ? raw : fallback;
-}
-
 function normalizeNavLink(link: unknown): NavLinkLike | null {
     if (!isRecord(link)) {
         return null;
@@ -461,16 +446,17 @@ export function normalizeNavBarLinks(merged: SiteSettingsPayload): void {
 const SITE_PROFILE_AVATAR_PATH = "assets/images/avatar.webp";
 
 /**
- * 规范化 profile 字段（avatar、name）。
+ * 规范化 profile 字段（avatar）。
  */
 export function normalizeProfile(
     merged: SiteSettingsPayload,
-    base: SiteSettingsPayload,
+    _base: SiteSettingsPayload,
 ): void {
     merged.profile.avatar = SITE_PROFILE_AVATAR_PATH;
-    merged.profile.name =
-        String(merged.profile.name || base.profile.name).trim() ||
-        base.profile.name;
+    const profileRecord = merged.profile as Record<string, unknown>;
+    if (Object.prototype.hasOwnProperty.call(profileRecord, "name")) {
+        delete profileRecord.name;
+    }
 }
 
 /**
@@ -502,31 +488,6 @@ export function normalizeMusicPlayer(merged: SiteSettingsPayload): void {
         1,
         120,
     );
-}
-
-/**
- * 规范化 analytics 字段（gtmId、clarityId）。
- */
-export function normalizeAnalytics(
-    merged: SiteSettingsPayload,
-    base: SiteSettingsPayload,
-): void {
-    const baseAnalytics = base.analytics ?? { gtmId: "", clarityId: "" };
-    const mergedAnalytics = (
-        isRecord(merged.analytics) ? merged.analytics : {}
-    ) as Record<string, unknown>;
-    merged.analytics = {
-        gtmId: normalizeAnalyticsId(
-            mergedAnalytics.gtmId,
-            String(baseAnalytics.gtmId ?? "").trim(),
-            GTM_ID_PATTERN,
-        ),
-        clarityId: normalizeAnalyticsId(
-            mergedAnalytics.clarityId,
-            String(baseAnalytics.clarityId ?? "").trim(),
-            CLARITY_ID_PATTERN,
-        ),
-    };
 }
 
 // ---- banner.src 辅助 ----

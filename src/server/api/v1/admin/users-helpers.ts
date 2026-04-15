@@ -15,6 +15,8 @@ const USER_DELETE_NULLIFY_REFERENCES: Array<{
     { collection: "directus_comments", field: "user_updated" },
     { collection: "app_site_settings", field: "user_created" },
     { collection: "app_site_settings", field: "user_updated" },
+    { collection: "app_site_announcements", field: "user_created" },
+    { collection: "app_site_announcements", field: "user_updated" },
     { collection: "app_diary_likes", field: "user_created" },
     { collection: "app_diary_likes", field: "user_updated" },
     { collection: "ai_prompts", field: "user_created" },

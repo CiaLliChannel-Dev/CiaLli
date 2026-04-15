@@ -6,17 +6,24 @@ import type {
     AppDiaryImage,
     AppProfile,
     AppProfileView,
+    AppUser,
 } from "@/types/app";
 import type { JsonObject } from "@/types/json";
 import {
     countItems,
     countItemsGroupedByField,
+    listDirectusRoles,
     readMany,
 } from "@/server/directus/client";
+import { DIRECTUS_ROLE_NAME } from "@/server/auth/directus-access";
 import { toAppProfileView } from "@/server/profile-view";
 import { withServiceRepositoryContext } from "@/server/repositories/directus/scope";
 
 import { DIARY_FIELDS } from "@/server/api/v1/shared/constants";
+
+export type AdministratorSidebarFallbackSource = {
+    profile: AppProfileView;
+};
 
 export async function loadProfileViewByUsernameFromRepository(
     username: string,
@@ -74,6 +81,70 @@ export async function loadProfileViewByFilterFromRepository(
             }).catch(() => []),
     );
     return toAppProfileView(profile, users[0]);
+}
+
+export async function loadAdministratorSidebarFallbackSourceFromRepository(): Promise<AdministratorSidebarFallbackSource | null> {
+    return await withServiceRepositoryContext(async () => {
+        const roles = await listDirectusRoles().catch(() => []);
+        const administratorRole = roles.find(
+            (role) =>
+                String(role.name || "").trim() ===
+                DIRECTUS_ROLE_NAME.administrator,
+        );
+        const administratorUserIds = Array.from(
+            new Set(
+                (administratorRole?.users ?? [])
+                    .map((userId) => String(userId || "").trim())
+                    .filter(Boolean),
+            ),
+        );
+        if (administratorUserIds.length === 0) {
+            return null;
+        }
+
+        const profiles = (await readMany("app_user_profiles", {
+            filter: {
+                _and: [
+                    { user_id: { _in: administratorUserIds } },
+                    { profile_public: { _eq: true } },
+                    { status: { _eq: "published" } },
+                ],
+            } as JsonObject,
+            limit: 1,
+            sort: ["date_created"],
+        })) as AppProfile[];
+        const profile = profiles[0];
+        if (!profile) {
+            return null;
+        }
+
+        const users = (await readMany("directus_users", {
+            filter: { id: { _eq: profile.user_id } } as JsonObject,
+            limit: 1,
+            fields: [
+                "id",
+                "email",
+                "first_name",
+                "last_name",
+                "avatar",
+                "description",
+            ],
+        }).catch(() => [])) as Array<
+            Pick<
+                AppUser,
+                | "id"
+                | "email"
+                | "first_name"
+                | "last_name"
+                | "avatar"
+                | "description"
+            >
+        >;
+
+        return {
+            profile: toAppProfileView(profile, users[0] ?? null),
+        };
+    });
 }
 
 export async function listHomeArticlesFromRepository(params: {

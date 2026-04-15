@@ -34,34 +34,91 @@ const formatAdminDateOrNone = (value: unknown): string => {
     );
 };
 
-const resolveRoleLabel = (
+type ResolvedRole = {
+    label: string;
+    badgeClass: string;
+};
+
+const DEFAULT_ROLE_BADGE_CLASS = "bg-black/5 text-75 dark:bg-white/10";
+const PLATFORM_ADMIN_ROLE_BADGE_CLASS =
+    "bg-rose-500/12 text-rose-600 dark:text-rose-300";
+const SITE_ADMIN_ROLE_BADGE_CLASS =
+    "bg-amber-500/12 text-amber-600 dark:text-amber-300";
+const MEMBER_ROLE_BADGE_CLASS = "bg-sky-500/12 text-sky-600 dark:text-sky-300";
+
+const resolveRegistrationStatusLabel = (status: string): string => {
+    switch (status) {
+        case "pending":
+            return t(I18nKey.authRegisterStatusPending);
+        case "approved":
+            return t(I18nKey.authRegisterStatusApproved);
+        case "rejected":
+            return t(I18nKey.authRegisterStatusRejected);
+        case "cancelled":
+            return t(I18nKey.authRegisterStatusCancelled);
+        default:
+            return t(I18nKey.adminUsersRegistrationStatusUnknown);
+    }
+};
+
+const resolveRole = (
+    entry: UnknownRecord,
     userRecord: UnknownRecord,
     appRole: string,
-): string => {
+): ResolvedRole => {
+    const isPlatformAdmin = Boolean(entry.is_platform_admin);
+    const isSiteAdmin = appRole === "admin" || Boolean(entry.is_site_admin);
     const rawRole = userRecord.role;
     if (typeof rawRole === "object" && rawRole) {
         const roleName = getStr((rawRole as UnknownRecord).name);
         if (roleName) {
-            return roleName;
+            if (roleName === "Administrator") {
+                return {
+                    label: roleName,
+                    badgeClass: PLATFORM_ADMIN_ROLE_BADGE_CLASS,
+                };
+            }
+            return {
+                label: roleName,
+                badgeClass:
+                    isSiteAdmin || isPlatformAdmin
+                        ? SITE_ADMIN_ROLE_BADGE_CLASS
+                        : DEFAULT_ROLE_BADGE_CLASS,
+            };
         }
     }
     if (typeof rawRole === "string" && getStr(rawRole)) {
-        return getStr(rawRole);
+        const roleName = getStr(rawRole);
+        if (roleName === "Administrator") {
+            return {
+                label: roleName,
+                badgeClass: PLATFORM_ADMIN_ROLE_BADGE_CLASS,
+            };
+        }
+        return {
+            label: roleName,
+            badgeClass:
+                isSiteAdmin || isPlatformAdmin
+                    ? SITE_ADMIN_ROLE_BADGE_CLASS
+                    : DEFAULT_ROLE_BADGE_CLASS,
+        };
     }
-    return appRole === "admin" ? "Site Admin" : "Member";
-};
-
-const resolveRoleBadgeClass = (roleLabel: string): string => {
-    if (roleLabel === "Administrator") {
-        return "bg-rose-500/12 text-rose-600 dark:text-rose-300";
+    if (isPlatformAdmin) {
+        return {
+            label: t(I18nKey.adminUsersRolePlatformAdmin),
+            badgeClass: PLATFORM_ADMIN_ROLE_BADGE_CLASS,
+        };
     }
-    if (roleLabel === "Site Admin") {
-        return "bg-amber-500/12 text-amber-600 dark:text-amber-300";
+    if (isSiteAdmin) {
+        return {
+            label: t(I18nKey.adminUsersRoleSiteAdmin),
+            badgeClass: SITE_ADMIN_ROLE_BADGE_CLASS,
+        };
     }
-    if (roleLabel === "Member") {
-        return "bg-sky-500/12 text-sky-600 dark:text-sky-300";
-    }
-    return "bg-black/5 text-75 dark:bg-white/10";
+    return {
+        label: t(I18nKey.adminUsersRoleMember),
+        badgeClass: MEMBER_ROLE_BADGE_CLASS,
+    };
 };
 
 export const renderUsersRows = (
@@ -92,13 +149,13 @@ export const renderUsersRows = (
                 (entry.permissions as UnknownRecord | undefined)?.app_role ||
                     "member",
             );
-            const roleLabel = resolveRoleLabel(userRecord, appRole);
+            const resolvedRole = resolveRole(entry, userRecord, appRole);
             // 关键渲染字段统一进行 HTML 转义，避免拼接 innerHTML 时出现注入。
             const safeUserId = escapeHtml(userId);
             const safeUserEmail = escapeHtml(userEmail);
             const safeUsername = escapeHtml(username);
-            const safeRoleLabel = escapeHtml(roleLabel);
-            const roleCell = `<span class="inline-flex items-center rounded-full px-2 py-1 text-xs ${resolveRoleBadgeClass(roleLabel)}">${safeRoleLabel}</span>`;
+            const safeRoleLabel = escapeHtml(resolvedRole.label);
+            const roleCell = `<span class="inline-flex items-center rounded-full px-2 py-1 text-xs ${resolvedRole.badgeClass}">${safeRoleLabel}</span>`;
             return `
 					<tr class="overlay-dialog-table-row border-b border-(--line-divider) text-75">
 						<td class="py-2 pr-2">${safeUserEmail}</td>
@@ -185,7 +242,7 @@ function buildDetailFields(item: UnknownRecord): DetailContentItem[] {
         },
         {
             label: t(I18nKey.adminUsersRegistrationStatus),
-            value: status || "unknown",
+            value: resolveRegistrationStatusLabel(status),
         },
         {
             label: t(I18nKey.adminUsersRejectReason),

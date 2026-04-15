@@ -22,6 +22,7 @@ import {
     listHomeAlbumsFromRepository,
     listHomeArticlesFromRepository,
     listHomeDiariesFromRepository,
+    loadAdministratorSidebarFallbackSourceFromRepository,
     loadProfileViewByFilterFromRepository,
 } from "@/server/repositories/public/public-data.repository";
 
@@ -120,14 +121,6 @@ export function profileToSidebarData(
     return {
         display_name: profile.display_name || profile.username || "user",
         bio: profile.bio,
-        bio_typewriter_enable: profile.bio_typewriter_enable ?? true,
-        bio_typewriter_speed: Math.max(
-            10,
-            Math.min(
-                500,
-                Math.floor(Number(profile.bio_typewriter_speed) || 80),
-            ),
-        ),
         avatar_url: avatarUrl,
         username: profile.username || null,
         social_links: profile.social_links ?? null,
@@ -239,8 +232,14 @@ export function buildOwnerData(opts: OwnerDataOptions): {
 // 官方 Sidebar 缓存
 // ---------------------------------------------------------------------------
 
+const SIDEBAR_OFFICIAL_CACHE_KEY = "official:v2";
+const SIDEBAR_OFFICIAL_LEGACY_CACHE_KEY = "official";
+
 export async function invalidateOfficialSidebarCacheAsync(): Promise<void> {
-    await cacheManager.invalidate("sidebar", "official");
+    await Promise.all([
+        cacheManager.invalidate("sidebar", SIDEBAR_OFFICIAL_CACHE_KEY),
+        cacheManager.invalidate("sidebar", SIDEBAR_OFFICIAL_LEGACY_CACHE_KEY),
+    ]);
 }
 
 export function invalidateOfficialSidebarCache(): void {
@@ -256,10 +255,20 @@ async function loadProfileViewByFilter(
 export async function loadOfficialSidebarProfile(): Promise<SidebarProfileData> {
     const cached = await cacheManager.get<SidebarProfileData>(
         "sidebar",
-        "official",
+        SIDEBAR_OFFICIAL_CACHE_KEY,
     );
     if (cached) {
         return cached;
+    }
+
+    // 兜底优先级：平台 Administrator 的公开 profile -> 公开官方档案 -> 字面量默认值。
+    // 当前服务 token 无法稳定读取 directus_users 明细，因此兜底只消费可公开展示的 profile。
+    const administratorSource =
+        await loadAdministratorSidebarFallbackSourceFromRepository();
+    if (administratorSource) {
+        const data = profileToSidebarData(administratorSource.profile);
+        void cacheManager.set("sidebar", SIDEBAR_OFFICIAL_CACHE_KEY, data);
+        return data;
     }
 
     const profile = await loadProfileViewByFilter({
@@ -272,8 +281,6 @@ export async function loadOfficialSidebarProfile(): Promise<SidebarProfileData> 
         return {
             display_name: "CiaLli",
             bio: null,
-            bio_typewriter_enable: true,
-            bio_typewriter_speed: 80,
             avatar_url: null,
             username: null,
             social_links: null,
@@ -282,7 +289,7 @@ export async function loadOfficialSidebarProfile(): Promise<SidebarProfileData> 
     }
 
     const data = profileToSidebarData(profile);
-    void cacheManager.set("sidebar", "official", data);
+    void cacheManager.set("sidebar", SIDEBAR_OFFICIAL_CACHE_KEY, data);
     return data;
 }
 

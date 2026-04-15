@@ -80,8 +80,10 @@ export const enAdmin: Record<string, string> = {
     [Key.adminUsersRegistrationNotFound]: "Registration request not found",
     [Key.adminUsersRegistrationReason]: "Reason",
     [Key.adminUsersRegistrationStatus]: "Status",
+    [Key.adminUsersRegistrationStatusAll]: "All",
     [Key.adminUsersRegistrationStatusConflict]: "Registration status conflict",
     [Key.adminUsersRegistrationStatusFilter]: "Status filter",
+    [Key.adminUsersRegistrationStatusUnknown]: "Unknown",
     [Key.adminUsersRegistrationsTitle]: "Registration requests",
     [Key.adminUsersReject]: "Reject",
     [Key.adminUsersRejectReason]: "Rejection reason",
@@ -91,6 +93,9 @@ export const enAdmin: Record<string, string> = {
     [Key.adminUsersReviewedAt]: "Reviewed at",
     [Key.adminUsersReviewedBy]: "Reviewed by",
     [Key.adminUsersRole]: "Role",
+    [Key.adminUsersRoleMember]: "Member",
+    [Key.adminUsersRolePlatformAdmin]: "Platform Admin",
+    [Key.adminUsersRoleSiteAdmin]: "Site Admin",
     [Key.adminUsersSortAsc]: "Ascending",
     [Key.adminUsersSortDesc]: "Descending",
     [Key.adminUsersSavingRegisterSwitchTitle]: "Saving registration switch",
@@ -104,11 +109,11 @@ export const enAdmin: Record<string, string> = {
     [Key.adminSiteSettingsAddItem]: "Add item",
     [Key.adminSiteSettingsAddNavLink]: "Add navigation link",
     [Key.adminSiteSettingsAddSubmenu]: "Add submenu",
-    [Key.adminSiteSettingsAnalyticsHint]:
-        "Configure analytics scripts and traffic information.",
-    [Key.adminSiteSettingsAnalyticsTitle]: "Analytics settings",
     [Key.adminSiteSettingsBannerAlignment]: "Banner alignment",
+    [Key.adminSiteSettingsBannerAlignmentBottom]: "Bottom",
+    [Key.adminSiteSettingsBannerAlignmentCenter]: "Center",
     [Key.adminSiteSettingsBannerApiUrl]: "Banner API URL",
+    [Key.adminSiteSettingsBannerAlignmentTop]: "Top",
     [Key.adminSiteSettingsBannerRemovedPendingSave]:
         "Banner removed. Changes take effect after saving",
     [Key.adminSiteSettingsCarouselIntervalSeconds]:
@@ -131,7 +136,6 @@ export const enAdmin: Record<string, string> = {
     [Key.adminSiteSettingsEnableArticleToc]: "Enable article table of contents",
     [Key.adminSiteSettingsEnableBannerApi]: "Enable banner API",
     [Key.adminSiteSettingsEnableMusicPlayer]: "Enable music player",
-    [Key.adminSiteSettingsEnableSakura]: "Enable sakura effect",
     [Key.adminSiteSettingsEnableTypewriter]: "Enable typewriter effect",
     [Key.adminSiteSettingsEnableWallpaperCarousel]: "Enable wallpaper carousel",
     [Key.adminSiteSettingsEnableWaveEffect]: "Enable wave effect",
@@ -172,12 +176,11 @@ export const enAdmin: Record<string, string> = {
     [Key.adminSiteSettingsPageIntro]:
         "Configure site display info and feature toggles here.",
     [Key.adminSiteSettingsPauseTimeMs]: "Pause duration (ms)",
+    [Key.adminSiteSettingsPauseTimeMsHint]:
+        "How long to pause after each typing cycle.",
     [Key.adminSiteSettingsPlaylistId]: "Playlist ID",
     [Key.adminSiteSettingsPresetLink]: "Preset link {index}",
     [Key.adminSiteSettingsProfileAvatarLabel]: "Profile avatar",
-    [Key.adminSiteSettingsProfileNameLabel]: "Profile name",
-    [Key.adminSiteSettingsProfileNamePlaceholder]: "Enter profile name",
-    [Key.adminSiteSettingsSakuraEffect]: "Sakura effect",
     [Key.adminSiteSettingsSaveArticle]: "Save article settings",
     [Key.adminSiteSettingsSaveHome]: "Save homepage settings",
     [Key.adminSiteSettingsSaveNav]: "Save navigation settings",
@@ -193,8 +196,18 @@ export const enAdmin: Record<string, string> = {
     [Key.adminSiteSettingsSelectImageFile]: "Select an image file",
     [Key.adminSiteSettingsShowBannerCopy]: "Show banner copyright",
     [Key.adminSiteSettingsSiteKeywords]: "Site keywords",
+    [Key.adminSiteSettingsSiteKeywordsHint]:
+        "Use commas to separate multiple keywords for SEO metadata.",
     [Key.adminSiteSettingsSiteLanguage]: "Site language",
+    [Key.adminSiteSettingsSiteLanguageHint]:
+        "Sets the default interface language.",
+    [Key.adminSiteSettingsSiteStartDateHint]:
+        "Used for runtime counters such as site running days.",
     [Key.adminSiteSettingsSiteTimeZone]: "Site time zone",
+    [Key.adminSiteSettingsSiteSubtitleHint]:
+        "Secondary copy shown in places like homepage or navigation.",
+    [Key.adminSiteSettingsSiteTitleHint]:
+        "Displayed in the browser title and main site heading.",
     [Key.adminSiteSettingsTimeZoneFollowEnvironment]: "Follow environment",
     [Key.adminSiteSettingsTimeZoneHint]:
         "Controls how system timestamps are shown across the site.",
@@ -208,9 +221,27 @@ export const enAdmin: Record<string, string> = {
     [Key.adminSiteSettingsTocDepth]: "TOC depth",
     [Key.adminSiteSettingsTocMode]: "TOC mode",
     [Key.adminSiteSettingsTypeSpeedMs]: "Typing speed (ms)",
+    [Key.adminSiteSettingsTypeSpeedMsHint]:
+        "Lower values make typing animation faster.",
+    [Key.adminSiteSettingsDeleteSpeedMsHint]:
+        "Lower values make deleting animation faster.",
+    [Key.adminSiteSettingsHomeTitleHint]:
+        "Main heading text shown on the homepage banner.",
+    [Key.adminSiteSettingsHomeSubtitleLinesHint]:
+        "One subtitle per line, used by the typewriter rotation.",
+    [Key.adminSiteSettingsWallpaperModeHint]:
+        "Controls the default wallpaper source mode for homepage.",
+    [Key.adminSiteSettingsBannerAlignmentHint]:
+        "Controls how the banner visual is aligned in its container.",
+    [Key.adminSiteSettingsCarouselIntervalSecondsHint]:
+        "Interval for desktop wallpaper carousel, in seconds.",
+    [Key.adminSiteSettingsBannerApiUrlHint]:
+        "When banner API is enabled, images are fetched from this URL.",
     [Key.adminSiteSettingsUploadFailedCanceled]:
         "Upload failed or was canceled",
     [Key.adminSiteSettingsUrlOrFileId]: "Enter URL or file ID",
     [Key.adminSiteSettingsUseJapaneseTocBadge]: "Use Japanese TOC badge",
     [Key.adminSiteSettingsWallpaperMode]: "Wallpaper mode",
+    [Key.adminSiteSettingsWallpaperModeBanner]: "Banner",
+    [Key.adminSiteSettingsWallpaperModeNone]: "None",
 };

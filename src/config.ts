@@ -147,7 +147,6 @@ export const defaultSiteSettings: SiteSettingsPayload = {
     },
     profile: {
         avatar: "assets/images/avatar.webp",
-        name: "CiaLli†Channel",
     },
     announcement: {
         title: "",
@@ -164,14 +163,6 @@ export const defaultSiteSettings: SiteSettingsPayload = {
         server: "netease",
         type: "playlist",
         marqueeSpeed: 10,
-    },
-    sakura: {
-        enable: false,
-    },
-
-    analytics: {
-        gtmId: "GTM-KRX3XGVH",
-        clarityId: "tjr3vkhj8i",
     },
 };
 
