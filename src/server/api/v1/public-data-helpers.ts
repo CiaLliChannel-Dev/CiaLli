@@ -22,6 +22,7 @@ import {
     listHomeAlbumsFromRepository,
     listHomeArticlesFromRepository,
     listHomeDiariesFromRepository,
+    loadAdministratorSidebarFallbackSourceFromRepository,
     loadProfileViewByFilterFromRepository,
 } from "@/server/repositories/public/public-data.repository";
 
@@ -231,8 +232,14 @@ export function buildOwnerData(opts: OwnerDataOptions): {
 // 官方 Sidebar 缓存
 // ---------------------------------------------------------------------------
 
+const SIDEBAR_OFFICIAL_CACHE_KEY = "official:v2";
+const SIDEBAR_OFFICIAL_LEGACY_CACHE_KEY = "official";
+
 export async function invalidateOfficialSidebarCacheAsync(): Promise<void> {
-    await cacheManager.invalidate("sidebar", "official");
+    await Promise.all([
+        cacheManager.invalidate("sidebar", SIDEBAR_OFFICIAL_CACHE_KEY),
+        cacheManager.invalidate("sidebar", SIDEBAR_OFFICIAL_LEGACY_CACHE_KEY),
+    ]);
 }
 
 export function invalidateOfficialSidebarCache(): void {
@@ -248,10 +255,20 @@ async function loadProfileViewByFilter(
 export async function loadOfficialSidebarProfile(): Promise<SidebarProfileData> {
     const cached = await cacheManager.get<SidebarProfileData>(
         "sidebar",
-        "official",
+        SIDEBAR_OFFICIAL_CACHE_KEY,
     );
     if (cached) {
         return cached;
+    }
+
+    // 兜底优先级：平台 Administrator 的公开 profile -> 公开官方档案 -> 字面量默认值。
+    // 当前服务 token 无法稳定读取 directus_users 明细，因此兜底只消费可公开展示的 profile。
+    const administratorSource =
+        await loadAdministratorSidebarFallbackSourceFromRepository();
+    if (administratorSource) {
+        const data = profileToSidebarData(administratorSource.profile);
+        void cacheManager.set("sidebar", SIDEBAR_OFFICIAL_CACHE_KEY, data);
+        return data;
     }
 
     const profile = await loadProfileViewByFilter({
@@ -272,7 +289,7 @@ export async function loadOfficialSidebarProfile(): Promise<SidebarProfileData> 
     }
 
     const data = profileToSidebarData(profile);
-    void cacheManager.set("sidebar", "official", data);
+    void cacheManager.set("sidebar", SIDEBAR_OFFICIAL_CACHE_KEY, data);
     return data;
 }
 
