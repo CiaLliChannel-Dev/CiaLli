@@ -40,11 +40,21 @@ import { i18n } from "@i18n/translation";
         id="admin-registration-status"
         class="rounded-lg border border-(--line-divider) px-3 py-2 text-sm bg-black/5 dark:bg-white/5 text-75"
       >
-        <option value="pending">pending</option>
-        <option value="approved">approved</option>
-        <option value="rejected">rejected</option>
-        <option value="cancelled">cancelled</option>
-        <option value="all">all</option>
+        <option value="pending">
+          {i18n(I18nKey.authRegisterStatusPending)}
+        </option>
+        <option value="approved">
+          {i18n(I18nKey.authRegisterStatusApproved)}
+        </option>
+        <option value="rejected">
+          {i18n(I18nKey.authRegisterStatusRejected)}
+        </option>
+        <option value="cancelled">
+          {i18n(I18nKey.authRegisterStatusCancelled)}
+        </option>
+        <option value="all">
+          {i18n(I18nKey.adminUsersRegistrationStatusAll)}
+        </option>
       </select>
       <button
         id="admin-registration-refresh"

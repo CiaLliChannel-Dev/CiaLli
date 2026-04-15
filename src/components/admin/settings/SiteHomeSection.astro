@@ -23,8 +23,12 @@ import SettingsField from "@/components/admin/settings/SettingsField.astro";
         id="ss-wallpaper-mode"
         class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75"
       >
-        <option value="banner">banner</option>
-        <option value="none">none</option>
+        <option value="banner">
+          {i18n(I18nKey.adminSiteSettingsWallpaperModeBanner)}
+        </option>
+        <option value="none">
+          {i18n(I18nKey.adminSiteSettingsWallpaperModeNone)}
+        </option>
       </select>
     </SettingsField>
     <SettingsField
@@ -35,9 +39,15 @@ import SettingsField from "@/components/admin/settings/SettingsField.astro";
         id="ss-banner-position"
         class="w-full rounded-lg border border-(--line-divider) px-3.5 py-2.5 bg-transparent text-75"
       >
-        <option value="top">top</option>
-        <option value="center">center</option>
-        <option value="bottom">bottom</option>
+        <option value="top">
+          {i18n(I18nKey.adminSiteSettingsBannerAlignmentTop)}
+        </option>
+        <option value="center">
+          {i18n(I18nKey.adminSiteSettingsBannerAlignmentCenter)}
+        </option>
+        <option value="bottom">
+          {i18n(I18nKey.adminSiteSettingsBannerAlignmentBottom)}
+        </option>
       </select>
     </SettingsField>
     <label

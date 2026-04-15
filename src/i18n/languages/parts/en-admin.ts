@@ -80,8 +80,10 @@ export const enAdmin: Record<string, string> = {
     [Key.adminUsersRegistrationNotFound]: "Registration request not found",
     [Key.adminUsersRegistrationReason]: "Reason",
     [Key.adminUsersRegistrationStatus]: "Status",
+    [Key.adminUsersRegistrationStatusAll]: "All",
     [Key.adminUsersRegistrationStatusConflict]: "Registration status conflict",
     [Key.adminUsersRegistrationStatusFilter]: "Status filter",
+    [Key.adminUsersRegistrationStatusUnknown]: "Unknown",
     [Key.adminUsersRegistrationsTitle]: "Registration requests",
     [Key.adminUsersReject]: "Reject",
     [Key.adminUsersRejectReason]: "Rejection reason",
@@ -91,6 +93,9 @@ export const enAdmin: Record<string, string> = {
     [Key.adminUsersReviewedAt]: "Reviewed at",
     [Key.adminUsersReviewedBy]: "Reviewed by",
     [Key.adminUsersRole]: "Role",
+    [Key.adminUsersRoleMember]: "Member",
+    [Key.adminUsersRolePlatformAdmin]: "Platform Admin",
+    [Key.adminUsersRoleSiteAdmin]: "Site Admin",
     [Key.adminUsersSortAsc]: "Ascending",
     [Key.adminUsersSortDesc]: "Descending",
     [Key.adminUsersSavingRegisterSwitchTitle]: "Saving registration switch",
@@ -105,7 +110,10 @@ export const enAdmin: Record<string, string> = {
     [Key.adminSiteSettingsAddNavLink]: "Add navigation link",
     [Key.adminSiteSettingsAddSubmenu]: "Add submenu",
     [Key.adminSiteSettingsBannerAlignment]: "Banner alignment",
+    [Key.adminSiteSettingsBannerAlignmentBottom]: "Bottom",
+    [Key.adminSiteSettingsBannerAlignmentCenter]: "Center",
     [Key.adminSiteSettingsBannerApiUrl]: "Banner API URL",
+    [Key.adminSiteSettingsBannerAlignmentTop]: "Top",
     [Key.adminSiteSettingsBannerRemovedPendingSave]:
         "Banner removed. Changes take effect after saving",
     [Key.adminSiteSettingsCarouselIntervalSeconds]:
@@ -234,4 +242,6 @@ export const enAdmin: Record<string, string> = {
     [Key.adminSiteSettingsUrlOrFileId]: "Enter URL or file ID",
     [Key.adminSiteSettingsUseJapaneseTocBadge]: "Use Japanese TOC badge",
     [Key.adminSiteSettingsWallpaperMode]: "Wallpaper mode",
+    [Key.adminSiteSettingsWallpaperModeBanner]: "Banner",
+    [Key.adminSiteSettingsWallpaperModeNone]: "None",
 };
