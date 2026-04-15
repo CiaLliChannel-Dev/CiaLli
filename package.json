@@ -8,6 +8,7 @@
     "check": "node scripts/check-i18n-hardcoded.mjs && node scripts/check-i18n-structure.mjs && astro check",
     "check:i18n": "node scripts/check-i18n-hardcoded.mjs",
     "build": "astro build",
+    "preview": "node scripts/preview-built-output.mjs",
     "astro": "astro",
     "type-check": "tsc --noEmit --isolatedDeclarations --skipLibCheck",
     "type-check:projects": "tsc -p tsconfig.json --noEmit --skipLibCheck && tsc -p tsconfig.test.json --noEmit --skipLibCheck && tsc -p tsconfig.node.json --noEmit --skipLibCheck",
