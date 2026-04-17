@@ -1,16 +1,24 @@
 import type { ArticleInteractionSnapshot } from "@/server/repositories/article/interaction.repository";
 import type { AuthorBundleItem } from "@/server/api/v1/shared/author-cache";
+import type { DetailPageMode } from "@/server/application/public/detail-page-access.service";
+import {
+    DETAIL_PAGE_PRIVATE_CACHE_CONTROL,
+    DETAIL_PAGE_PUBLIC_CACHE_CONTROL,
+    resolveDetailPageAccess,
+    resolveDetailPageCacheControl,
+} from "@/server/application/public/detail-page-access.service";
 import type { AppArticle, AppProfileView } from "@/types/app";
 
 export const ARTICLE_DETAIL_PUBLIC_CACHE_CONTROL =
-    "public, s-maxage=60, stale-while-revalidate=300";
-export const ARTICLE_DETAIL_PRIVATE_CACHE_CONTROL = "private, no-store";
+    DETAIL_PAGE_PUBLIC_CACHE_CONTROL;
+export const ARTICLE_DETAIL_PRIVATE_CACHE_CONTROL =
+    DETAIL_PAGE_PRIVATE_CACHE_CONTROL;
 
 type SessionUser = {
     id: string;
 };
 
-export type ArticleDetailMode = "public" | "owner";
+export type ArticleDetailMode = DetailPageMode;
 
 export type ArticleDetailRouteResolution =
     | {
@@ -37,47 +45,23 @@ type ResolveArticleDetailRouteInput = {
 export async function resolveArticleDetailRoute(
     input: ResolveArticleDetailRouteInput,
 ): Promise<ArticleDetailRouteResolution> {
-    const publicArticle = await input.loadPublicArticleByRoute(input.routeId);
-    if (publicArticle) {
-        return {
-            mode: "public",
-            article: publicArticle,
-            sessionUserId: null,
-        };
-    }
+    const result = await resolveDetailPageAccess({
+        routeId: input.routeId,
+        loadPublicDetail: input.loadPublicArticleByRoute,
+        loadSessionUser: input.loadSessionUser,
+        getSessionAccessToken: input.getSessionAccessToken,
+        loadOwnerDetail: async (routeId, accessToken) =>
+            await input.loadOwnerArticleByRoute(routeId, accessToken),
+    });
 
-    // 公开内容未命中后才懒加载会话，避免公开详情页因为 cookie 被整体打成私有缓存。
-    const sessionUser = await input.loadSessionUser();
-    if (!sessionUser) {
-        return {
-            mode: "not_found",
-            sessionUserId: null,
-        };
-    }
-
-    const accessToken = input.getSessionAccessToken();
-    if (!accessToken) {
-        return {
-            mode: "not_found",
-            sessionUserId: sessionUser.id,
-        };
-    }
-
-    const ownerArticle = await input.loadOwnerArticleByRoute(
-        input.routeId,
-        accessToken,
-    );
-    if (!ownerArticle || ownerArticle.author_id !== sessionUser.id) {
-        return {
-            mode: "not_found",
-            sessionUserId: sessionUser.id,
-        };
+    if (result.mode === "not_found") {
+        return result;
     }
 
     return {
-        mode: "owner",
-        article: ownerArticle,
-        sessionUserId: sessionUser.id,
+        mode: result.mode,
+        article: result.detail,
+        sessionUserId: result.sessionUserId,
     };
 }
 
@@ -85,13 +69,7 @@ export function resolveArticleDetailCacheControl(input: {
     responseStatus: number;
     mode: ArticleDetailMode | "not_found" | "error";
 }): string | null {
-    if (input.responseStatus >= 500) {
-        return null;
-    }
-    if (input.mode === "owner") {
-        return ARTICLE_DETAIL_PRIVATE_CACHE_CONTROL;
-    }
-    return ARTICLE_DETAIL_PUBLIC_CACHE_CONTROL;
+    return resolveDetailPageCacheControl(input);
 }
 
 type LoadArticleDetailViewDataInput = {

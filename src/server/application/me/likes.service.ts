@@ -20,6 +20,8 @@ import {
     DIARY_FIELDS,
     invalidateArticleInteractionAggregate,
     invalidateArticleInteractionViewerState,
+    invalidateDiaryInteractionAggregate,
+    invalidateDiaryInteractionViewerState,
     parseRouteId,
 } from "@/server/api/v1/shared";
 
@@ -113,6 +115,48 @@ async function handleArticleLikeState(
     const liked = await hasViewerLikedArticle(articleId, access.user.id);
     return ok({
         article_id: articleId,
+        liked,
+    });
+}
+
+async function hasViewerLikedDiary(
+    diaryId: string,
+    viewerId: string,
+): Promise<boolean> {
+    const rows = await readMany("app_diary_likes", {
+        filter: {
+            _and: [
+                { diary_id: { _eq: diaryId } },
+                { user_id: { _eq: viewerId } },
+                { status: { _eq: "published" } },
+            ],
+        } as JsonObject,
+        limit: 1,
+        fields: ["id"],
+    });
+    return rows.length > 0;
+}
+
+async function handleDiaryLikeState(
+    context: APIContext,
+    access: AppAccess,
+    segments: string[],
+): Promise<Response> {
+    if (segments.length !== 3 || segments[1] !== "state") {
+        return fail("未找到接口", 404);
+    }
+    if (context.request.method !== "GET") {
+        return fail("方法不允许", 405);
+    }
+
+    const diaryId = parseRouteId(segments[2]);
+    if (!diaryId) {
+        return fail("缺少日记 ID", 400);
+    }
+
+    const liked = await hasViewerLikedDiary(diaryId, access.user.id);
+    return ok({
+        diary_id: diaryId,
         liked,
     });
 }
@@ -241,6 +285,10 @@ export async function handleMyDiaryLikes(
     access: AppAccess,
     segments: string[],
 ): Promise<Response> {
+    if (segments[1] === "state") {
+        return await handleDiaryLikeState(context, access, segments);
+    }
+
     if (segments.length !== 1) {
         return fail("未找到接口", 404);
     }
@@ -332,7 +380,11 @@ export async function handleMyDiaryLikes(
 
         const likeCount = await getDiaryLikeCount(diaryId);
         await awaitCacheInvalidations(
-            [cacheManager.invalidateByDomain("home-feed")],
+            [
+                invalidateDiaryInteractionAggregate(diaryId),
+                invalidateDiaryInteractionViewerState(diaryId, access.user.id),
+                cacheManager.invalidateByDomain("home-feed"),
+            ],
             { label: "me/diary-likes#toggle" },
         );
         return ok({

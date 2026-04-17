@@ -448,7 +448,7 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     mountToFloatingAnchor,
     handleDeleteAction,
     handleLikeAction,
-    loadArticleViewerLikeState,
+    loadViewerLikeState,
   } from "@/scripts/interactions/detail-action-float-helpers";
   import type { LikeActionState } from "@/scripts/interactions/detail-action-float-helpers";
 
@@ -618,7 +618,7 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
     }
 
     async function syncViewerLikeState(state: AuthState): Promise<void> {
-      if (contentType !== "article" || !contentId) {
+      if (!contentId) {
         return;
       }
 
@@ -640,7 +640,7 @@ const deleteLabel = i18n(I18nKey.interactionCommonDelete);
       }
 
       lastViewerLikeSyncUserId = normalizedUserId;
-      const viewerLiked = await loadArticleViewerLikeState({
+      const viewerLiked = await loadViewerLikeState({
         contentType,
         contentId,
         authState: state,

@@ -8,7 +8,11 @@ import { validateBody } from "@/server/api/validate";
 import { CreateCommentSchema, UpdateCommentSchema } from "@/server/api/schemas";
 import { fail, ok } from "@/server/api/response";
 import { readOneById, updateOne } from "@/server/directus/client";
-import { DIARY_FIELDS, requireAccess } from "@/server/api/v1/shared";
+import {
+    DIARY_FIELDS,
+    invalidateDiaryInteractionAggregate,
+    requireAccess,
+} from "@/server/api/v1/shared";
 import {
     buildCommentUpdatePayload,
     buildDecoratedCommentTree,
@@ -154,6 +158,7 @@ async function createDiaryCommentForEntry(
                 String(diary.id),
                 diary.short_id,
             ),
+            invalidateDiaryInteractionAggregate(String(diary.id)),
             cacheManager.invalidateByDomain("home-feed"),
         ],
         { label: "comments-diary#create" },
@@ -209,6 +214,7 @@ async function patchDiaryComment(
     await awaitCacheInvalidations(
         [
             invalidateDiaryDetailCacheByDiaryId(comment.diary_id),
+            invalidateDiaryInteractionAggregate(comment.diary_id),
             cacheManager.invalidateByDomain("home-feed"),
         ],
         { label: "comments-diary#patch" },
@@ -237,6 +243,7 @@ async function deleteDiaryComment(
     await awaitCacheInvalidations(
         [
             invalidateDiaryDetailCacheByDiaryId(comment.diary_id),
+            invalidateDiaryInteractionAggregate(comment.diary_id),
             cacheManager.invalidateByDomain("home-feed"),
         ],
         { label: "comments-diary#delete" },

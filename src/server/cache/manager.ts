@@ -64,6 +64,11 @@ const STRATEGIES: Record<CacheDomain, CacheStrategy> = {
         l2TtlMs: 30_000,
         l1MaxEntries: 600,
     },
+    "diary-interaction": {
+        l1TtlMs: 30_000,
+        l2TtlMs: 30_000,
+        l1MaxEntries: 600,
+    },
     "diary-list": {
         l1TtlMs: 30_000,
         l2TtlMs: 2 * 60_000,

@@ -12,24 +12,27 @@ import {
   buildPublicAssetUrl,
 } from "@/server/directus-auth";
 import {
-  countItems,
-  readMany,
   runWithDirectusPublicAccess,
   runWithDirectusUserAccess,
 } from "@/server/directus/client";
 import { renderMarkdown } from "@/server/markdown/render";
 import { getResolvedSiteSettings } from "@/server/site-settings/service";
 import {
-  loadProfileForViewer,
+  loadProfileForViewerByUserId,
   loadUserDiaryDetail,
+  readAuthor,
+  loadPublicProfileByUserId,
   profileToSidebarData,
 } from "@/server/api/v1/public-data";
-import type {
-  ContentLoadResult,
-  DiaryDetail,
-} from "@/server/api/v1/public-data";
+import type { DiaryDetail } from "@/server/api/v1/public-data";
+import { getAuthorBundle } from "@/server/api/v1/shared/author-cache";
+import { loadDiaryInteractionSnapshot } from "@/server/api/v1/shared";
+import {
+  loadDiaryDetailViewData,
+  resolveDiaryDetailCacheControl,
+  resolveDiaryDetailRoute,
+} from "@/server/application/public/diary-detail-page.service";
 import { getSessionAccessToken, getSessionUser } from "@/server/auth/session";
-import type { JsonObject } from "@/types/json";
 import {
   buildSiteDateFormatContext,
   formatSiteDateTime,
@@ -41,13 +44,14 @@ export const prerender = false;
 const username = (Astro.params.username || "").trim();
 const id = (Astro.params.id || "").trim();
 
-let result: ContentLoadResult<DiaryDetail> = { status: "not_found" };
 let html = "";
 let diaryLikeCount = 0;
 let diaryCommentCount = 0;
 let diaryLikedByViewer = false;
 let viewerOwnsDiary = false;
+let diarySupportsPublicInteraction = false;
 let diaryData = null as DiaryDetail | null;
+let diaryDetailMode: "public" | "owner" | "not_found" | "error" = "not_found";
 const resolvedSiteSettings =
   Astro.locals.siteSettings ?? (await getResolvedSiteSettings());
 const siteDateContext = buildSiteDateFormatContext(resolvedSiteSettings);
@@ -108,79 +112,88 @@ if (!username || !id) {
   Astro.response.status = 404;
 } else {
   try {
-    const sessionUser = await getSessionUser(Astro);
-    const viewerId = sessionUser?.id ?? null;
-    const loadWithViewerAccess = async (): Promise<void> => {
-      result = await loadUserDiaryDetail(username, id, { viewerId });
-      if (result.status !== "ok") {
-        return;
+    const resolvedDiary = await resolveDiaryDetailRoute({
+      routeId: id,
+      loadPublicDiaryByRoute: async (routeId) => {
+        const publicResult = await runWithDirectusPublicAccess(
+          async () => await loadUserDiaryDetail(username, routeId),
+        );
+        return publicResult.status === "ok" ? publicResult.data : null;
+      },
+      loadSessionUser: async () => await getSessionUser(Astro),
+      getSessionAccessToken: () => getSessionAccessToken(Astro),
+      loadOwnerDiaryByRoute: async (routeId, accessToken, sessionUserId) => {
+        const ownerResult = await runWithDirectusUserAccess(
+          accessToken,
+          async () =>
+            await loadUserDiaryDetail(username, routeId, {
+              viewerId: sessionUserId,
+            }),
+        );
+        return ownerResult.status === "ok" ? ownerResult.data : null;
+      },
+    });
+
+    diaryDetailMode = resolvedDiary.mode;
+
+    if (resolvedDiary.mode === "public" || resolvedDiary.mode === "owner") {
+      const rawDiary = resolvedDiary.detail;
+      const loadViewData = async () =>
+        await loadDiaryDetailViewData({
+          diary: rawDiary,
+          mode: resolvedDiary.mode,
+          sessionUserId: resolvedDiary.sessionUserId,
+          loadAuthorBundle: async (authorId) =>
+            await getAuthorBundle([authorId]),
+          loadDiaryInteractionSnapshot,
+          loadPublicProfileByUserId,
+          loadProfileForViewerByUserId,
+          renderDiaryMarkdown: async (content) =>
+            await renderMarkdown(stripMarkdownImages(content), {
+              target: "page",
+            }),
+        });
+
+      const viewData =
+        resolvedDiary.mode === "owner"
+          ? await runWithDirectusUserAccess(
+              getSessionAccessToken(Astro),
+              loadViewData,
+            )
+          : await runWithDirectusPublicAccess(loadViewData);
+
+      diaryData = {
+        ...rawDiary,
+        author: readAuthor(viewData.authorMap, rawDiary.author_id),
+      };
+      html = viewData.diaryHtml;
+      diaryLikeCount = viewData.interaction.likeCount;
+      diaryCommentCount = viewData.interaction.commentCount;
+      diaryLikedByViewer = viewData.interaction.viewerLiked;
+      viewerOwnsDiary = resolvedDiary.mode === "owner";
+      diarySupportsPublicInteraction = viewData.isPubliclyVisible;
+
+      if (viewData.authorProfile) {
+        Astro.locals.sidebarProfile = profileToSidebarData(
+          viewData.authorProfile,
+        );
       }
-      diaryData = result.data as DiaryDetail;
-
-      html = await renderMarkdown(stripMarkdownImages(diaryData.content), {
-        target: "page",
-      });
-
-      const [likeCount, commentCount, likedRows] = await Promise.all([
-        countItems("app_diary_likes", {
-          _and: [
-            { diary_id: { _eq: diaryData.id } },
-            { status: { _eq: "published" } },
-          ],
-        } as JsonObject),
-        countItems("app_diary_comments", {
-          _and: [
-            { diary_id: { _eq: diaryData.id } },
-            { status: { _eq: "published" } },
-            { is_public: { _eq: true } },
-          ],
-        } as JsonObject),
-        viewerId
-          ? readMany("app_diary_likes", {
-              filter: {
-                _and: [
-                  { diary_id: { _eq: diaryData.id } },
-                  { user_id: { _eq: viewerId } },
-                  { status: { _eq: "published" } },
-                ],
-              } as JsonObject,
-              limit: 1,
-              fields: ["id"],
-            })
-          : Promise.resolve([]),
-      ]);
-      diaryLikeCount = likeCount;
-      diaryCommentCount = commentCount;
-      diaryLikedByViewer = likedRows.length > 0;
-
-      const sidebarProfile = await loadProfileForViewer(username, viewerId);
-      if (sidebarProfile) {
-        Astro.locals.sidebarProfile = profileToSidebarData(sidebarProfile);
-      }
-      viewerOwnsDiary = Boolean(viewerId) && diaryData.author_id === viewerId;
-    };
-
-    if (viewerId) {
-      await runWithDirectusUserAccess(
-        getSessionAccessToken(Astro),
-        loadWithViewerAccess,
-      );
     } else {
-      await runWithDirectusPublicAccess(loadWithViewerAccess);
-    }
-    if (
-      (result as ContentLoadResult<DiaryDetail>).status === "permission_denied"
-    ) {
       Astro.response.status = 404;
-    } else {
-      if ((result as ContentLoadResult<DiaryDetail>).status === "not_found") {
-        Astro.response.status = 404;
-      }
     }
   } catch (error) {
     console.error("[diary] failed to load detail:", error);
+    diaryDetailMode = "error";
     Astro.response.status = 500;
   }
+}
+
+const diaryCacheControl = resolveDiaryDetailCacheControl({
+  responseStatus: Astro.response.status ?? 200,
+  mode: diaryDetailMode,
+});
+if (diaryCacheControl) {
+  Astro.response.headers.set("Cache-Control", diaryCacheControl);
 }
 
 const diary = diaryData;
@@ -348,7 +361,10 @@ const diaryMetaText = formatSiteDateTime(diary?.date_created, siteDateContext);
               commentCount={diaryCommentCount}
               likedByViewer={diaryLikedByViewer}
               dockToBackTop={true}
-              showCommentAction={diary!.allow_comments}
+              showLikeAction={diarySupportsPublicInteraction}
+              showCommentAction={
+                diarySupportsPublicInteraction && diary!.allow_comments
+              }
               editHref={`/${username}/diary/${encodeURIComponent(diary!.short_id || diary!.id)}/edit`}
               deleteEndpoint={`/api/v1/me/diaries/${encodeURIComponent(diary!.id)}`}
               adminDeleteEndpoint={`/api/v1/admin/content/diaries/${encodeURIComponent(diary!.id)}`}
@@ -368,7 +384,9 @@ const diaryMetaText = formatSiteDateTime(diary?.date_created, siteDateContext);
               contentId={diary!.id}
               contentShortId={diary!.short_id || ""}
               contentAuthorId={diary!.author?.id || ""}
-              allowComments={diary!.allow_comments}
+              allowComments={
+                diarySupportsPublicInteraction && diary!.allow_comments
+              }
             />
           </div>
           <div class="home-sidebar-placeholder" data-detail-float-slot />

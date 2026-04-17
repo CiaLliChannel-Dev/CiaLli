@@ -30,6 +30,7 @@ import {
     type AdminModuleKey,
     hasOwn,
     invalidateArticleInteractionAggregate,
+    invalidateDiaryInteractionAggregate,
     parseBodyTextField,
     parseRouteId,
     requireAdmin,
@@ -181,7 +182,10 @@ async function invalidatePatchCache(
     } else if (module === "diary-comments") {
         const diaryId = toOptionalString(relatedComment?.diary_id);
         if (diaryId) {
-            tasks.push(...buildDiaryDetailInvalidationTasks(diaryId));
+            tasks.push(
+                invalidateDiaryInteractionAggregate(diaryId),
+                ...buildDiaryDetailInvalidationTasks(diaryId),
+            );
         }
         tasks.push(cacheManager.invalidateByDomain("home-feed"));
     }
@@ -386,7 +390,10 @@ async function invalidateDeleteCache(
     } else if (module === "diary-comments") {
         const diaryId = toOptionalString(relatedComment?.diary_id);
         if (diaryId) {
-            tasks.push(...buildDiaryDetailInvalidationTasks(diaryId));
+            tasks.push(
+                invalidateDiaryInteractionAggregate(diaryId),
+                ...buildDiaryDetailInvalidationTasks(diaryId),
+            );
         }
         tasks.push(cacheManager.invalidateByDomain("home-feed"));
     }

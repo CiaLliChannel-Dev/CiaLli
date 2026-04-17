@@ -10,6 +10,7 @@ export type CacheDomain =
     | "article-detail"
     | "article-public"
     | "article-interaction"
+    | "diary-interaction"
     | "diary-list"
     | "diary-detail"
     | "home-feed"

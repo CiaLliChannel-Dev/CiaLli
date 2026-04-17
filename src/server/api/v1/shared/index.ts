@@ -71,3 +71,9 @@ export {
     invalidateArticleInteractionAggregate,
     invalidateArticleInteractionViewerState,
 } from "./article-interaction";
+
+export {
+    loadDiaryInteractionSnapshot,
+    invalidateDiaryInteractionAggregate,
+    invalidateDiaryInteractionViewerState,
+} from "./diary-interaction";

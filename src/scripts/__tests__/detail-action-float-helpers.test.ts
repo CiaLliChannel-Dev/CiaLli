@@ -14,7 +14,7 @@ vi.mock("@/utils/csrf", () => ({
 }));
 
 import {
-    loadArticleViewerLikeState,
+    loadViewerLikeState,
     resetArticleViewerLikeStateRequestsForTest,
 } from "@/scripts/interactions/detail-action-float-helpers";
 import type { AuthState } from "@/scripts/auth/state";
@@ -44,7 +44,7 @@ describe("detail-action-float viewer like sync", () => {
             ),
         );
 
-        const result = await loadArticleViewerLikeState({
+        const result = await loadViewerLikeState({
             contentType: "article",
             contentId: "article-1",
             authState: createLoggedInState(),
@@ -65,13 +65,13 @@ describe("detail-action-float viewer like sync", () => {
         );
 
         const state = createLoggedInState();
-        const firstRequest = loadArticleViewerLikeState({
+        const firstRequest = loadViewerLikeState({
             contentType: "article",
             contentId: "article-1",
             authState: state,
             fetchImpl,
         });
-        const secondRequest = loadArticleViewerLikeState({
+        const secondRequest = loadViewerLikeState({
             contentType: "article",
             contentId: "article-1",
             authState: state,
@@ -96,7 +96,7 @@ describe("detail-action-float viewer like sync", () => {
     it("未登录时不会发起 viewer like 请求", async () => {
         const fetchImpl = vi.fn();
 
-        const result = await loadArticleViewerLikeState({
+        const result = await loadViewerLikeState({
             contentType: "article",
             contentId: "article-1",
             authState: {
@@ -110,5 +110,33 @@ describe("detail-action-float viewer like sync", () => {
 
         expect(result).toBeNull();
         expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
+    it("日记详情会命中 diary likes state 接口", async () => {
+        const fetchImpl = vi.fn().mockResolvedValue(
+            new Response(
+                JSON.stringify({
+                    ok: true,
+                    diary_id: "diary-1",
+                    liked: true,
+                }),
+            ),
+        );
+
+        const result = await loadViewerLikeState({
+            contentType: "diary",
+            contentId: "diary-1",
+            authState: createLoggedInState(),
+            fetchImpl,
+        });
+
+        expect(result).toBe(true);
+        expect(fetchImpl).toHaveBeenCalledWith(
+            "/api/v1/me/diary-likes/state/diary-1",
+            expect.objectContaining({
+                method: "GET",
+                cache: "no-store",
+            }),
+        );
     });
 });

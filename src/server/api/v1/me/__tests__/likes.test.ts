@@ -324,6 +324,111 @@ describe("GET /me/article-likes/state/:articleId", () => {
     });
 });
 
+describe("GET /me/diary-likes/state/:diaryId", () => {
+    it("当前用户已点赞时返回 liked=true", async () => {
+        mockedReadMany.mockResolvedValueOnce([{ id: "like-1" }] as never);
+
+        const context = createMockAPIContext({
+            method: "GET",
+            url: "http://localhost:4321/api/v1/me/diary-likes/state/diary-1",
+        });
+        const access = createMemberAccess();
+
+        const response = await handleMeDiaryLikes(
+            context as unknown as APIContext,
+            access,
+            ["diary-likes", "state", "diary-1"],
+        );
+        const body = await parseResponseJson<{
+            ok: boolean;
+            diary_id: string;
+            liked: boolean;
+        }>(response);
+
+        expect(response.status).toBe(200);
+        expect(body.ok).toBe(true);
+        expect(body.diary_id).toBe("diary-1");
+        expect(body.liked).toBe(true);
+        expect(mockedReadMany).toHaveBeenCalledWith(
+            "app_diary_likes",
+            expect.objectContaining({
+                fields: ["id"],
+                limit: 1,
+            }),
+        );
+    });
+
+    it("当前用户未点赞时返回 liked=false", async () => {
+        mockedReadMany.mockResolvedValueOnce([] as never);
+
+        const context = createMockAPIContext({
+            method: "GET",
+            url: "http://localhost:4321/api/v1/me/diary-likes/state/diary-1",
+        });
+
+        const response = await handleMeDiaryLikes(
+            context as unknown as APIContext,
+            createMemberAccess(),
+            ["diary-likes", "state", "diary-1"],
+        );
+        const body = await parseResponseJson<{
+            ok: boolean;
+            liked: boolean;
+        }>(response);
+
+        expect(response.status).toBe(200);
+        expect(body.ok).toBe(true);
+        expect(body.liked).toBe(false);
+    });
+
+    it("非法路径返回 404", async () => {
+        const context = createMockAPIContext({
+            method: "GET",
+            url: "http://localhost:4321/api/v1/me/diary-likes/state",
+        });
+
+        const response = await handleMeDiaryLikes(
+            context as unknown as APIContext,
+            createMemberAccess(),
+            ["diary-likes", "state"],
+        );
+
+        expect(response.status).toBe(404);
+    });
+
+    it("非法方法返回 405", async () => {
+        const context = createMockAPIContext({
+            method: "POST",
+            url: "http://localhost:4321/api/v1/me/diary-likes/state/diary-1",
+        });
+
+        const response = await handleMeDiaryLikes(
+            context as unknown as APIContext,
+            createMemberAccess(),
+            ["diary-likes", "state", "diary-1"],
+        );
+
+        expect(response.status).toBe(405);
+    });
+
+    it("未登录通过 me 路由访问时返回 401", async () => {
+        getSessionUserMock.mockResolvedValueOnce(null);
+
+        const context = createMockAPIContext({
+            method: "GET",
+            url: "http://localhost:4321/api/v1/me/diary-likes/state/diary-1",
+        });
+
+        const response = await handleMe(context as unknown as APIContext, [
+            "diary-likes",
+            "state",
+            "diary-1",
+        ]);
+
+        expect(response.status).toBe(401);
+    });
+});
+
 describe("点赞记录查询字段最小化", () => {
     it("四类 POST 点赞查询都只请求 id/status 字段", async () => {
         const access = createMemberAccess();
