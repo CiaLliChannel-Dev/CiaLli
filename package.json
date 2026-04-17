@@ -1,7 +1,7 @@
 {
-  "name": "@ciallichannel/cialli",
+  "name": "@cialli-dev/cialli-channel",
   "type": "module",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
