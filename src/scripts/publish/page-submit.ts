@@ -14,6 +14,8 @@ import { ARTICLE_TITLE_MAX, weightedCharLength } from "@/constants/text-limits";
 import I18nKey from "@/i18n/i18nKey";
 import { requestApi as api } from "@/scripts/shared/http-client";
 import { t, tFmt } from "@/scripts/shared/i18n-runtime";
+import { buildArticleDetailSuccessRedirectUrl } from "@/scripts/shared/editor-save-redirect";
+import { navigateToPage } from "@/utils/navigation-utils";
 import { buildOwnerArticlePasswordStorageKeys } from "@/utils/protected-content";
 import {
     type PendingUpload,
@@ -415,23 +417,22 @@ export async function handleSubmitApiResponse(
     );
     ui.setSubmitError("");
 
-    if (
-        options.redirectOnSuccess === false ||
-        options.targetStatus === "draft"
-    ) {
+    if (options.redirectOnSuccess === false) {
         return;
     }
 
-    if (item) {
-        const slug = toStringValue(item.slug);
-        const shortId = toStringValue(item.short_id);
-        if (slug) {
-            window.location.href = `/posts/${encodeURIComponent(slug)}`;
-            return;
-        }
-        if (shortId) {
-            window.location.href = `/posts/${encodeURIComponent(shortId)}`;
-        }
+    const successRedirectUrl =
+        options.successRedirectUrl ||
+        buildArticleDetailSuccessRedirectUrl({
+            id: nextId,
+            short_id: nextShortId || state.currentItemShortId,
+            slug: item?.slug,
+        });
+    if (successRedirectUrl) {
+        navigateToPage(successRedirectUrl, {
+            force: true,
+            replace: true,
+        });
     }
 }
 
@@ -478,6 +479,7 @@ export type SubmitDeps = {
 
 export type SubmitOptions = {
     redirectOnSuccess?: boolean;
+    successRedirectUrl?: string;
     targetStatus?: "draft" | "published";
 };
 

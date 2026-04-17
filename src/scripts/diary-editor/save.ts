@@ -6,6 +6,7 @@ import {
     updateTask,
     type ProgressTaskHandle,
 } from "@/scripts/shared/progress-overlay-manager";
+import { buildDiaryDetailSuccessRedirectUrl } from "@/scripts/shared/editor-save-redirect";
 import { navigateToPage } from "@/utils/navigation-utils";
 import {
     api,
@@ -50,6 +51,7 @@ export type SaveDiaryContext = {
 
 export type ExecuteSaveDiaryOptions = {
     redirectOnSuccess?: boolean;
+    successRedirectUrl?: string;
     targetStatus?: "draft" | "published";
 };
 
@@ -211,12 +213,6 @@ async function runSaveDiaryCore(
         }
 
         const { id, shortId } = saveResult;
-        const targetId = shortId || id;
-        if (!targetId) {
-            ctx.setSubmitError(t(I18nKey.diaryEditorSaveMissingDiaryId));
-            ctx.setSubmitMessage("");
-            return false;
-        }
 
         ctx.setCurrentDiaryId(id);
         ctx.setCurrentStatus(targetStatus);
@@ -242,12 +238,17 @@ async function runSaveDiaryCore(
                       ? t(I18nKey.diaryEditorSaveSuccessRedirecting)
                       : t(I18nKey.diaryEditorPublishSuccessRedirecting),
             );
-            if (targetStatus === "published") {
-                navigateToPage(
-                    `/${ctx.username}/diary/${encodeURIComponent(targetId)}`,
-                    { force: true },
-                );
-            }
+            navigateToPage(
+                options.successRedirectUrl ||
+                    buildDiaryDetailSuccessRedirectUrl(ctx.username, {
+                        id,
+                        short_id: shortId,
+                    }),
+                {
+                    force: true,
+                    replace: true,
+                },
+            );
         }
         return true;
     } catch (error) {
