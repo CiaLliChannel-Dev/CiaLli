@@ -18,8 +18,6 @@ import {
   POSTS_PER_PAGE,
 } from "@/scripts/articles/list-filter-helpers";
 
-export const prerender = false;
-
 const articleListInput = parsePublicArticleListInput(Astro.url, {
   defaultLimit: POSTS_PER_PAGE,
   maxLimit: POSTS_PER_PAGE,

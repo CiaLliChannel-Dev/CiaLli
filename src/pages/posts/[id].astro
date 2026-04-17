@@ -55,8 +55,6 @@ import {
 } from "@/utils/date-utils";
 import DetailActionFloat from "@components/control/DetailActionFloat.astro";
 
-export const prerender = false;
-
 const rawId = (Astro.params.id || "").replace(/^\/+|\/+$/g, "");
 
 let article: {

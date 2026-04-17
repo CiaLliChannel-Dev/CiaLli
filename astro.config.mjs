@@ -29,7 +29,8 @@ export default defineConfig({
         allowedDomains: [{ hostname: _siteHostname }],
     },
 
-    output: "static",
+    // server 模式只改变默认渲染策略；静态例外继续由显式 prerender 控制。
+    output: "server",
     adapter: vercel({
         // 启用 Vercel Image Optimization
         imageService: true,
