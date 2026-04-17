@@ -12,7 +12,7 @@ import {
   parsePublicArticleListInput,
   UNCATEGORIZED_ARTICLE_CATEGORY,
 } from "@/server/application/public/articles.service";
-import type { HomeFeedPageItem } from "@/server/recommendation/home-feed.types";
+import type { FeedPageItem } from "@/server/application/feed/feed.types";
 import {
   buildPageNumbers,
   POSTS_PER_PAGE,
@@ -29,7 +29,7 @@ const [{ items, page, limit, total }, taxonomy] = await Promise.all([
   getPublicArticleTaxonomyData(),
 ]);
 
-const articleListFeedItems: HomeFeedPageItem[] = items.map((entry) => ({
+const articleListFeedItems: FeedPageItem[] = items.map((entry) => ({
   type: "article",
   id: entry.data.article_id,
   authorId: entry.data.author_id,

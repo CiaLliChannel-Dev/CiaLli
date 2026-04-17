@@ -279,7 +279,7 @@ async function handleArticlesCreate(
             cacheManager.invalidateByDomain("article-list"),
             cacheManager.invalidateByDomain("article-taxonomy"),
             cacheManager.invalidateByDomain("article-public"),
-            cacheManager.invalidateByDomain("home-feed"),
+            cacheManager.invalidateByDomain("mixed-feed"),
         ],
         { label: "me/articles#create" },
     );
@@ -633,7 +633,7 @@ async function handleWorkingDraftPut(
                 cacheManager.invalidateByDomain("article-list"),
                 cacheManager.invalidateByDomain("article-taxonomy"),
                 cacheManager.invalidateByDomain("article-public"),
-                cacheManager.invalidateByDomain("home-feed"),
+                cacheManager.invalidateByDomain("mixed-feed"),
             ],
             { label: "me/articles#working-draft#create" },
         );
@@ -666,7 +666,7 @@ async function handleWorkingDraftPut(
             cacheManager.invalidateByDomain("article-taxonomy"),
             cacheManager.invalidateByDomain("article-public"),
             cacheManager.invalidate("article-detail", target.id),
-            cacheManager.invalidateByDomain("home-feed"),
+            cacheManager.invalidateByDomain("mixed-feed"),
         ],
         { label: "me/articles#working-draft#update" },
     );
@@ -730,7 +730,7 @@ async function handleArticlePatch(
             cacheManager.invalidateByDomain("article-taxonomy"),
             cacheManager.invalidateByDomain("article-public"),
             cacheManager.invalidate("article-detail", id),
-            cacheManager.invalidateByDomain("home-feed"),
+            cacheManager.invalidateByDomain("mixed-feed"),
         ],
         { label: "me/articles#patch" },
     );
@@ -767,7 +767,7 @@ async function handleArticleDelete(
             cacheManager.invalidateByDomain("article-taxonomy"),
             cacheManager.invalidateByDomain("article-public"),
             cacheManager.invalidate("article-detail", id),
-            cacheManager.invalidateByDomain("home-feed"),
+            cacheManager.invalidateByDomain("mixed-feed"),
         ],
         { label: "me/articles#delete" },
     );

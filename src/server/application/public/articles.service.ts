@@ -24,7 +24,7 @@ import {
 import {
     buildArticleFeedEntry,
     normalizeIdentity,
-} from "@/server/recommendation/home-feed-helpers";
+} from "@/server/application/feed/feed-entry-helpers";
 import { buildPostUrl } from "@/utils/content-post-helpers";
 import type { DirectusPostEntry } from "@/utils/content-utils";
 
