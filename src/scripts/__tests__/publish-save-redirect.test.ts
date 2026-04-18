@@ -33,15 +33,10 @@ describe("publish save redirect", () => {
             },
         );
 
-        expect(navigateToPage).toHaveBeenCalledWith(
-            expect.stringMatching(
-                new RegExp(`^/posts\\?${EDITOR_SAVE_FRESHNESS_PARAM}=`),
-            ),
-            {
-                force: true,
-                replace: true,
-            },
-        );
+        expect(navigateToPage).toHaveBeenCalledWith("/posts", {
+            force: true,
+            replace: true,
+        });
     });
 
     it("文章发布和保存修改成功后进入文章详情页", async () => {

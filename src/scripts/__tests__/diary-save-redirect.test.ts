@@ -68,15 +68,10 @@ describe("diary save redirect", () => {
             targetStatus: "draft",
         });
 
-        expect(navigateToPage).toHaveBeenCalledWith(
-            expect.stringMatching(
-                new RegExp(`^/alice/diary\\?${EDITOR_SAVE_FRESHNESS_PARAM}=`),
-            ),
-            {
-                force: true,
-                replace: true,
-            },
-        );
+        expect(navigateToPage).toHaveBeenCalledWith("/alice/diary", {
+            force: true,
+            replace: true,
+        });
     });
 
     it("日记发布和保存修改成功后进入日记详情页", async () => {

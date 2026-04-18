@@ -55,6 +55,36 @@ type OwnedArticleRecord = JsonObject & {
     short_id?: string | null;
 };
 
+type ArticleDetailInvalidationTarget = {
+    id?: unknown;
+    short_id?: unknown;
+    slug?: unknown;
+};
+
+function addArticleDetailInvalidationKey(
+    keys: Set<string>,
+    value: unknown,
+): void {
+    const key = String(value ?? "").trim();
+    if (key) {
+        keys.add(key);
+    }
+}
+
+function buildArticleDetailInvalidationTasks(
+    ...targets: ArticleDetailInvalidationTarget[]
+): Array<Promise<void>> {
+    const keys = new Set<string>();
+    for (const target of targets) {
+        addArticleDetailInvalidationKey(keys, target.id);
+        addArticleDetailInvalidationKey(keys, target.short_id);
+        addArticleDetailInvalidationKey(keys, target.slug);
+    }
+    return Array.from(keys, (key) =>
+        cacheManager.invalidate("article-detail", key),
+    );
+}
+
 function normalizeArticleStatus(
     value: unknown,
 ): "draft" | "published" | "archived" {
@@ -279,6 +309,7 @@ async function handleArticlesCreate(
             cacheManager.invalidateByDomain("article-list"),
             cacheManager.invalidateByDomain("article-taxonomy"),
             cacheManager.invalidateByDomain("article-public"),
+            ...buildArticleDetailInvalidationTasks(created),
             cacheManager.invalidateByDomain("mixed-feed"),
         ],
         { label: "me/articles#create" },
@@ -633,6 +664,7 @@ async function handleWorkingDraftPut(
                 cacheManager.invalidateByDomain("article-list"),
                 cacheManager.invalidateByDomain("article-taxonomy"),
                 cacheManager.invalidateByDomain("article-public"),
+                ...buildArticleDetailInvalidationTasks(created),
                 cacheManager.invalidateByDomain("mixed-feed"),
             ],
             { label: "me/articles#working-draft#create" },
@@ -665,7 +697,7 @@ async function handleWorkingDraftPut(
             cacheManager.invalidateByDomain("article-list"),
             cacheManager.invalidateByDomain("article-taxonomy"),
             cacheManager.invalidateByDomain("article-public"),
-            cacheManager.invalidate("article-detail", target.id),
+            ...buildArticleDetailInvalidationTasks(target, updated),
             cacheManager.invalidateByDomain("mixed-feed"),
         ],
         { label: "me/articles#working-draft#update" },
@@ -729,7 +761,7 @@ async function handleArticlePatch(
             cacheManager.invalidateByDomain("article-list"),
             cacheManager.invalidateByDomain("article-taxonomy"),
             cacheManager.invalidateByDomain("article-public"),
-            cacheManager.invalidate("article-detail", id),
+            ...buildArticleDetailInvalidationTasks(target, updated),
             cacheManager.invalidateByDomain("mixed-feed"),
         ],
         { label: "me/articles#patch" },
@@ -766,7 +798,7 @@ async function handleArticleDelete(
             cacheManager.invalidateByDomain("article-list"),
             cacheManager.invalidateByDomain("article-taxonomy"),
             cacheManager.invalidateByDomain("article-public"),
-            cacheManager.invalidate("article-detail", id),
+            ...buildArticleDetailInvalidationTasks(target),
             cacheManager.invalidateByDomain("mixed-feed"),
         ],
         { label: "me/articles#delete" },

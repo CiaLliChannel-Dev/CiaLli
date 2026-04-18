@@ -80,6 +80,62 @@ describe("detail-page-access.service", () => {
         expect(loadPublicDetail).not.toHaveBeenCalled();
     });
 
+    it("保存后新鲜读取 owner 未命中时回退 public 详情", async () => {
+        const loadPublicDetail = vi.fn().mockResolvedValue(
+            createDetail({
+                title: "公开标题",
+            }),
+        );
+
+        const result = await resolveDetailPageAccess({
+            routeId: "post-1",
+            preferOwner: true,
+            loadPublicDetail,
+            loadSessionUser: vi.fn().mockResolvedValue({
+                id: "author-1",
+            }),
+            getSessionAccessToken: vi.fn().mockReturnValue("token"),
+            loadOwnerDetail: vi.fn().mockResolvedValue(null),
+        });
+
+        expect(result).toMatchObject({
+            mode: "public",
+            cacheScope: "public",
+            detail: {
+                title: "公开标题",
+            },
+        });
+        expect(loadPublicDetail).toHaveBeenCalledWith("post-1");
+    });
+
+    it("保存后新鲜读取 owner 不属于当前用户时回退 public 详情", async () => {
+        const loadPublicDetail = vi.fn().mockResolvedValue(
+            createDetail({
+                title: "公开标题",
+            }),
+        );
+
+        const result = await resolveDetailPageAccess({
+            routeId: "post-1",
+            preferOwner: true,
+            loadPublicDetail,
+            loadSessionUser: vi.fn().mockResolvedValue({
+                id: "viewer-1",
+            }),
+            getSessionAccessToken: vi.fn().mockReturnValue("token"),
+            loadOwnerDetail: vi.fn().mockResolvedValue(createDetail()),
+        });
+
+        expect(result).toMatchObject({
+            mode: "public",
+            cacheScope: "public",
+            detail: {
+                title: "公开标题",
+            },
+        });
+        expect(loadPublicDetail).toHaveBeenCalledWith("post-1");
+    });
+
     it("普通详情请求保持 public-first 行为", async () => {
         const loadOwnerDetail = vi.fn();
 
