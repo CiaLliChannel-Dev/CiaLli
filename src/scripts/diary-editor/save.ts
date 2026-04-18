@@ -8,6 +8,7 @@ import {
 } from "@/scripts/shared/progress-overlay-manager";
 import { buildDiaryDetailSuccessRedirectUrl } from "@/scripts/shared/editor-save-redirect";
 import { navigateToPage } from "@/utils/navigation-utils";
+import { appendEditorSaveFreshnessParam } from "@/utils/editor-save-freshness";
 import {
     api,
     getApiMessage,
@@ -239,11 +240,16 @@ async function runSaveDiaryCore(
                       : t(I18nKey.diaryEditorPublishSuccessRedirecting),
             );
             navigateToPage(
-                options.successRedirectUrl ||
-                    buildDiaryDetailSuccessRedirectUrl(ctx.username, {
-                        id,
-                        short_id: shortId,
-                    }),
+                options.successRedirectUrl
+                    ? appendEditorSaveFreshnessParam(options.successRedirectUrl)
+                    : buildDiaryDetailSuccessRedirectUrl(
+                          ctx.username,
+                          {
+                              id,
+                              short_id: shortId,
+                          },
+                          { fresh: true },
+                      ),
                 {
                     force: true,
                     replace: true,

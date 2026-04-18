@@ -5,6 +5,7 @@ import {
     buildArticleDetailSuccessRedirectUrl,
     buildDiarySaveSuccessRedirectUrl,
 } from "@/scripts/shared/editor-save-redirect";
+import { EDITOR_SAVE_FRESHNESS_PARAM } from "@/utils/editor-save-freshness";
 
 const navigateToPage = vi.fn();
 
@@ -32,10 +33,15 @@ describe("publish save redirect", () => {
             },
         );
 
-        expect(navigateToPage).toHaveBeenCalledWith("/posts", {
-            force: true,
-            replace: true,
-        });
+        expect(navigateToPage).toHaveBeenCalledWith(
+            expect.stringMatching(
+                new RegExp(`^/posts\\?${EDITOR_SAVE_FRESHNESS_PARAM}=`),
+            ),
+            {
+                force: true,
+                replace: true,
+            },
+        );
     });
 
     it("文章发布和保存修改成功后进入文章详情页", async () => {
@@ -71,16 +77,28 @@ describe("publish save redirect", () => {
         expect(navigateToPage).toHaveBeenCalledTimes(2);
         expect(navigateToPage).toHaveBeenNthCalledWith(
             1,
-            "/posts/published%20post",
+            expect.stringMatching(
+                new RegExp(
+                    `^/posts/published%20post\\?${EDITOR_SAVE_FRESHNESS_PARAM}=`,
+                ),
+            ),
             {
                 force: true,
                 replace: true,
             },
         );
-        expect(navigateToPage).toHaveBeenNthCalledWith(2, "/posts/post-short", {
-            force: true,
-            replace: true,
-        });
+        expect(navigateToPage).toHaveBeenNthCalledWith(
+            2,
+            expect.stringMatching(
+                new RegExp(
+                    `^/posts/post-short\\?${EDITOR_SAVE_FRESHNESS_PARAM}=`,
+                ),
+            ),
+            {
+                force: true,
+                replace: true,
+            },
+        );
     });
 
     it("文章未保存守卫保存路径不触发列表跳转", async () => {

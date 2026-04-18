@@ -12,6 +12,7 @@ import {
   parsePublicArticleListInput,
   UNCATEGORIZED_ARTICLE_CATEGORY,
 } from "@/server/application/public/articles.service";
+import { hasEditorSaveFreshnessParam } from "@/utils/editor-save-freshness";
 import type { FeedPageItem } from "@/server/application/feed/feed.types";
 import {
   buildPageNumbers,
@@ -21,12 +22,14 @@ import {
 const articleListInput = parsePublicArticleListInput(Astro.url, {
   defaultLimit: POSTS_PER_PAGE,
   maxLimit: POSTS_PER_PAGE,
+  bypassCache: hasEditorSaveFreshnessParam(Astro.url),
 });
+const bypassArticleListCache = articleListInput.bypassCache === true;
 const uncategorizedLabel = i18n(I18nKey.contentUncategorized);
 
 const [{ items, page, limit, total }, taxonomy] = await Promise.all([
   getPublicArticleListData(articleListInput),
-  getPublicArticleTaxonomyData(),
+  getPublicArticleTaxonomyData({ bypassCache: bypassArticleListCache }),
 ]);
 
 const articleListFeedItems: FeedPageItem[] = items.map((entry) => ({
@@ -72,7 +75,9 @@ if (articleListInput.q) {
 
 Astro.response.headers.set(
   "Cache-Control",
-  "public, s-maxage=300, stale-while-revalidate=900",
+  bypassArticleListCache
+    ? "private, no-store"
+    : "public, s-maxage=300, stale-while-revalidate=900",
 );
 ---
 

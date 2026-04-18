@@ -4,6 +4,7 @@ import {
     buildDiaryDetailSuccessRedirectUrl,
     buildDiarySaveSuccessRedirectUrl,
 } from "@/scripts/shared/editor-save-redirect";
+import { EDITOR_SAVE_FRESHNESS_PARAM } from "@/utils/editor-save-freshness";
 
 const navigateToPage = vi.fn();
 const materializePendingUploads = vi.fn();
@@ -67,10 +68,15 @@ describe("diary save redirect", () => {
             targetStatus: "draft",
         });
 
-        expect(navigateToPage).toHaveBeenCalledWith("/alice/diary", {
-            force: true,
-            replace: true,
-        });
+        expect(navigateToPage).toHaveBeenCalledWith(
+            expect.stringMatching(
+                new RegExp(`^/alice/diary\\?${EDITOR_SAVE_FRESHNESS_PARAM}=`),
+            ),
+            {
+                force: true,
+                replace: true,
+            },
+        );
     });
 
     it("日记发布和保存修改成功后进入日记详情页", async () => {
@@ -93,7 +99,11 @@ describe("diary save redirect", () => {
         expect(navigateToPage).toHaveBeenCalledTimes(2);
         expect(navigateToPage).toHaveBeenNthCalledWith(
             1,
-            "/alice/diary/diary-short",
+            expect.stringMatching(
+                new RegExp(
+                    `^/alice/diary/diary-short\\?${EDITOR_SAVE_FRESHNESS_PARAM}=`,
+                ),
+            ),
             {
                 force: true,
                 replace: true,
@@ -101,7 +111,11 @@ describe("diary save redirect", () => {
         );
         expect(navigateToPage).toHaveBeenNthCalledWith(
             2,
-            "/alice/diary/diary-short",
+            expect.stringMatching(
+                new RegExp(
+                    `^/alice/diary/diary-short\\?${EDITOR_SAVE_FRESHNESS_PARAM}=`,
+                ),
+            ),
             {
                 force: true,
                 replace: true,

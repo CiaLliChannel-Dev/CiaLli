@@ -16,6 +16,7 @@ import { requestApi as api } from "@/scripts/shared/http-client";
 import { t, tFmt } from "@/scripts/shared/i18n-runtime";
 import { buildArticleDetailSuccessRedirectUrl } from "@/scripts/shared/editor-save-redirect";
 import { navigateToPage } from "@/utils/navigation-utils";
+import { appendEditorSaveFreshnessParam } from "@/utils/editor-save-freshness";
 import { buildOwnerArticlePasswordStorageKeys } from "@/utils/protected-content";
 import {
     type PendingUpload,
@@ -421,13 +422,16 @@ export async function handleSubmitApiResponse(
         return;
     }
 
-    const successRedirectUrl =
-        options.successRedirectUrl ||
-        buildArticleDetailSuccessRedirectUrl({
-            id: nextId,
-            short_id: nextShortId || state.currentItemShortId,
-            slug: item?.slug,
-        });
+    const successRedirectUrl = options.successRedirectUrl
+        ? appendEditorSaveFreshnessParam(options.successRedirectUrl)
+        : buildArticleDetailSuccessRedirectUrl(
+              {
+                  id: nextId,
+                  short_id: nextShortId || state.currentItemShortId,
+                  slug: item?.slug,
+              },
+              { fresh: true },
+          );
     if (successRedirectUrl) {
         navigateToPage(successRedirectUrl, {
             force: true,
